@@ -1,0 +1,154 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Shopkeeper profile, onboarding state, theme, language, and security preferences.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "mobileNumber": { "type": "string", "minLength": 0, "maxLength": 20 },
+        "language": {
+          "type": "string",
+          "enum": ["en", "hi", "hinglish", "mr", "gu", "ta", "te", "pa", "ml", "kn", "bn"]
+        },
+        "accentTheme": { "type": "string", "enum": ["green", "crimson"] },
+        "appearance": { "type": "string", "enum": ["light", "dark", "system"] },
+        "activeBusinessId": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "appLockPin": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "onboardingDone": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "mobileNumber", "language", "accentTheme", "appearance", "activeBusinessId", "onboardingDone", "createdAt", "updatedAt"]
+    },
+    "Business": {
+      "title": "Business",
+      "description": "Shop or business profile with GST, business card details, and UPI VPA.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "phone": { "type": "string", "minLength": 0, "maxLength": 20 },
+        "gstNumber": { "type": "string", "minLength": 0, "maxLength": 24 },
+        "businessType": { "type": "string", "minLength": 0, "maxLength": 60 },
+        "category": { "type": "string", "minLength": 0, "maxLength": 60 },
+        "address": { "type": "string", "minLength": 0, "maxLength": 240 },
+        "email": { "type": "string", "minLength": 0, "maxLength": 120 },
+        "about": { "type": "string", "minLength": 0, "maxLength": 300 },
+        "upiId": { "type": "string", "minLength": 0, "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "name", "phone", "gstNumber", "businessType", "category", "address", "email", "about", "upiId", "createdAt", "updatedAt"]
+    },
+    "LedgerAccount": {
+      "title": "LedgerAccount",
+      "description": "Customer or supplier khata account belonging to a business.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "businessId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "kind": { "type": "string", "enum": ["customer", "supplier"] },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "phone": { "type": "string", "minLength": 0, "maxLength": 20 },
+        "dueDate": { "type": "string", "minLength": 0, "maxLength": 24 },
+        "creditLimit": { "type": "number" },
+        "balance": { "type": "number" },
+        "lastNote": { "type": "string", "minLength": 0, "maxLength": 160 },
+        "lastActivityAt": { "type": "string", "minLength": 0, "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "businessId", "kind", "name", "phone", "dueDate", "balance", "lastNote", "lastActivityAt", "createdAt", "updatedAt"]
+    },
+    "LedgerTransaction": {
+      "title": "LedgerTransaction",
+      "description": "Individual credit (given) or debit (received) entry in an account ledger.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "businessId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "accountId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "direction": { "type": "string", "enum": ["given", "received"] },
+        "amount": { "type": "number" },
+        "note": { "type": "string", "minLength": 0, "maxLength": 240 },
+        "billDate": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "voiceRaw": { "type": "string", "minLength": 0, "maxLength": 300 },
+        "billImage": { "type": "string", "minLength": 0, "maxLength": 150000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "businessId", "accountId", "direction", "amount", "note", "billDate", "voiceRaw", "billImage", "createdAt", "updatedAt"]
+    },
+    "BillDocument": {
+      "title": "BillDocument",
+      "description": "Customer bill or quote with line items and GST calculation.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "businessId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "docType": { "type": "string", "enum": ["bill", "quote"] },
+        "billNumber": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "customerPhone": { "type": "string", "minLength": 0, "maxLength": 20 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "totalGst": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["paid", "unpaid", "partial"] },
+        "linkedTxId": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "templateId": { "type": "string", "enum": ["classic", "modern", "gst-color", "thermal-58"] },
+        "notes": { "type": "string", "minLength": 0, "maxLength": 240 },
+        "billDate": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "businessId", "docType", "billNumber", "customerName", "customerPhone", "items", "subtotal", "totalGst", "totalAmount", "templateId", "notes", "billDate", "createdAt", "updatedAt"]
+    },
+    "StockItem": {
+      "title": "StockItem",
+      "description": "Shop inventory product item with unit price and stock quantity.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "businessId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 24 },
+        "salePrice": { "type": "number" },
+        "purchasePrice": { "type": "number" },
+        "quantity": { "type": "number" },
+        "lowStockThreshold": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "businessId", "name", "unit", "salePrice", "quantity", "lowStockThreshold", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner-only user profile, theme, language, and PIN settings."
+    },
+    "/businesses/{businessId}": {
+      "schema": { "$ref": "#/entities/Business" },
+      "description": "Businesses owned by an authenticated user."
+    },
+    "/accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/LedgerAccount" },
+      "description": "Customer and supplier accounts linked to an owner and business."
+    },
+    "/transactions/{txId}": {
+      "schema": { "$ref": "#/entities/LedgerTransaction" },
+      "description": "Ledger transactions linked to an owner, business, and account."
+    },
+    "/bills/{billId}": {
+      "schema": { "$ref": "#/entities/BillDocument" },
+      "description": "Bills and quotes created by a business owner."
+    },
+    "/stockItems/{itemId}": {
+      "schema": { "$ref": "#/entities/StockItem" },
+      "description": "Inventory items managed by a business owner."
+    }
+  }
+}

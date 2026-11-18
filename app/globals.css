@@ -1,0 +1,96 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --brand: #008037;
+  --brand-hover: #006B2E;
+  --brand-tint: #E8F5EE;
+  --brand-soft: rgba(0, 128, 55, 0.14);
+  --app-bg: #F6F8F7;
+  --credit-red: #C62828;
+  --credit-tint: #FEECEC;
+  --debit-green: #1B8A4B;
+  --debit-tint: #E8F5EE;
+}
+
+:root[data-accent="crimson"] {
+  --brand: #9A1B1E;
+  --brand-hover: #7F1518;
+  --brand-tint: #FCECEC;
+  --brand-soft: rgba(154, 27, 30, 0.14);
+  --app-bg: #F9F6F0;
+}
+
+.dark {
+  --brand-tint: rgba(0, 128, 55, 0.18);
+  --app-bg: #0D1210;
+  --credit-tint: rgba(198, 40, 40, 0.18);
+  --debit-tint: rgba(27, 138, 75, 0.18);
+}
+
+.dark[data-accent="crimson"] {
+  --brand-tint: rgba(154, 27, 30, 0.22);
+  --app-bg: #141010;
+}
+
+body {
+  background-color: var(--app-bg);
+  font-family: var(--font-sans), var(--font-devanagari), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-tabular {
+  font-family: var(--font-mono), var(--font-sans), monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes voicePulse {
+  0%, 100% {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16), 0 0 0 0 var(--brand-soft);
+  }
+  50% {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2), 0 0 0 10px rgba(0, 0, 0, 0);
+  }
+}
+
+.voice-fab-pulse {
+  animation: voicePulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-fab-pulse {
+    animation: none;
+  }
+}
+
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+@media print {
+  @page {
+    margin: 10mm;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  body.printing-bill * {
+    visibility: hidden;
+  }
+  body.printing-bill .print-area,
+  body.printing-bill .print-area * {
+    visibility: visible;
+  }
+  body.printing-bill .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}

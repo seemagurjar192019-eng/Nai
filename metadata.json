@@ -1,0 +1,6 @@
+{
+  "name": "BolBahi",
+  "description": "Voice-first offline Hinglish khata ledger PWA for Indian shopkeepers.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
