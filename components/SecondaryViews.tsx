@@ -8,6 +8,7 @@ import {
   Bell,
   BookOpen,
   Building2,
+  Camera,
   Check,
   CreditCard,
   Database,
@@ -33,6 +34,8 @@ import {
   Trash2,
   Upload,
   User,
+  UserCheck,
+  Wallet,
   X,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -60,21 +63,19 @@ export type SecondaryRoute =
   | 'business-profile'
   | 'account-summary'
   | 'multi-device'
-  | 'help-support';
+  | 'help-support'
+  | 'galla'
+  | 'staff-audit';
 
 interface MoreDrawerProps {
   open: boolean;
   onClose: () => void;
   onNavigate: (
-    target: SecondaryRoute | 'bills' | 'stock' | 'collection'
+    target: SecondaryRoute | 'bills' | 'stock' | 'collection' | 'scan-parchi'
   ) => void;
 }
 
-export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
-  open,
-  onClose,
-  onNavigate,
-}) => {
+export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({ open, onClose, onNavigate }) => {
   if (!open) return null;
 
   return (
@@ -84,11 +85,9 @@ export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
       aria-label="More options"
       className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
     >
-      <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+      <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-5 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-            More
-          </h2>
+          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">More</h2>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -96,7 +95,7 @@ export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
                 onClose();
                 onNavigate('settings');
               }}
-              className="min-h-[40px] px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold inline-flex items-center gap-1.5"
+              className="min-h-[40px] px-3 rounded-xl bg-black/5 dark:bg-white/10 text-xs font-bold inline-flex items-center gap-1.5"
             >
               <Palette className="w-4 h-4 text-[var(--brand)]" />
               <span>Settings</span>
@@ -105,14 +104,14 @@ export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Close more menu"
-              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500 hover:bg-black/5 dark:hover:bg-white/10"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Primary 3 Tiles matching OkCredit */}
+        {/* Primary 3 Tiles */}
         <div className="grid grid-cols-3 gap-3">
           <button
             type="button"
@@ -120,7 +119,7 @@ export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
               onClose();
               onNavigate('account-summary');
             }}
-            className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-800 p-4 flex flex-col items-center gap-2 text-center hover:border-[var(--brand)] transition"
+            className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 flex flex-col items-center gap-2 text-center hover:border-[var(--brand)] transition"
           >
             <span className="w-10 h-10 rounded-full bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
               <User className="w-5 h-5" />
@@ -134,7 +133,7 @@ export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
               onClose();
               onNavigate('business-profile');
             }}
-            className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-800 p-4 flex flex-col items-center gap-2 text-center hover:border-[var(--brand)] transition"
+            className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 flex flex-col items-center gap-2 text-center hover:border-[var(--brand)] transition"
           >
             <span className="w-10 h-10 rounded-full bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
               <Store className="w-5 h-5" />
@@ -148,7 +147,7 @@ export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
               onClose();
               onNavigate('help-support');
             }}
-            className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-800 p-4 flex flex-col items-center gap-2 text-center hover:border-[var(--brand)] transition"
+            className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 flex flex-col items-center gap-2 text-center hover:border-[var(--brand)] transition"
           >
             <span className="w-10 h-10 rounded-full bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
               <HelpCircle className="w-5 h-5" />
@@ -160,16 +159,64 @@ export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
         {/* Business Tools Grid */}
         <div className="space-y-2.5">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Grow &amp; Manage Business
+            Ucred Power Tools
           </p>
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => {
                 onClose();
+                onNavigate('galla');
+              }}
+              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
+            >
+              <Wallet className="w-5 h-5 text-[var(--brand)] shrink-0" />
+              <span className="text-sm font-bold">Galla Cashbook</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onNavigate('scan-parchi');
+              }}
+              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
+            >
+              <Camera className="w-5 h-5 text-[var(--brand)] shrink-0" />
+              <span className="text-sm font-bold">Scan Parchi (AI)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onNavigate('staff-audit');
+              }}
+              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
+            >
+              <UserCheck className="w-5 h-5 text-[var(--brand)] shrink-0" />
+              <span className="text-sm font-bold">Staff &amp; Audit Log</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onNavigate('stock');
+              }}
+              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
+            >
+              <Package className="w-5 h-5 text-[var(--brand)] shrink-0" />
+              <span className="text-sm font-bold">Stock Inventory</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
                 onNavigate('bills');
               }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
+              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
             >
               <Receipt className="w-5 h-5 text-[var(--brand)] shrink-0" />
               <span className="text-sm font-bold">Bills &amp; Quotes</span>
@@ -179,21 +226,9 @@ export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
               type="button"
               onClick={() => {
                 onClose();
-                onNavigate('stock');
-              }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
-            >
-              <Package className="w-5 h-5 text-[var(--brand)] shrink-0" />
-              <span className="text-sm font-bold">Stock Management</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
                 onNavigate('collection');
               }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
+              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
             >
               <MessageCircle className="w-5 h-5 text-[var(--brand)] shrink-0" />
               <span className="text-sm font-bold">1-Click Vasooli</span>
@@ -205,7 +240,7 @@ export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
                 onClose();
                 onNavigate('multi-device');
               }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
+              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
             >
               <Laptop className="w-5 h-5 text-[var(--brand)] shrink-0" />
               <span className="text-sm font-bold">Multi Device Sync</span>
@@ -217,21 +252,21 @@ export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({
                 onClose();
                 onNavigate('settings');
               }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
+              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
             >
               <Lock className="w-5 h-5 text-[var(--brand)] shrink-0" />
               <span className="text-sm font-bold">App PIN &amp; Theme</span>
             </button>
-
-            <Link
-              href="/privacy"
-              onClick={onClose}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
-            >
-              <ShieldCheck className="w-5 h-5 text-[var(--brand)] shrink-0" />
-              <span className="text-sm font-bold">Privacy &amp; Legal</span>
-            </Link>
           </div>
+
+          <Link
+            href="/privacy"
+            onClick={onClose}
+            className="w-full min-h-[48px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center justify-center gap-2 text-xs font-bold hover:border-[var(--brand)] transition"
+          >
+            <ShieldCheck className="w-4 h-4 text-[var(--brand)] shrink-0" />
+            <span>Privacy Policy, Terms &amp; Account Deletion Info</span>
+          </Link>
         </div>
       </div>
     </div>
@@ -345,7 +380,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {/* Section 1: Brand Theme & Dark Mode */}
-      <section className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-4">
+      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Palette className="w-5 h-5 text-[var(--brand)]" />
           <h2 className="text-base font-extrabold">Theme &amp; Appearance</h2>
@@ -353,43 +388,62 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         <div className="space-y-2">
           <p className="text-xs font-bold text-slate-500 uppercase">Brand Accent</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <button
+              type="button"
+              onClick={async () => {
+                await onChangeAccent('obsidian');
+                flash('Ucred Obsidian theme applied');
+              }}
+              className={`min-h-[50px] px-3.5 rounded-xl border-2 flex items-center justify-between text-xs sm:text-sm font-bold transition ${
+                accentTheme === 'obsidian'
+                  ? 'border-[var(--brand)] bg-[var(--brand-tint)] text-[var(--brand)]'
+                  : 'border-[var(--surface-border)]'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2">
+                <span className="w-4 h-4 rounded-full bg-[#161514] border border-[#E5DEC9]" />
+                <span>Ucred Obsidian</span>
+              </span>
+              {accentTheme === 'obsidian' && <Check className="w-4 h-4 shrink-0" />}
+            </button>
+
             <button
               type="button"
               onClick={async () => {
                 await onChangeAccent('green');
                 flash('OkCredit Green theme applied');
               }}
-              className={`min-h-[50px] px-4 rounded-xl border-2 flex items-center justify-between text-sm font-bold transition ${
+              className={`min-h-[50px] px-3.5 rounded-xl border-2 flex items-center justify-between text-xs sm:text-sm font-bold transition ${
                 accentTheme === 'green'
                   ? 'border-[#008037] bg-[#E8F5EE] text-[#008037]'
-                  : 'border-slate-200 dark:border-slate-700'
+                  : 'border-[var(--surface-border)]'
               }`}
             >
               <span className="inline-flex items-center gap-2">
                 <span className="w-4 h-4 rounded-full bg-[#008037]" />
                 <span>OkCredit Green</span>
               </span>
-              {accentTheme === 'green' && <Check className="w-4 h-4" />}
+              {accentTheme === 'green' && <Check className="w-4 h-4 shrink-0" />}
             </button>
 
             <button
               type="button"
               onClick={async () => {
                 await onChangeAccent('crimson');
-                flash('BolBahi Crimson theme applied');
+                flash('Crimson theme applied');
               }}
-              className={`min-h-[50px] px-4 rounded-xl border-2 flex items-center justify-between text-sm font-bold transition ${
+              className={`min-h-[50px] px-3.5 rounded-xl border-2 flex items-center justify-between text-xs sm:text-sm font-bold transition ${
                 accentTheme === 'crimson'
                   ? 'border-[#9A1B1E] bg-[#FCECEC] text-[#9A1B1E]'
-                  : 'border-slate-200 dark:border-slate-700'
+                  : 'border-[var(--surface-border)]'
               }`}
             >
               <span className="inline-flex items-center gap-2">
                 <span className="w-4 h-4 rounded-full bg-[#9A1B1E]" />
-                <span>BolBahi Crimson</span>
+                <span>Ucred Crimson</span>
               </span>
-              {accentTheme === 'crimson' && <Check className="w-4 h-4" />}
+              {accentTheme === 'crimson' && <Check className="w-4 h-4 shrink-0" />}
             </button>
           </div>
         </div>
@@ -416,7 +470,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   className={`min-h-[44px] rounded-xl border text-sm font-bold flex items-center justify-center gap-1.5 ${
                     appearance === m.id
                       ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                      : 'border-slate-200 dark:border-slate-700'
+                      : 'border-[var(--surface-border)]'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -429,7 +483,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </section>
 
       {/* Section 2: Language */}
-      <section className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-3">
         <h2 className="text-base font-extrabold">App Language</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {LANGUAGE_OPTIONS.map((opt) => (
@@ -443,7 +497,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               className={`min-h-[44px] px-3 rounded-xl border text-left text-xs font-bold flex items-center justify-between ${
                 language === opt.code
                   ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                  : 'border-slate-200 dark:border-slate-700'
+                  : 'border-[var(--surface-border)]'
               }`}
             >
               <span>{opt.nativeName}</span>
@@ -454,23 +508,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </section>
 
       {/* Section 3: Shop Mobile, UPI QR & PIN Lock */}
-      <section className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-4">
+      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-4">
         <h2 className="text-base font-extrabold">Account, UPI &amp; Security</h2>
 
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-500">
-            Shop Mobile Number
-          </label>
+          <label className="block text-xs font-bold text-slate-500">Shop Mobile Number</label>
           <div className="flex gap-2">
             <input
               type="tel"
               maxLength={10}
               value={phoneInput}
-              onChange={(e) =>
-                setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))
-              }
+              onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
               placeholder="9876543210"
-              className="flex-1 min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-bold font-tabular outline-none"
+              className="flex-1 min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold font-tabular outline-none"
             />
             <button
               type="button"
@@ -481,7 +531,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 }
                 void runSafely('mobile', () => onSaveMobile(phoneInput), 'Mobile number updated');
               }}
-              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-white text-xs font-bold"
+              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold"
             >
               Save
             </button>
@@ -498,7 +548,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               value={upiInput}
               onChange={(e) => setUpiInput(e.target.value)}
               placeholder="sharma@okicici"
-              className="flex-1 min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-bold outline-none"
+              className="flex-1 min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold outline-none"
             />
             <button
               type="button"
@@ -510,7 +560,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 }
                 void runSafely('upi', () => onSaveUpiId(clean), 'UPI ID saved');
               }}
-              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-white text-xs font-bold inline-flex items-center gap-1"
+              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold inline-flex items-center gap-1"
             >
               <QrCode className="w-3.5 h-3.5" />
               <span>Save UPI</span>
@@ -548,11 +598,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               inputMode="numeric"
               maxLength={4}
               value={pinInput}
-              onChange={(e) =>
-                setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))
-              }
+              onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder={appLockPin ? 'Enter new 4 digits' : 'e.g. 1234'}
-              className="flex-1 min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-bold font-tabular outline-none"
+              className="flex-1 min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold font-tabular outline-none"
             />
             <button
               type="button"
@@ -580,7 +628,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </section>
 
       {/* Section 4: Data Management */}
-      <section className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Database className="w-5 h-5 text-[var(--brand)]" />
           <h2 className="text-base font-extrabold">Data &amp; Backup Management</h2>
@@ -594,7 +642,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               setBusyAction('demo');
               await onLoadDemo();
               setBusyAction('');
-              flash('Demo customers & stock loaded');
+              flash('Demo customers, Galla & staff loaded');
             }}
             className="min-h-[46px] px-4 rounded-xl bg-[var(--brand-tint)] text-[var(--brand)] text-sm font-bold flex items-center justify-center gap-2"
           >
@@ -608,7 +656,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onExportCsv();
               flash('CSV exported');
             }}
-            className="min-h-[46px] px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold flex items-center justify-center gap-2"
+            className="min-h-[46px] px-4 rounded-xl border border-[var(--surface-border)] text-sm font-bold flex items-center justify-center gap-2"
           >
             <FileSpreadsheet className="w-4 h-4 text-[var(--brand)]" />
             <span>Export Data (CSV)</span>
@@ -620,7 +668,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onExportJson();
               flash('JSON backup downloaded');
             }}
-            className="min-h-[46px] px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold flex items-center justify-center gap-2"
+            className="min-h-[46px] px-4 rounded-xl border border-[var(--surface-border)] text-sm font-bold flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4 text-[var(--brand)]" />
             <span>Download JSON Backup</span>
@@ -629,7 +677,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <button
             type="button"
             onClick={() => restoreRef.current?.click()}
-            className="min-h-[46px] px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold flex items-center justify-center gap-2"
+            className="min-h-[46px] px-4 rounded-xl border border-[var(--surface-border)] text-sm font-bold flex items-center justify-center gap-2"
           >
             <Upload className="w-4 h-4 text-[var(--brand)]" />
             <span>Restore JSON Backup</span>
@@ -642,7 +690,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               const file = e.target.files?.[0];
               e.target.value = '';
               if (!file) return;
-              await runSafely('restore', () => onRestoreJson(file), 'Backup restored to cloud khata');
+              await runSafely(
+                'restore',
+                () => onRestoreJson(file),
+                'Backup restored to cloud khata'
+              );
             }}
             className="hidden"
           />
@@ -661,7 +713,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           ) : (
             <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-3 space-y-2">
               <p className="text-xs font-bold text-red-700 dark:text-red-300 text-center">
-                Erase all customers, bills, and stock for {business.name}?
+                Erase all customers, bills, Galla, staff, and stock for {business.name}?
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -678,7 +730,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setConfirmClear(false)}
-                  className="min-h-[40px] rounded-lg bg-white dark:bg-slate-800 text-xs font-bold"
+                  className="min-h-[40px] rounded-lg bg-[var(--surface)] text-xs font-bold"
                 >
                   Cancel
                 </button>
@@ -689,11 +741,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </section>
 
       {/* Section 5: About, Legal & Permanent Account Deletion */}
-      <section className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-4">
+      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-4">
         <div className="space-y-1">
-          <p className="text-sm font-extrabold">BolBahi — Voice Khata</p>
+          <p className="text-sm font-extrabold">Ucred — Smart Voice Khata &amp; Galla OS</p>
           <p className="text-xs text-slate-500">
-            Synced privately via Google ({userEmail || 'Authenticated'}). Your shop data stays 100% private.
+            Synced privately via Google ({userEmail || 'Authenticated'}). Your shop data stays 100%
+            private.
           </p>
           <div className="flex flex-wrap gap-3 pt-1 text-xs font-bold text-[var(--brand)]">
             <Link href="/privacy" className="hover:underline">
@@ -729,7 +782,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         ) : (
           <div className="rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 p-3.5 space-y-2.5">
             <p className="text-xs font-bold text-red-700 dark:text-red-300 text-center leading-relaxed">
-              This permanently erases ALL businesses, customers, transactions, bills, stock, and removes your BolBahi account. Export a JSON backup first!
+              This permanently erases ALL businesses, customers, transactions, bills, Galla, staff,
+              stock, and removes your Ucred account. Export a JSON backup first!
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -743,7 +797,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setConfirmDeleteAcc(false)}
-                className="min-h-[42px] rounded-xl bg-white dark:bg-slate-800 text-xs font-bold"
+                className="min-h-[42px] rounded-xl bg-[var(--surface)] text-xs font-bold"
               >
                 Cancel
               </button>
@@ -845,11 +899,11 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
       </div>
 
       {/* Business Card Preview */}
-      <div className="rounded-3xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-hover)] text-white p-6 shadow-md space-y-3">
+      <div className="rounded-3xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-hover)] text-[var(--brand-fg)] p-6 shadow-md space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center font-extrabold text-xl">
-              {(name || 'B').charAt(0).toUpperCase()}
+            <div className="w-12 h-12 rounded-2xl bg-current/15 flex items-center justify-center font-extrabold text-xl">
+              {(name || 'U').charAt(0).toUpperCase()}
             </div>
             <div>
               <h2 className="text-xl font-extrabold">{name || 'My Shop'}</h2>
@@ -860,7 +914,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
           </div>
           <Building2 className="w-7 h-7 opacity-70" />
         </div>
-        <div className="text-xs space-y-1 opacity-90 pt-2 border-t border-white/20">
+        <div className="text-xs space-y-1 opacity-90 pt-2 border-t border-current/20">
           {phone && <p>Mobile: +91 {phone}</p>}
           {gstNumber && <p>GSTIN: {gstNumber}</p>}
           {address && <p>{address}</p>}
@@ -868,7 +922,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
       </div>
 
       {/* Profile Form */}
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-3.5">
+      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-3.5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">
@@ -878,108 +932,90 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-bold"
+              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
-              Mobile Number
-            </label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">Mobile Number</label>
             <input
               type="tel"
               maxLength={10}
               value={phone}
-              onChange={(e) =>
-                setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))
-              }
-              className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-tabular font-bold"
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular font-bold"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
-              GST Number
-            </label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">GST Number</label>
             <input
               type="text"
               value={gstNumber}
               onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
               placeholder="22AAAAA0000A1Z5"
-              className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-tabular uppercase"
+              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular uppercase"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
-              UPI ID
-            </label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">UPI ID</label>
             <input
               type="text"
               value={upiId}
               onChange={(e) => setUpiId(e.target.value)}
               placeholder="shopname@okicici"
-              className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-bold"
+              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
-              Business Type
-            </label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">Business Type</label>
             <input
               type="text"
               value={businessType}
               onChange={(e) => setBusinessType(e.target.value)}
               placeholder="Retailer / Wholesaler"
-              className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm"
+              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
-              Category
-            </label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">Category</label>
             <input
               type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Kirana / Medical / Hardware"
-              className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm"
+              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">
-            Shop Address
-          </label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">Shop Address</label>
           <input
             type="text"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             placeholder="Main Market Road, Near Bus Stand"
-            className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm"
+            className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
-              Email
-            </label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm"
+              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
-              About Shop
-            </label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">About Shop</label>
             <input
               type="text"
               value={about}
               onChange={(e) => setAbout(e.target.value)}
               placeholder="Fresh groceries & daily essentials"
-              className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm"
+              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
             />
           </div>
         </div>
@@ -990,13 +1026,13 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
           type="button"
           disabled={saving}
           onClick={handleSave}
-          className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white font-extrabold text-sm disabled:opacity-60"
+          className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm disabled:opacity-60"
         >
           {saving ? 'Saving Profile...' : savedToast ? 'Saved ✓' : 'Save Business Profile'}
         </button>
 
         {canDeleteBusiness && onDeleteBusiness && (
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="pt-2 border-t border-[var(--surface-border)]">
             {!confirmDeleteBiz ? (
               <button
                 type="button"
@@ -1032,7 +1068,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setConfirmDeleteBiz(false)}
-                    className="min-h-[40px] rounded-lg bg-white dark:bg-slate-800 text-xs font-bold"
+                    className="min-h-[40px] rounded-lg bg-[var(--surface)] text-xs font-bold"
                   >
                     Cancel
                   </button>
@@ -1045,18 +1081,18 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
 
       {showCardModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 p-6 text-center space-y-4">
+          <div className="w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 text-center space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-extrabold">Digital Visiting Card</h3>
               <button type="button" onClick={() => setShowCardModal(false)}>
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="rounded-2xl bg-[var(--brand)] text-white p-5 space-y-2 text-left">
+            <div className="rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] p-5 space-y-2 text-left">
               <p className="text-xl font-extrabold">{name || 'My Shop'}</p>
               <p className="text-xs opacity-90">{about || category}</p>
-              {phone && <p className="text-xs font-tabular">📞 +91 {phone}</p>}
-              {address && <p className="text-xs">📍 {address}</p>}
+              {phone && <p className="text-xs font-tabular">Tel: +91 {phone}</p>}
+              {address && <p className="text-xs">{address}</p>}
             </div>
             {upiId && (
               <div className="mx-auto w-fit p-3 bg-white rounded-2xl border border-slate-200">
@@ -1071,7 +1107,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               )}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-white font-bold flex items-center justify-center gap-2"
+              className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold flex items-center justify-center gap-2"
             >
               <Share2 className="w-4 h-4" />
               <span>Share on WhatsApp</span>
@@ -1117,12 +1153,10 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
         <span>Account Summary &amp; Backup</span>
       </button>
 
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-extrabold">Customer Khata</h2>
-          <span className="text-xs font-bold text-slate-500">
-            {customers.length} customers
-          </span>
+          <span className="text-xs font-bold text-slate-500">{customers.length} customers</span>
         </div>
         <div className="grid grid-cols-2 gap-3 font-tabular">
           <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-3">
@@ -1130,22 +1164,16 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
             <p className="text-xl font-extrabold text-red-600">{formatINR(custDue)}</p>
           </div>
           <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 p-3">
-            <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
-              Advance
-            </p>
-            <p className="text-xl font-extrabold text-emerald-600">
-              {formatINR(custAdv)}
-            </p>
+            <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Advance</p>
+            <p className="text-xl font-extrabold text-emerald-600">{formatINR(custAdv)}</p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-extrabold">Supplier Khata</h2>
-          <span className="text-xs font-bold text-slate-500">
-            {suppliers.length} suppliers
-          </span>
+          <span className="text-xs font-bold text-slate-500">{suppliers.length} suppliers</span>
         </div>
         <p className="text-2xl font-extrabold font-tabular text-[var(--brand)]">
           {formatINR(suppDue)}
@@ -1159,7 +1187,7 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
         <button
           type="button"
           onClick={onExportJson}
-          className="min-h-[50px] rounded-2xl bg-[var(--brand)] text-white font-extrabold text-sm flex items-center justify-center gap-2"
+          className="min-h-[50px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2"
         >
           <Download className="w-4 h-4" />
           <span>Download JSON Backup</span>
@@ -1167,7 +1195,7 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
         <button
           type="button"
           onClick={onExportCsv}
-          className="min-h-[50px] rounded-2xl border border-slate-300 dark:border-slate-700 font-extrabold text-sm flex items-center justify-center gap-2"
+          className="min-h-[50px] rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] font-extrabold text-sm flex items-center justify-center gap-2"
         >
           <FileSpreadsheet className="w-4 h-4 text-[var(--brand)]" />
           <span>Export CSV Statement</span>
@@ -1192,18 +1220,17 @@ export const MultiDeviceView: React.FC<{
       <span>Multi-Device Cloud Sync</span>
     </button>
 
-    <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+    <div className="rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4">
       <div className="w-12 h-12 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
         <Laptop className="w-6 h-6" />
       </div>
-      <h2 className="text-xl font-extrabold">
-        Your Khata is Live Across Mobile &amp; Desktop
-      </h2>
+      <h2 className="text-xl font-extrabold">Your Khata is Live Across Mobile &amp; Desktop</h2>
       <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-        Every customer entry, voice transaction, GST bill, and stock change syncs automatically to Cloud Firestore with offline IndexedDB persistence on this device.
+        Every customer entry, voice transaction, parchi scan, Galla cash entry, GST bill, and stock
+        change syncs automatically to Cloud Firestore with offline IndexedDB persistence.
       </p>
 
-      <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 p-4 space-y-2 text-sm">
+      <div className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 space-y-2 text-sm">
         <div className="flex justify-between">
           <span className="text-slate-500">Cloud Account</span>
           <span className="font-bold">{userEmail || 'Signed In'}</span>
@@ -1221,7 +1248,8 @@ export const MultiDeviceView: React.FC<{
       </div>
 
       <p className="text-xs text-slate-500">
-        Sign in with this same Google Account on your counter tablet, second phone, or shop laptop to access live updates together.
+        Sign in with this same Google Account on your counter tablet, second phone, or shop laptop
+        to access live updates together.
       </p>
     </div>
   </div>
@@ -1255,7 +1283,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 h-full p-5 flex flex-col gap-4 overflow-y-auto shadow-2xl">
+      <div className="w-full max-w-md bg-[var(--surface)] border-l border-[var(--surface-border)] h-full p-5 flex flex-col gap-4 overflow-y-auto shadow-2xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bell className="w-5 h-5 text-[var(--brand)]" />
@@ -1286,7 +1314,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
               className={`min-h-[38px] rounded-xl text-xs font-bold border ${
                 tab === t.id
                   ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                  : 'border-slate-200 dark:border-slate-700'
+                  : 'border-[var(--surface-border)]'
               }`}
             >
               {t.label}
@@ -1305,8 +1333,8 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                 key={item.id}
                 className={`rounded-2xl border p-4 space-y-2.5 ${
                   item.read
-                    ? 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
-                    : 'bg-white dark:bg-slate-900 border-[var(--brand)]/50'
+                    ? 'bg-[var(--app-bg)] border-[var(--surface-border)]'
+                    : 'bg-[var(--surface)] border-[var(--brand)]/50'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -1336,7 +1364,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                       onTriggerAction(item.targetAction);
                       onClose();
                     }}
-                    className="min-h-[36px] px-3.5 rounded-xl bg-[var(--brand)] text-white text-xs font-bold"
+                    className="min-h-[36px] px-3.5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold"
                   >
                     {item.actionLabel}
                   </button>
@@ -1371,26 +1399,30 @@ export const HelpSupportView: React.FC<{ onBack: () => void }> = ({ onBack }) =>
     </button>
 
     <div className="space-y-3">
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-2">
+      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-2">
         <div className="flex items-center gap-2 text-[var(--brand)] font-extrabold text-sm">
           <BookOpen className="w-4 h-4" />
-          <span>Voice Entry Examples (Hinglish &amp; Hindi)</span>
+          <span>Hybrid Voice Entry &amp; Counter Queue Examples</span>
         </div>
         <ul className="text-sm text-slate-600 dark:text-slate-300 space-y-1.5 list-disc list-inside">
-          <li>&quot;Ramesh do hazaar udhaar&quot; → Records ₹2,000 Given (Udhaar)</li>
-          <li>&quot;Mohan se paanch sau mila&quot; → Records ₹500 Received (Jama)</li>
-          <li>&quot;Suresh dedh sau bakaya&quot; → Records ₹150 Given (Udhaar)</li>
-          <li>&quot;Anita ne 350 wapas diye&quot; → Records ₹350 Received (Jama)</li>
+          <li>&quot;Ramesh do hazaar udhaar&quot; → Instant offline ₹2,000 Given (Udhaar)</li>
+          <li>&quot;Mohan se paanch sau mila&quot; → Instant ₹500 Received (Jama)</li>
+          <li>
+            &quot;Ramesh ka bill 2kg chini 90 aur 1kg atta 45&quot; → AI Voice Bill Draft
+          </li>
+          <li>Hands-Free Counter Mode → Auto-saves and stays listening during shop rush</li>
         </ul>
       </div>
 
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-2">
+      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-2">
         <div className="flex items-center gap-2 text-[var(--brand)] font-extrabold text-sm">
           <ShieldCheck className="w-4 h-4" />
-          <span>100% Free &amp; Private Ledger</span>
+          <span>Ucred Powerhouse Suite — Free &amp; Private</span>
         </div>
         <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-          All core features—Voice Entry, Multiple Businesses, Collection UPI QR Codes, 1-Click WhatsApp Vasooli, GST Bills, and Stock Management—are completely free and secured inside your personal Firebase Cloud account.
+          Ucred combines AI Parchi Photo Scanning, Live Galla Cashbook &amp; Daily Profit Pulse,
+          Customer Trust Scores, Staff Munim Counter Logs, Multi-Business Khata, GST Bills, and
+          1-Click WhatsApp UPI Vasooli inside your private Google Cloud account.
         </p>
       </div>
     </div>
@@ -1443,13 +1475,13 @@ export const PinLockOverlay: React.FC<{
 
   return (
     <div className="min-h-screen bg-[var(--app-bg)] flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-xs rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 text-center space-y-5 shadow-xl">
+      <div className="w-full max-w-xs rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 text-center space-y-5 shadow-xl">
         <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
           <Lock className="w-7 h-7" />
         </div>
         <div>
           <h1 className="text-xl font-extrabold">Enter 4-Digit App PIN</h1>
-          <p className="text-xs text-slate-500 mt-1">BolBahi Security Lock</p>
+          <p className="text-xs text-slate-500 mt-1">Ucred Security Lock</p>
         </div>
 
         <div className="flex justify-center gap-3">
@@ -1472,25 +1504,22 @@ export const PinLockOverlay: React.FC<{
         )}
 
         <div className="grid grid-cols-3 gap-2.5">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map(
-            (key, i) =>
-              key === '' ? (
-                <div key={i} />
-              ) : (
-                <button
-                  key={key}
-                  type="button"
-                  disabled={cooldownSec > 0}
-                  onClick={() =>
-                    key === '⌫'
-                      ? setEntered((p) => p.slice(0, -1))
-                      : void handleDigit(key)
-                  }
-                  className="min-h-[52px] rounded-2xl bg-slate-100 dark:bg-slate-800 text-lg font-extrabold font-tabular hover:bg-[var(--brand-tint)] disabled:opacity-40 transition"
-                >
-                  {key}
-                </button>
-              )
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((key, i) =>
+            key === '' ? (
+              <div key={i} />
+            ) : (
+              <button
+                key={key}
+                type="button"
+                disabled={cooldownSec > 0}
+                onClick={() =>
+                  key === '⌫' ? setEntered((p) => p.slice(0, -1)) : void handleDigit(key)
+                }
+                className="min-h-[52px] rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] text-lg font-extrabold font-tabular hover:bg-[var(--brand-tint)] disabled:opacity-40 transition"
+              >
+                {key}
+              </button>
+            )
           )}
         </div>
 

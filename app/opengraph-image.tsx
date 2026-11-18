@@ -3,7 +3,7 @@ import { ImageResponse } from 'next/og';
 export const runtime = 'edge';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const alt = 'BolBahi — Voice Khata Ledger PWA';
+export const alt = 'Ucred — Smart Voice Khata, AI Parchi & Galla OS';
 
 export default function OpenGraphImage() {
   return new ImageResponse(
@@ -16,8 +16,8 @@ export default function OpenGraphImage() {
           flexDirection: 'column',
           justifyContent: 'space-between',
           padding: '64px',
-          background: 'linear-gradient(135deg, #008037 0%, #005C27 100%)',
-          color: '#FFFFFF',
+          background: 'linear-gradient(135deg, #161514 0%, #262320 65%, #161514 100%)',
+          color: '#F6F2EC',
           fontFamily: 'sans-serif',
         }}
       >
@@ -33,33 +33,33 @@ export default function OpenGraphImage() {
               width: '72px',
               height: '72px',
               borderRadius: '20px',
-              background: '#FFFFFF',
-              color: '#008037',
+              background: '#F6F2EC',
+              color: '#161514',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '40px',
+              fontSize: '38px',
               fontWeight: 800,
             }}
           >
-            ₹
+            U
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '34px', fontWeight: 800, letterSpacing: '-0.02em' }}>
-              BolBahi
+            <span style={{ fontSize: '36px', fontWeight: 800, letterSpacing: '-0.02em' }}>
+              Ucred
             </span>
-            <span style={{ fontSize: '18px', opacity: 0.85 }}>
-              Voice-First Digital Khata &amp; Munim
+            <span style={{ fontSize: '18px', color: '#D6CEC2' }}>
+              Smart Voice Khata · AI Parchi · Live Galla OS
             </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '880px' }}>
-          <div style={{ fontSize: '56px', fontWeight: 800, lineHeight: 1.15 }}>
-            Bol ke Likho. Udhaar &amp; Vasooli in Seconds.
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '900px' }}>
+          <div style={{ fontSize: '54px', fontWeight: 800, lineHeight: 1.14, color: '#FFFFFF' }}>
+            Hands-Free Counter Khata, AI Parchi &amp; Daily Galla Pulse.
           </div>
-          <div style={{ fontSize: '26px', opacity: 0.9, lineHeight: 1.4 }}>
-            Offline Hinglish &amp; Hindi voice entries, GST bills, 58mm thermal slips, stock tracking, and 1-Click UPI reminders.
+          <div style={{ fontSize: '25px', color: '#D6CEC2', lineHeight: 1.4 }}>
+            Hybrid Hindi/Hinglish voice ledger, photo-to-bill scanner, customer trust scores, GST billing, and 1-Click UPI Vasooli.
           </div>
         </div>
 
@@ -68,15 +68,15 @@ export default function OpenGraphImage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderTop: '1px solid rgba(255,255,255,0.22)',
+            borderTop: '1px solid rgba(246,242,236,0.2)',
             paddingTop: '24px',
             fontSize: '20px',
             fontWeight: 600,
-            opacity: 0.92,
+            color: '#EDE7DF',
           }}
         >
-          <span>100% Free Cloud Sync · Offline Ready PWA</span>
-          <span>Made for Indian Dukandaars</span>
+          <span>Offline-First Cloud Sync · PWA &amp; Android Ready</span>
+          <span>Built for Indian Dukandaars</span>
         </div>
       </div>
     ),

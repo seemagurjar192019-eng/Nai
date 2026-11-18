@@ -30,14 +30,24 @@ import type {
   BillPaymentStatus,
   BillTemplateId,
   Business,
+  CashbookMode,
   StockItem,
 } from '@/lib/types';
+
+export interface BillExternalDraft {
+  customerName: string;
+  customerPhone?: string;
+  items?: BillLineItem[];
+  paymentStatus?: BillPaymentStatus;
+  notes?: string;
+}
 
 interface BillsViewProps {
   bills: BillDocument[];
   stockItems: StockItem[];
   business: Business;
   prefillCustomer?: { name: string; phone: string } | null;
+  externalDraft?: BillExternalDraft | null;
   onClearPrefill?: () => void;
   onSaveBill: (payload: {
     docType: BillDocType;
@@ -47,6 +57,7 @@ interface BillsViewProps {
     items: BillLineItem[];
     discountAmount: number;
     paymentStatus: BillPaymentStatus;
+    syncToGalla?: { mode: CashbookMode } | null;
     templateId: BillTemplateId;
     notes: string;
     billDate: string;
@@ -74,6 +85,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
   stockItems,
   business,
   prefillCustomer,
+  externalDraft,
   onClearPrefill,
   onSaveBill,
   onConvertQuote,
@@ -81,16 +93,27 @@ export const BillsView: React.FC<BillsViewProps> = ({
 }) => {
   const [docTypeFilter, setDocTypeFilter] = useState<BillDocType>('bill');
   const [searchQuery, setSearchQuery] = useState('');
-  const [creating, setCreating] = useState(Boolean(prefillCustomer));
-  const [customerName, setCustomerName] = useState(prefillCustomer?.name || '');
-  const [customerPhone, setCustomerPhone] = useState(prefillCustomer?.phone || '');
+  const [creating, setCreating] = useState(Boolean(prefillCustomer || externalDraft));
+  const [customerName, setCustomerName] = useState(
+    externalDraft?.customerName || prefillCustomer?.name || ''
+  );
+  const [customerPhone, setCustomerPhone] = useState(
+    externalDraft?.customerPhone || prefillCustomer?.phone || ''
+  );
   const [templateId, setTemplateId] = useState<BillTemplateId>('gst-color');
-  const [paymentStatus, setPaymentStatus] = useState<BillPaymentStatus>('paid');
+  const [paymentStatus, setPaymentStatus] = useState<BillPaymentStatus>(
+    externalDraft?.paymentStatus || 'paid'
+  );
+  const [syncGallaMode, setSyncGallaMode] = useState<CashbookMode | null>('cash');
   const [discountAmount, setDiscountAmount] = useState<string>('');
-  const [notes, setNotes] = useState('Thank you for shopping with us!');
-  const [items, setItems] = useState<BillLineItem[]>([
-    { name: 'Grocery Item', qty: 1, rate: 500, gstRate: 5 },
-  ]);
+  const [notes, setNotes] = useState(
+    externalDraft?.notes || 'Thank you for shopping with us!'
+  );
+  const [items, setItems] = useState<BillLineItem[]>(
+    externalDraft?.items && externalDraft.items.length > 0
+      ? externalDraft.items
+      : [{ name: 'Grocery Item', qty: 1, rate: 500, gstRate: 5 }]
+  );
   const [saving, setSaving] = useState(false);
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
@@ -153,10 +176,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
     () => typeBills.reduce((s, b) => s + b.totalAmount, 0),
     [typeBills]
   );
-  const totalGst = useMemo(
-    () => typeBills.reduce((s, b) => s + b.totalGst, 0),
-    [typeBills]
-  );
+  const totalGst = useMemo(() => typeBills.reduce((s, b) => s + b.totalGst, 0), [typeBills]);
 
   const subtotal = items.reduce((s, i) => s + (i.qty || 0) * (i.rate || 0), 0);
   const gstSum = items.reduce(
@@ -192,6 +212,10 @@ export const BillsView: React.FC<BillsViewProps> = ({
       const nextNum = getNextSequenceNumber(bills, docTypeFilter);
       const effectiveStatus: BillPaymentStatus =
         docTypeFilter === 'quote' ? 'paid' : paymentStatus;
+      const syncToGalla =
+        docTypeFilter === 'bill' && effectiveStatus === 'paid' && syncGallaMode
+          ? { mode: syncGallaMode }
+          : null;
       const res = await onSaveBill({
         docType: docTypeFilter,
         billNumber: nextNum,
@@ -200,6 +224,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
         items,
         discountAmount: cleanDiscount,
         paymentStatus: effectiveStatus,
+        syncToGalla,
         templateId,
         notes,
         billDate: new Date().toISOString(),
@@ -211,6 +236,9 @@ export const BillsView: React.FC<BillsViewProps> = ({
       }
       if (docTypeFilter === 'bill' && effectiveStatus === 'unpaid') {
         notices.push(`posted ${formatINR(grandTotal)} Udhaar to ${customerName.trim()}'s Khata`);
+      }
+      if (syncToGalla) {
+        notices.push(`synced ${formatINR(grandTotal)} to Galla (${syncToGalla.mode.toUpperCase()})`);
       }
       if (notices.length > 0) {
         setDeductNotice(`Saved ${nextNum} & ${notices.join(' · ')}.`);
@@ -280,7 +308,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             <button
               type="button"
               onClick={() => setPreviewBill(null)}
-              className="min-h-[42px] px-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm font-bold"
+              className="min-h-[42px] px-4 rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] text-sm font-bold"
             >
               ← Back
             </button>
@@ -308,7 +336,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               <button
                 type="button"
                 onClick={handlePrintBill}
-                className="min-h-[42px] px-4 rounded-xl bg-[var(--brand)] text-white text-sm font-bold inline-flex items-center gap-2"
+                className="min-h-[42px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-2"
               >
                 <Printer className="w-4 h-4" />
                 <span>Print 58mm</span>
@@ -404,7 +432,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
           <button
             type="button"
             onClick={() => setPreviewBill(null)}
-            className="min-h-[42px] px-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm font-bold"
+            className="min-h-[42px] px-4 rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] text-sm font-bold"
           >
             ← Back to Bills
           </button>
@@ -434,7 +462,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             <button
               type="button"
               onClick={handlePrintBill}
-              className="min-h-[42px] px-4 rounded-xl bg-[var(--brand)] text-white text-sm font-bold inline-flex items-center gap-2"
+              className="min-h-[42px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-2"
             >
               <Printer className="w-4 h-4" />
               <span>Print / PDF</span>
@@ -445,7 +473,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
         <div className="print-area rounded-2xl bg-white text-slate-900 border border-slate-200 shadow-sm overflow-hidden">
           <div
             className={`p-5 flex items-start justify-between gap-4 ${
-              isColored ? 'bg-[var(--brand)] text-white' : 'border-b border-slate-200'
+              isColored ? 'bg-[var(--brand)] text-[var(--brand-fg)]' : 'border-b border-slate-200'
             }`}
           >
             <div>
@@ -456,9 +484,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               {business.gstNumber && (
                 <p className="text-xs opacity-90">GSTIN: {business.gstNumber}</p>
               )}
-              {business.phone && (
-                <p className="text-xs opacity-90">Phone: +91 {business.phone}</p>
-              )}
+              {business.phone && <p className="text-xs opacity-90">Phone: +91 {business.phone}</p>}
             </div>
             <div className="text-right font-tabular">
               <p className="text-sm font-extrabold">{previewBill.billNumber}</p>
@@ -548,7 +574,8 @@ export const BillsView: React.FC<BillsViewProps> = ({
                 <p className="text-xs text-slate-600">Note: {previewBill.notes}</p>
               )}
               <p className="text-[10px] text-slate-400">
-                Computer-generated retail bill / estimate. Verify GSTIN and tax rates before official GST filing.
+                Computer-generated retail bill / estimate. Verify GSTIN and tax rates before official
+                GST filing.
               </p>
             </div>
           </div>
@@ -560,7 +587,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
   return (
     <div className="space-y-4 pb-24">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="inline-flex rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1">
+        <div className="inline-flex rounded-xl bg-black/5 dark:bg-white/10 p-1">
           {(['bill', 'quote'] as const).map((tab) => (
             <button
               key={tab}
@@ -571,7 +598,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               }}
               className={`min-h-[38px] px-5 rounded-lg text-sm font-bold capitalize transition ${
                 docTypeFilter === tab
-                  ? 'bg-white dark:bg-slate-900 text-[var(--brand)] shadow-xs'
+                  ? 'bg-[var(--surface)] text-[var(--brand)] shadow-xs'
                   : 'text-slate-600 dark:text-slate-300'
               }`}
             >
@@ -586,7 +613,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             setError('');
             setCreating(true);
           }}
-          className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white text-sm font-extrabold inline-flex items-center gap-1.5"
+          className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" />
           <span>Create {docTypeFilter === 'bill' ? 'Bill' : 'Quote'}</span>
@@ -602,7 +629,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={`Search ${docTypeFilter === 'bill' ? 'bills' : 'quotes'} by number, customer, or mobile...`}
-            className="w-full min-h-[42px] rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 pl-10 pr-3 text-sm outline-none focus:border-[var(--brand)]"
+            className="w-full min-h-[42px] rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] pl-10 pr-3 text-sm outline-none focus:border-[var(--brand)]"
           />
         </div>
       )}
@@ -627,7 +654,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
 
       {/* Sales & GST Summary */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
+        <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4">
           <p className="text-xs font-bold text-slate-500 uppercase">
             Total {docTypeFilter === 'bill' ? 'Sales' : 'Quotes'}
           </p>
@@ -635,7 +662,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             {formatINR(totalSales)}
           </p>
         </div>
-        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
+        <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4">
           <p className="text-xs font-bold text-slate-500 uppercase">Total GST</p>
           <p className="text-2xl font-extrabold font-tabular text-[var(--brand)] mt-1">
             {formatINR(totalGst)}
@@ -645,7 +672,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
 
       {/* Bill List */}
       {filteredBills.length === 0 ? (
-        <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-10 text-center space-y-3">
+        <div className="rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-10 text-center space-y-3">
           <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
             <Receipt className="w-7 h-7" />
           </div>
@@ -657,7 +684,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="min-h-[46px] px-5 rounded-xl bg-[var(--brand)] text-white text-sm font-extrabold inline-flex items-center gap-1.5"
+            className="min-h-[46px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             <span>Create {docTypeFilter === 'bill' ? 'Bill' : 'Quote'}</span>
@@ -670,7 +697,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             return (
               <div
                 key={b.id}
-                className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 flex items-center justify-between gap-3"
+                className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4 flex items-center justify-between gap-3"
               >
                 <button
                   type="button"
@@ -682,14 +709,11 @@ export const BillsView: React.FC<BillsViewProps> = ({
                     <p className="font-extrabold text-sm truncate">
                       {b.billNumber} · {b.customerName}
                     </p>
-                    {b.docType === 'bill' && b.paymentStatus === 'unpaid' && (
-                      <span className="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[10px] font-extrabold shrink-0">
-                        Udhaar
-                      </span>
-                    )}
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5 truncate">
                     {b.items.length} item(s) · {formatDateTime(b.billDate)}
+                    {b.docType === 'bill' && b.paymentStatus === 'unpaid' ? ' · Udhaar' : ''}
+                    {b.createdByName ? ` · ${b.createdByName}` : ''}
                   </p>
                 </button>
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -719,9 +743,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                     }}
                     aria-label="Delete bill"
                     className={`px-2 py-1.5 rounded-lg text-xs font-bold transition ${
-                      armed
-                        ? 'bg-red-600 text-white'
-                        : 'text-slate-400 hover:text-red-600'
+                      armed ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-red-600'
                     }`}
                   >
                     {armed ? 'Confirm?' : <Trash2 className="w-4 h-4" />}
@@ -746,7 +768,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 p-6 space-y-4 max-h-[92vh] overflow-y-auto"
+            className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4 max-h-[92vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-extrabold">
@@ -774,7 +796,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Ramesh"
-                  className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-bold"
+                  className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold"
                 />
               </div>
               <div>
@@ -787,7 +809,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   placeholder="9876543210"
-                  className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-tabular"
+                  className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular"
                 />
               </div>
             </div>
@@ -800,10 +822,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                 <button
                   type="button"
                   onClick={() =>
-                    setItems((prev) => [
-                      ...prev,
-                      { name: '', qty: 1, rate: 0, gstRate: 0 },
-                    ])
+                    setItems((prev) => [...prev, { name: '', qty: 1, rate: 0, gstRate: 0 }])
                   }
                   className="text-xs font-bold text-[var(--brand)]"
                 >
@@ -812,7 +831,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               </div>
 
               {stockItems.length > 0 && (
-                <div className="flex items-center gap-2 rounded-xl bg-slate-50 dark:bg-slate-800/70 px-3 py-2">
+                <div className="flex items-center gap-2 rounded-xl bg-[var(--app-bg)] border border-[var(--surface-border)] px-3 py-2">
                   <Package className="w-4 h-4 text-[var(--brand)] shrink-0" />
                   <select
                     aria-label="Pick item from stock"
@@ -850,7 +869,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               {items.map((it, idx) => (
                 <div
                   key={idx}
-                  className="grid grid-cols-12 gap-2 items-center rounded-xl bg-slate-50 dark:bg-slate-800/60 p-2"
+                  className="grid grid-cols-12 gap-2 items-center rounded-xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-2"
                 >
                   <input
                     type="text"
@@ -861,7 +880,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       setItems(next);
                     }}
                     placeholder="Item name"
-                    className="col-span-5 min-h-[38px] rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 text-xs font-semibold"
+                    className="col-span-5 min-h-[38px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-semibold"
                   />
                   <input
                     type="number"
@@ -873,7 +892,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       setItems(next);
                     }}
                     placeholder="Qty"
-                    className="col-span-2 min-h-[38px] rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 text-xs font-tabular"
+                    className="col-span-2 min-h-[38px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-tabular"
                   />
                   <input
                     type="number"
@@ -885,7 +904,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       setItems(next);
                     }}
                     placeholder="₹ Rate"
-                    className="col-span-3 min-h-[38px] rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 text-xs font-tabular"
+                    className="col-span-3 min-h-[38px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-tabular"
                   />
                   <input
                     type="number"
@@ -897,7 +916,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       setItems(next);
                     }}
                     placeholder="GST%"
-                    className="col-span-2 min-h-[38px] rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 text-xs font-tabular"
+                    className="col-span-2 min-h-[38px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-tabular"
                   />
                 </div>
               ))}
@@ -914,15 +933,13 @@ export const BillsView: React.FC<BillsViewProps> = ({
                   value={discountAmount}
                   onChange={(e) => setDiscountAmount(e.target.value)}
                   placeholder="0"
-                  className="w-full min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-tabular font-bold"
+                  className="w-full min-h-[42px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular font-bold"
                 />
               </div>
 
               {docTypeFilter === 'bill' && (
                 <div>
-                  <span className="block text-xs font-bold text-slate-500 mb-1">
-                    Payment Mode
-                  </span>
+                  <span className="block text-xs font-bold text-slate-500 mb-1">Payment Mode</span>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
@@ -930,7 +947,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       className={`min-h-[42px] rounded-xl text-xs font-bold border ${
                         paymentStatus === 'paid'
                           ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-700 dark:text-emerald-300'
-                          : 'border-slate-200 dark:border-slate-700'
+                          : 'border-[var(--surface-border)]'
                       }`}
                     >
                       Paid Cash/UPI
@@ -941,7 +958,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       className={`min-h-[42px] rounded-xl text-xs font-bold border ${
                         paymentStatus === 'unpaid'
                           ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 text-amber-800 dark:text-amber-300'
-                          : 'border-slate-200 dark:border-slate-700'
+                          : 'border-[var(--surface-border)]'
                       }`}
                     >
                       Post Udhaar
@@ -950,6 +967,36 @@ export const BillsView: React.FC<BillsViewProps> = ({
                 </div>
               )}
             </div>
+
+            {docTypeFilter === 'bill' && paymentStatus === 'paid' && (
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-[var(--app-bg)] border border-[var(--surface-border)] px-3 py-2">
+                <span className="text-[11px] font-bold text-slate-500">
+                  Sync Paid Bill to Galla
+                </span>
+                <div className="flex items-center gap-1">
+                  {(
+                    [
+                      { id: null, label: 'Off' },
+                      { id: 'cash', label: 'Cash' },
+                      { id: 'upi', label: 'UPI' },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => setSyncGallaMode(opt.id)}
+                      className={`min-h-[30px] px-2.5 rounded-lg text-[11px] font-extrabold border ${
+                        syncGallaMode === opt.id
+                          ? 'bg-[var(--brand)] border-[var(--brand)] text-[var(--brand-fg)]'
+                          : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <span className="block text-xs font-bold text-slate-500 mb-1.5">
@@ -971,7 +1018,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                     className={`min-h-[40px] rounded-xl text-xs font-bold border ${
                       templateId === tpl.id
                         ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                        : 'border-slate-200 dark:border-slate-700'
+                        : 'border-[var(--surface-border)]'
                     }`}
                   >
                     {tpl.label}
@@ -986,11 +1033,11 @@ export const BillsView: React.FC<BillsViewProps> = ({
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full min-h-[42px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-xs"
+                className="w-full min-h-[42px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xs"
               />
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between pt-2 border-t border-[var(--surface-border)]">
               <div>
                 <p className="text-xs text-slate-500">Grand Total (incl. GST)</p>
                 <p className="text-xl font-extrabold font-tabular text-[var(--brand)]">
@@ -1001,7 +1048,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                 type="button"
                 disabled={saving}
                 onClick={handleCreate}
-                className="min-h-[48px] px-6 rounded-xl bg-[var(--brand)] text-white font-extrabold text-sm disabled:opacity-60"
+                className="min-h-[48px] px-6 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm disabled:opacity-60"
               >
                 {saving ? 'Saving...' : 'Save & Preview'}
               </button>

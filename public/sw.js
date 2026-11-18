@@ -1,10 +1,9 @@
-const CACHE_NAME = 'bolbahi-nextjs-v4';
+const CACHE_NAME = 'ucred-nextjs-v5';
 const SHELL_ASSETS = [
   '/',
   '/privacy',
   '/terms',
   '/delete-account',
-  '/icon.svg',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
   '/pwa-maskable-512x512.png',
@@ -67,7 +66,7 @@ self.addEventListener('fetch', (event) => {
               (home) =>
                 home ||
                 new Response(
-                  '<!doctype html><html><body style="font-family:sans-serif;padding:24px;text-align:center;"><h2>BolBahi is Offline</h2><p>Please check your internet connection and reload.</p></body></html>',
+                  '<!doctype html><html><body style="font-family:sans-serif;padding:24px;text-align:center;background:#F6F2EC;color:#161514;"><h2>Ucred is Offline</h2><p>Please check your internet connection and reload.</p></body></html>',
                   { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
                 )
             );
@@ -80,6 +79,7 @@ self.addEventListener('fetch', (event) => {
   if (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.endsWith('.png') ||
+    url.pathname.endsWith('.webp') ||
     url.pathname.endsWith('.svg') ||
     url.pathname.endsWith('.ico')
   ) {

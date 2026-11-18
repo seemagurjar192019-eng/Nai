@@ -29,7 +29,7 @@ const APP_ORIGIN =
   'https://ais-dev-b5572c6vlenhbxhdhwmdvx-303612259339.asia-east1.run.app';
 
 export const viewport: Viewport = {
-  themeColor: '#008037',
+  themeColor: '#161514',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -37,18 +37,19 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_ORIGIN),
-  applicationName: 'BolBahi',
+  applicationName: 'Ucred',
   title: {
-    default: 'BolBahi — Voice Khata',
-    template: '%s | BolBahi',
+    default: 'Ucred — Smart Voice Khata, AI Parchi & Galla OS',
+    template: '%s | Ucred',
   },
   description:
-    'Voice-first offline Hinglish khata ledger PWA with cloud sync, GST billing, stock, and UPI collection for Indian shopkeepers.',
+    'Voice-first offline Hinglish khata, AI parchi scanner, live Galla cashbook, trust scores, GST billing, stock & UPI collection for Indian shopkeepers.',
   keywords: [
-    'BolBahi',
+    'Ucred',
     'Voice Khata',
+    'AI Parchi Scanner',
+    'Galla Cashbook',
     'Udhaar Khata App',
-    'Hinglish Ledger',
     'Digital Bahi Khata',
     'Shopkeeper Billing PWA',
     'UPI Vasooli',
@@ -59,38 +60,38 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'BolBahi',
+    title: 'Ucred',
   },
   icons: {
-    icon: '/icon.svg',
+    icon: '/pwa-192x192.png',
     apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'BolBahi — Voice Khata',
+    title: 'Ucred — Smart Voice Khata, AI Parchi & Galla OS',
     description:
-      'Voice-first digital khata ledger, billing, stock & UPI collection PWA for Indian shopkeepers.',
+      'Voice-first digital khata, AI receipt scanner, live Galla drawer, GST billing & UPI collection PWA for Indian shopkeepers.',
     url: '/',
-    siteName: 'BolBahi',
+    siteName: 'Ucred',
     locale: 'en_IN',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'BolBahi — Voice Khata',
+    title: 'Ucred — Smart Voice Khata, AI Parchi & Galla OS',
     description:
-      'Voice-first digital khata ledger, billing, stock & UPI collection PWA for Indian shopkeepers.',
+      'Voice-first digital khata, AI receipt scanner, live Galla drawer, GST billing & UPI collection PWA for Indian shopkeepers.',
   },
 };
 
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: 'BolBahi — Voice Khata',
+  name: 'Ucred — Smart Voice Khata & Galla OS',
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Android, iOS, Web',
   inLanguage: ['en-IN', 'hi-IN'],
   description:
-    'Voice-first offline Hinglish khata ledger PWA with cloud sync, GST billing, stock tracking, and UPI collection for Indian shopkeepers.',
+    'Voice-first offline Hinglish khata ledger PWA with AI parchi scanner, live Galla cashbook, trust score predictor, GST billing, and UPI collection for Indian shopkeepers.',
   offers: {
     '@type': 'Offer',
     price: '0',
@@ -105,7 +106,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${plusJakarta.variable} ${notoDevanagari.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="min-h-screen text-slate-900 dark:text-slate-100" suppressHydrationWarning>
+      <body className="min-h-screen text-stone-900 dark:text-stone-100" suppressHydrationWarning>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

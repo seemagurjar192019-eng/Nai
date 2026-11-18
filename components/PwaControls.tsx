@@ -18,12 +18,12 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
         onClick={install}
         className={
           compact
-            ? 'inline-flex items-center gap-1.5 min-h-[40px] px-3 py-1.5 rounded-xl bg-[var(--brand)] text-white text-xs font-bold whitespace-nowrap shrink-0 hover:bg-[var(--brand-hover)] transition'
-            : 'inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2 rounded-xl bg-[var(--brand)] text-white text-sm font-bold whitespace-nowrap shrink-0 hover:bg-[var(--brand-hover)] transition'
+            ? 'inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold whitespace-nowrap shrink-0 hover:bg-[var(--brand-hover)] transition'
+            : 'inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold whitespace-nowrap shrink-0 hover:bg-[var(--brand-hover)] transition'
         }
       >
         <Download className="w-4 h-4" />
-        <span>Install App</span>
+        <span>Install Ucred</span>
       </button>
     );
   }
@@ -34,7 +34,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
         <button
           type="button"
           onClick={() => setShowIOSGuide(true)}
-          className="inline-flex items-center gap-1.5 min-h-[40px] px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap shrink-0"
+          className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-xl border border-[#E5DEC9] dark:border-[#2A2824] bg-white dark:bg-[#181715] text-xs font-semibold text-stone-700 dark:text-stone-200 whitespace-nowrap shrink-0"
         >
           <Share className="w-3.5 h-3.5" />
           <span>Install</span>
@@ -42,21 +42,21 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
 
         {showIOSGuide && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl space-y-4">
+            <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#181715] border border-[#E5DEC9] dark:border-[#2A2824] p-6 shadow-xl space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Install BolBahi on iPhone
+                <h3 className="text-lg font-bold text-stone-900 dark:text-stone-100">
+                  Install Ucred on iPhone
                 </h3>
                 <button
                   type="button"
                   onClick={() => setShowIOSGuide(false)}
                   aria-label="Close"
-                  className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <ol className="text-sm text-slate-600 dark:text-slate-300 space-y-2 list-decimal list-inside">
+              <ol className="text-sm text-stone-600 dark:text-stone-300 space-y-2 list-decimal list-inside">
                 <li>
                   Tap the <strong>Share</strong> button in Safari toolbar.
                 </li>
@@ -67,7 +67,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
               <button
                 type="button"
                 onClick={() => setShowIOSGuide(false)}
-                className="w-full min-h-[44px] rounded-xl bg-[var(--brand)] text-white font-semibold"
+                className="w-full min-h-[44px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-semibold"
               >
                 Got It
               </button>

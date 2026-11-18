@@ -37,11 +37,15 @@ service cloud.firestore {
     }
 
     function isValidAccent(theme) {
-      return theme in ['green', 'crimson'];
+      return theme in ['obsidian', 'green', 'crimson'];
     }
 
     function isValidAppearance(mode) {
       return mode in ['light', 'dark', 'system'];
+    }
+
+    function isValidStaffRole(role) {
+      return role in ['owner', 'munim', 'cashier'];
     }
 
     // Entity Validation Blueprints
@@ -79,7 +83,7 @@ service cloud.firestore {
 
     function isValidLedgerAccount(data) {
       return data.keys().hasAll(['ownerId', 'businessId', 'kind', 'name', 'phone', 'dueDate', 'balance', 'lastNote', 'lastActivityAt', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['ownerId', 'businessId', 'kind', 'name', 'phone', 'dueDate', 'creditLimit', 'balance', 'lastNote', 'lastActivityAt', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'businessId', 'kind', 'name', 'phone', 'dueDate', 'creditLimit', 'promiseDate', 'promiseNote', 'balance', 'lastNote', 'lastActivityAt', 'createdAt', 'updatedAt'])
         && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
         && isValidId(data.businessId)
         && data.kind in ['customer', 'supplier']
@@ -87,6 +91,8 @@ service cloud.firestore {
         && data.phone is string && data.phone.size() <= 20
         && data.dueDate is string && data.dueDate.size() <= 24
         && (!('creditLimit' in data) || ((data.creditLimit is int || data.creditLimit is float) && data.creditLimit >= 0 && data.creditLimit <= 100000000))
+        && (!('promiseDate' in data) || (data.promiseDate is string && data.promiseDate.size() <= 24))
+        && (!('promiseNote' in data) || (data.promiseNote is string && data.promiseNote.size() <= 160))
         && (data.balance is int || data.balance is float)
         && data.lastNote is string && data.lastNote.size() <= 160
         && data.lastActivityAt is string && data.lastActivityAt.size() <= 40
@@ -96,7 +102,7 @@ service cloud.firestore {
 
     function isValidLedgerTransaction(data) {
       return data.keys().hasAll(['ownerId', 'businessId', 'accountId', 'direction', 'amount', 'note', 'billDate', 'voiceRaw', 'billImage', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['ownerId', 'businessId', 'accountId', 'direction', 'amount', 'note', 'billDate', 'voiceRaw', 'billImage', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'businessId', 'accountId', 'direction', 'amount', 'note', 'billDate', 'voiceRaw', 'billImage', 'createdByName', 'createdByRole', 'gallaSynced', 'createdAt', 'updatedAt'])
         && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
         && isValidId(data.businessId)
         && isValidId(data.accountId)
@@ -106,13 +112,16 @@ service cloud.firestore {
         && data.billDate is string && data.billDate.size() >= 1 && data.billDate.size() <= 40
         && data.voiceRaw is string && data.voiceRaw.size() <= 300
         && data.billImage is string && data.billImage.size() <= 150000
+        && (!('createdByName' in data) || (data.createdByName is string && data.createdByName.size() <= 80))
+        && (!('createdByRole' in data) || (data.createdByRole is string && isValidStaffRole(data.createdByRole)))
+        && (!('gallaSynced' in data) || data.gallaSynced is bool)
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
 
     function isValidBillDocument(data) {
       return data.keys().hasAll(['ownerId', 'businessId', 'docType', 'billNumber', 'customerName', 'customerPhone', 'items', 'subtotal', 'totalGst', 'totalAmount', 'templateId', 'notes', 'billDate', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['ownerId', 'businessId', 'docType', 'billNumber', 'customerName', 'customerPhone', 'items', 'subtotal', 'totalGst', 'discountAmount', 'totalAmount', 'paymentStatus', 'linkedTxId', 'templateId', 'notes', 'billDate', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'businessId', 'docType', 'billNumber', 'customerName', 'customerPhone', 'items', 'subtotal', 'totalGst', 'discountAmount', 'totalAmount', 'paymentStatus', 'linkedTxId', 'createdByName', 'estimatedCost', 'templateId', 'notes', 'billDate', 'createdAt', 'updatedAt'])
         && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
         && isValidId(data.businessId)
         && data.docType in ['bill', 'quote']
@@ -128,6 +137,8 @@ service cloud.firestore {
         && (data.totalAmount is int || data.totalAmount is float) && data.totalAmount >= 0
         && (!('paymentStatus' in data) || (data.paymentStatus is string && data.paymentStatus in ['paid', 'unpaid', 'partial']))
         && (!('linkedTxId' in data) || (data.linkedTxId is string && data.linkedTxId.size() <= 128))
+        && (!('createdByName' in data) || (data.createdByName is string && data.createdByName.size() <= 80))
+        && (!('estimatedCost' in data) || ((data.estimatedCost is int || data.estimatedCost is float) && data.estimatedCost >= 0 && data.estimatedCost <= 100000000))
         && data.templateId in ['classic', 'modern', 'gst-color', 'thermal-58']
         && data.notes is string && data.notes.size() <= 240
         && data.billDate is string && data.billDate.size() >= 1 && data.billDate.size() <= 40
@@ -146,6 +157,52 @@ service cloud.firestore {
         && (!('purchasePrice' in data) || ((data.purchasePrice is int || data.purchasePrice is float) && data.purchasePrice >= 0 && data.purchasePrice <= 100000000))
         && (data.quantity is int || data.quantity is float) && data.quantity >= 0
         && (data.lowStockThreshold is int || data.lowStockThreshold is float) && data.lowStockThreshold >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCashbookEntry(data) {
+      return data.keys().hasAll(['ownerId', 'businessId', 'entryType', 'mode', 'category', 'amount', 'note', 'entryDate', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'businessId', 'entryType', 'mode', 'category', 'amount', 'note', 'entryDate', 'linkedRefId', 'actorName', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
+        && isValidId(data.businessId)
+        && data.entryType in ['inflow', 'outflow']
+        && data.mode in ['cash', 'upi', 'bank']
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 40
+        && (data.amount is int || data.amount is float) && data.amount > 0 && data.amount <= 100000000
+        && data.note is string && data.note.size() <= 200
+        && data.entryDate is string && data.entryDate.size() >= 1 && data.entryDate.size() <= 40
+        && (!('linkedRefId' in data) || (data.linkedRefId is string && data.linkedRefId.size() <= 128))
+        && (!('actorName' in data) || (data.actorName is string && data.actorName.size() <= 80))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStaffMember(data) {
+      return data.keys().hasAll(['ownerId', 'businessId', 'name', 'role', 'phone', 'active', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'businessId', 'name', 'role', 'phone', 'pinHash', 'active', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
+        && isValidId(data.businessId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.role is string && isValidStaffRole(data.role)
+        && data.phone is string && data.phone.size() <= 20
+        && (!('pinHash' in data) || (data.pinHash is string && data.pinHash.size() <= 128))
+        && data.active is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidActivityLog(data) {
+      return data.keys().hasAll(['ownerId', 'businessId', 'actorName', 'actorRole', 'actionType', 'summary', 'targetName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'businessId', 'actorName', 'actorRole', 'actionType', 'summary', 'targetName', 'amount', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
+        && isValidId(data.businessId)
+        && data.actorName is string && data.actorName.size() >= 1 && data.actorName.size() <= 80
+        && data.actorRole is string && isValidStaffRole(data.actorRole)
+        && data.actionType in ['ledger', 'bill', 'stock', 'galla', 'staff', 'account']
+        && data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 240
+        && data.targetName is string && data.targetName.size() <= 100
+        && (!('amount' in data) || ((data.amount is int || data.amount is float) && data.amount >= 0 && data.amount <= 100000000))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -211,7 +268,7 @@ service cloud.firestore {
         && incoming().businessId == existing().businessId
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly(['kind', 'name', 'phone', 'dueDate', 'creditLimit', 'balance', 'lastNote', 'lastActivityAt', 'updatedAt']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['kind', 'name', 'phone', 'dueDate', 'creditLimit', 'promiseDate', 'promiseNote', 'balance', 'lastNote', 'lastActivityAt', 'updatedAt']);
       allow delete: if isValidId(accountId) && isVerified() && existing().ownerId == request.auth.uid;
     }
 
@@ -235,7 +292,7 @@ service cloud.firestore {
         && incoming().accountId == existing().accountId
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly(['direction', 'amount', 'note', 'billDate', 'voiceRaw', 'billImage', 'updatedAt']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['direction', 'amount', 'note', 'billDate', 'voiceRaw', 'billImage', 'createdByName', 'createdByRole', 'gallaSynced', 'updatedAt']);
       allow delete: if isValidId(txId) && isVerified() && existing().ownerId == request.auth.uid;
     }
 
@@ -257,7 +314,7 @@ service cloud.firestore {
         && incoming().businessId == existing().businessId
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly(['docType', 'billNumber', 'customerName', 'customerPhone', 'items', 'subtotal', 'totalGst', 'discountAmount', 'totalAmount', 'paymentStatus', 'linkedTxId', 'templateId', 'notes', 'billDate', 'updatedAt']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['docType', 'billNumber', 'customerName', 'customerPhone', 'items', 'subtotal', 'totalGst', 'discountAmount', 'totalAmount', 'paymentStatus', 'linkedTxId', 'createdByName', 'estimatedCost', 'templateId', 'notes', 'billDate', 'updatedAt']);
       allow delete: if isValidId(billId) && isVerified() && existing().ownerId == request.auth.uid;
     }
 
@@ -281,6 +338,64 @@ service cloud.firestore {
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'unit', 'salePrice', 'purchasePrice', 'quantity', 'lowStockThreshold', 'updatedAt']);
       allow delete: if isValidId(itemId) && isVerified() && existing().ownerId == request.auth.uid;
+    }
+
+    match /cashbookEntries/{entryId} {
+      allow get: if isValidId(entryId) && isVerified() && existing().ownerId == request.auth.uid;
+      allow list: if isVerified() && resource.data.ownerId == request.auth.uid;
+      allow create: if isValidId(entryId)
+        && isVerified()
+        && isValidCashbookEntry(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/businesses/$(incoming().businessId))
+        && getAfter(/databases/$(database)/documents/businesses/$(incoming().businessId)).data.ownerId == request.auth.uid;
+      allow update: if isValidId(entryId)
+        && isVerified()
+        && existing().ownerId == request.auth.uid
+        && isValidCashbookEntry(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().businessId == existing().businessId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['entryType', 'mode', 'category', 'amount', 'note', 'entryDate', 'linkedRefId', 'actorName', 'updatedAt']);
+      allow delete: if isValidId(entryId) && isVerified() && existing().ownerId == request.auth.uid;
+    }
+
+    match /staffMembers/{staffId} {
+      allow get: if isValidId(staffId) && isVerified() && existing().ownerId == request.auth.uid;
+      allow list: if isVerified() && resource.data.ownerId == request.auth.uid;
+      allow create: if isValidId(staffId)
+        && isVerified()
+        && isValidStaffMember(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/businesses/$(incoming().businessId))
+        && getAfter(/databases/$(database)/documents/businesses/$(incoming().businessId)).data.ownerId == request.auth.uid;
+      allow update: if isValidId(staffId)
+        && isVerified()
+        && existing().ownerId == request.auth.uid
+        && isValidStaffMember(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().businessId == existing().businessId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'phone', 'pinHash', 'active', 'updatedAt']);
+      allow delete: if isValidId(staffId) && isVerified() && existing().ownerId == request.auth.uid;
+    }
+
+    match /activityLogs/{logId} {
+      allow get: if isValidId(logId) && isVerified() && existing().ownerId == request.auth.uid;
+      allow list: if isVerified() && resource.data.ownerId == request.auth.uid;
+      allow create: if isValidId(logId)
+        && isVerified()
+        && isValidActivityLog(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/businesses/$(incoming().businessId))
+        && getAfter(/databases/$(database)/documents/businesses/$(incoming().businessId)).data.ownerId == request.auth.uid;
+      allow update: if false;
+      allow delete: if isValidId(logId) && isVerified() && existing().ownerId == request.auth.uid;
     }
   }
 }

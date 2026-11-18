@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -23,7 +24,6 @@ import {
   UserCog,
   X,
 } from 'lucide-react';
-import { AlertTriangle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   buildReminderMessage,
@@ -40,6 +40,8 @@ import {
 } from '@/lib/i18n';
 import type {
   Business,
+  CashbookMode,
+  CustomerTrustScore,
   LanguageCode,
   LedgerAccount,
   LedgerTransaction,
@@ -51,6 +53,7 @@ interface AccountChatLedgerProps {
   business: Business;
   language: LanguageCode;
   transactions: LedgerTransaction[];
+  trustScore?: CustomerTrustScore;
   onBack: () => void;
   onAddTransaction: (payload: {
     direction: TxDirection;
@@ -58,6 +61,7 @@ interface AccountChatLedgerProps {
     note: string;
     billDate: string;
     billImage: string;
+    syncToGalla?: { mode: CashbookMode } | null;
   }) => Promise<void>;
   onUpdateTransaction: (
     tx: LedgerTransaction,
@@ -75,10 +79,13 @@ interface AccountChatLedgerProps {
     phone?: string;
     dueDate?: string;
     creditLimit?: number;
+    promiseDate?: string;
+    promiseNote?: string;
   }) => Promise<void>;
   onDeleteAccount: () => Promise<void>;
   onOpenVoiceForCustomer: (name: string) => void;
   onOpenCreateBill: (customerName: string, customerPhone: string) => void;
+  onOpenParchiScanner?: () => void;
 }
 
 const KEYPAD_BUTTONS = [
@@ -115,6 +122,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
   business,
   language,
   transactions,
+  trustScore,
   onBack,
   onAddTransaction,
   onUpdateTransaction,
@@ -123,11 +131,14 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
   onDeleteAccount,
   onOpenVoiceForCustomer,
   onOpenCreateBill,
+  onOpenParchiScanner,
 }) => {
   const t = getUIStrings(language);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [timelineFilter, setTimelineFilter] = useState<'all' | 'given' | 'received' | 'photos'>('all');
+  const [timelineFilter, setTimelineFilter] = useState<'all' | 'given' | 'received' | 'photos'>(
+    'all'
+  );
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [showDueModal, setShowDueModal] = useState(false);
@@ -136,10 +147,12 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
   const [brokenImgIds, setBrokenImgIds] = useState<Record<string, boolean>>({});
   const [actionError, setActionError] = useState('');
 
-  // Edit profile form
+  // Edit profile & promise-to-pay form
   const [editName, setEditName] = useState(account.name);
   const [editPhone, setEditPhone] = useState(account.phone);
   const [editDueDate, setEditDueDate] = useState(account.dueDate);
+  const [editPromiseDate, setEditPromiseDate] = useState(account.promiseDate || '');
+  const [editPromiseNote, setEditPromiseNote] = useState(account.promiseNote || '');
   const [editCreditLimit, setEditCreditLimit] = useState(
     account.creditLimit ? String(account.creditLimit) : ''
   );
@@ -156,6 +169,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
   const [calcNote, setCalcNote] = useState('');
   const [calcDate, setCalcDate] = useState(() => getLocalDateKey());
   const [calcBillImage, setCalcBillImage] = useState('');
+  const [syncGallaMode, setSyncGallaMode] = useState<CashbookMode | null>(null);
   const [calcSaving, setCalcSaving] = useState(false);
   const [calcError, setCalcError] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -171,7 +185,16 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [previewImage, showDueModal, dueSaving, showQrModal, showProfileDrawer, profileSaving, calcDirection, calcSaving]);
+  }, [
+    previewImage,
+    showDueModal,
+    dueSaving,
+    showQrModal,
+    showProfileDrawer,
+    profileSaving,
+    calcDirection,
+    calcSaving,
+  ]);
 
   // Chronological entries + running balance per transaction
   const timeline = useMemo(() => {
@@ -219,6 +242,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
     setCalcNote('');
     setCalcDate(getLocalDateKey());
     setCalcBillImage('');
+    setSyncGallaMode(null);
     setCalcError('');
   };
 
@@ -229,6 +253,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
     setCalcNote(tx.note || '');
     setCalcDate((tx.billDate || '').slice(0, 10) || getLocalDateKey());
     setCalcBillImage(tx.billImage || '');
+    setSyncGallaMode(null);
     setCalcError('');
   };
 
@@ -287,9 +312,10 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
     setCalcSaving(true);
     try {
       const nowTime = new Date().toTimeString().slice(0, 8);
-      const isoDate = editingTx && editingTx.billDate.startsWith(calcDate)
-        ? editingTx.billDate
-        : new Date(`${calcDate}T${nowTime}`).toISOString();
+      const isoDate =
+        editingTx && editingTx.billDate.startsWith(calcDate)
+          ? editingTx.billDate
+          : new Date(`${calcDate}T${nowTime}`).toISOString();
 
       if (editingTx) {
         await onUpdateTransaction(editingTx, {
@@ -306,6 +332,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           note: calcNote.trim(),
           billDate: isoDate,
           billImage: calcBillImage,
+          syncToGalla: syncGallaMode ? { mode: syncGallaMode } : null,
         });
       }
       setCalcSaving(false);
@@ -372,16 +399,12 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
 
   const absBal = Math.abs(account.balance);
   const balLabel =
-    account.balance > 0
-      ? t.due
-      : account.balance < 0
-      ? t.advance
-      : t.settled;
+    account.balance > 0 ? t.due : account.balance < 0 ? t.advance : t.settled;
 
-  // Calculator Modal View (OkCredit video 02:00 - 02:10)
+  // Calculator Modal View
   if (calcDirection) {
     return (
-      <div className="fixed inset-0 z-50 bg-white dark:bg-slate-950 flex flex-col">
+      <div className="fixed inset-0 z-50 bg-[var(--app-bg)] flex flex-col">
         <div className="max-w-lg w-full mx-auto flex-1 flex flex-col justify-between p-4">
           {/* Header */}
           <div className="flex items-center justify-between gap-3">
@@ -390,7 +413,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 type="button"
                 onClick={() => setCalcDirection(null)}
                 aria-label="Back to ledger"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -426,7 +449,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                         ? d === 'given'
                           ? 'bg-red-600 border-red-600 text-white'
                           : 'bg-emerald-600 border-emerald-600 text-white'
-                        : 'border-slate-200 dark:border-slate-700'
+                        : 'border-[var(--surface-border)]'
                     }`}
                   >
                     {d === 'given' ? 'Given' : 'Received'}
@@ -437,7 +460,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           </div>
 
           {/* Big Amount Display */}
-          <div className="py-5 text-center space-y-1.5">
+          <div className="py-4 text-center space-y-1.5">
             <div
               className={`text-5xl font-extrabold font-tabular tracking-tight ${
                 calcDirection === 'given' ? 'text-red-600' : 'text-emerald-600'
@@ -454,15 +477,16 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               <p className="inline-flex items-center gap-1.5 text-xs font-bold font-tabular text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 rounded-xl px-3 py-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                 <span>
-                  Limit {formatINR(calcLimitWarning.limit)} exceeded by {formatINR(calcLimitWarning.excess)}
+                  Limit {formatINR(calcLimitWarning.limit)} exceeded by{' '}
+                  {formatINR(calcLimitWarning.excess)}
                 </span>
               </p>
             )}
           </div>
 
-          {/* Notes / Date / Bill Attachment */}
+          {/* Notes / Date / Bill Attachment / Galla Sync */}
           <div className="space-y-2.5">
-            <div className="flex items-center gap-2 rounded-2xl bg-slate-100 dark:bg-slate-900 px-3.5 min-h-[48px]">
+            <div className="flex items-center gap-2 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] px-3.5 min-h-[48px]">
               <Receipt className="w-4 h-4 text-slate-400 shrink-0" />
               <input
                 type="text"
@@ -475,14 +499,14 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 type="button"
                 onClick={handleDictateNote}
                 aria-label="Speak note"
-                className="min-w-[38px] min-h-[38px] rounded-full flex items-center justify-center text-[var(--brand)] hover:bg-white dark:hover:bg-slate-800"
+                className="min-w-[38px] min-h-[38px] rounded-full flex items-center justify-center text-[var(--brand)] hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <Mic className="w-4 h-4" />
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
-              <label className="flex items-center justify-between gap-2 rounded-2xl bg-slate-100 dark:bg-slate-900 px-3.5 min-h-[46px] text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer">
+              <label className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] px-3.5 min-h-[46px] text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer">
                 <span className="inline-flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-[var(--brand)]" />
                   <span>Bill Date</span>
@@ -498,7 +522,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-between gap-2 rounded-2xl bg-slate-100 dark:bg-slate-900 px-3.5 min-h-[46px] text-xs font-bold text-slate-700 dark:text-slate-200"
+                className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] px-3.5 min-h-[46px] text-xs font-bold text-slate-700 dark:text-slate-200"
               >
                 <span className="inline-flex items-center gap-1.5">
                   <Camera className="w-4 h-4 text-[var(--brand)]" />
@@ -515,6 +539,36 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               />
             </div>
 
+            {!editingTx && (
+              <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] px-3.5 py-2">
+                <span className="text-[11px] font-bold text-slate-500">
+                  Sync to Today&apos;s Galla
+                </span>
+                <div className="flex items-center gap-1">
+                  {(
+                    [
+                      { id: null, label: 'Off' },
+                      { id: 'cash', label: 'Cash' },
+                      { id: 'upi', label: 'UPI' },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => setSyncGallaMode(opt.id)}
+                      className={`min-h-[30px] px-2.5 rounded-lg text-[11px] font-extrabold border ${
+                        syncGallaMode === opt.id
+                          ? 'bg-[var(--brand)] border-[var(--brand)] text-[var(--brand-fg)]'
+                          : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {calcError && (
               <p className="text-xs font-bold text-red-600 text-center">{calcError}</p>
             )}
@@ -527,7 +581,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     setCalcDirection(null);
                     onOpenCreateBill(account.name, account.phone);
                   }}
-                  className="min-h-[52px] px-4 rounded-2xl border border-slate-300 dark:border-slate-700 text-sm font-bold text-slate-800 dark:text-slate-100 inline-flex items-center gap-1.5 whitespace-nowrap"
+                  className="min-h-[52px] px-4 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] text-sm font-bold text-slate-800 dark:text-slate-100 inline-flex items-center gap-1.5 whitespace-nowrap"
                 >
                   <FileText className="w-4 h-4 text-[var(--brand)]" />
                   <span>Create Bill</span>
@@ -537,7 +591,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 type="button"
                 disabled={calcSaving}
                 onClick={handleConfirmCalc}
-                className="flex-1 min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-white font-extrabold text-base flex items-center justify-center gap-2"
+                className="flex-1 min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-base flex items-center justify-center gap-2"
               >
                 <Check className="w-5 h-5" />
                 <span>{calcSaving ? 'Saving...' : 'Confirm'}</span>
@@ -556,10 +610,10 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   onClick={() => handleKeypadPress(btn)}
                   className={`min-h-[54px] rounded-2xl font-tabular text-xl font-bold flex items-center justify-center transition active:scale-95 ${
                     btn === '='
-                      ? 'bg-[var(--brand)] text-white'
+                      ? 'bg-[var(--brand)] text-[var(--brand-fg)]'
                       : isOp
                       ? 'bg-[var(--brand-tint)] text-[var(--brand)]'
-                      : 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-800'
+                      : 'bg-[var(--surface)] border border-[var(--surface-border)] text-slate-900 dark:text-white'
                   }`}
                 >
                   {btn === 'BACK' ? <Delete className="w-5 h-5" /> : btn}
@@ -573,15 +627,15 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
   }
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-140px)] bg-slate-50 dark:bg-slate-950 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+    <div className="flex flex-col min-h-[calc(100vh-140px)] bg-[var(--app-bg)] rounded-3xl border border-[var(--surface-border)] overflow-hidden">
       {/* Ledger Chat Top Bar */}
-      <div className="no-print bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 flex items-center justify-between gap-2">
+      <div className="no-print bg-[var(--surface)] border-b border-[var(--surface-border)] px-3 py-2.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
             onClick={onBack}
             aria-label="Back to Ledger"
-            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 shrink-0"
+            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-black/5 dark:hover:bg-white/10 shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -597,6 +651,8 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               setEditName(account.name);
               setEditPhone(account.phone);
               setEditDueDate(account.dueDate);
+              setEditPromiseDate(account.promiseDate || '');
+              setEditPromiseNote(account.promiseNote || '');
               setEditCreditLimit(account.creditLimit ? String(account.creditLimit) : '');
               setConfirmDeleteCustomer(false);
               setShowProfileDrawer(true);
@@ -606,19 +662,34 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
             <h2 className="text-base font-extrabold text-slate-900 dark:text-white truncate">
               {account.name}
             </h2>
-            <p className="text-xs font-semibold text-[var(--brand)]">
-              View Profile {account.creditLimit ? `· Limit ₹${account.creditLimit.toLocaleString('en-IN')}` : ''}
+            <p className="text-xs font-semibold text-[var(--brand)] truncate">
+              {trustScore && account.kind === 'customer'
+                ? `Trust ${trustScore.score}/100 · ${trustScore.recoveryTimingHint}`
+                : 'View Profile'}
+              {account.creditLimit ? ` · Limit ₹${account.creditLimit.toLocaleString('en-IN')}` : ''}
+              {account.promiseDate ? ` · Promise ${account.promiseDate}` : ''}
             </p>
           </button>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {onOpenParchiScanner && (
+            <button
+              type="button"
+              onClick={onOpenParchiScanner}
+              aria-label="Scan Parchi"
+              title="Scan Parchi (AI)"
+              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              <Camera className="w-5 h-5" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => window.print()}
             aria-label="Print PDF Statement"
             title="Print / Save PDF Statement"
-            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
           >
             <FileText className="w-5 h-5" />
           </button>
@@ -626,7 +697,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
             type="button"
             onClick={() => setSearchOpen((v) => !v)}
             aria-label="Search entries"
-            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
           >
             <Search className="w-5 h-5" />
           </button>
@@ -634,20 +705,20 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
       </div>
 
       {searchOpen && (
-        <div className="no-print bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-2">
+        <div className="no-print bg-[var(--surface)] border-b border-[var(--surface-border)] px-4 py-2">
           <input
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search notes or ₹ amount..."
-            className="w-full min-h-[40px] rounded-xl bg-slate-100 dark:bg-slate-800 px-3 text-sm outline-none"
+            className="w-full min-h-[40px] rounded-xl bg-black/5 dark:bg-white/10 px-3 text-sm outline-none"
           />
         </div>
       )}
 
       {/* Timeline Filter Strip */}
       {transactions.length > 0 && (
-        <div className="no-print bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="no-print bg-[var(--surface)] border-b border-[var(--surface-border)] px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {(
             [
               { id: 'all', label: 'All Entries' },
@@ -663,7 +734,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               className={`min-h-[32px] px-3 rounded-lg text-xs font-bold whitespace-nowrap border transition ${
                 timelineFilter === f.id
                   ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-300'
               }`}
             >
               {f.label}
@@ -698,14 +769,15 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               <Lock className="w-7 h-7" />
             </div>
             <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 max-w-xs">
-              All transactions between you and {account.name} are totally private & synced securely.
+              All transactions between you and {account.name} are totally private &amp; synced
+              securely.
             </p>
           </div>
         ) : (
           timeline.map((group) => (
             <div key={group.dateLabel} className="space-y-3">
               <div className="flex justify-center">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1 rounded-lg">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-[var(--surface)] border border-[var(--surface-border)] px-3 py-1 rounded-lg">
                   {group.dateLabel}
                 </span>
               </div>
@@ -713,13 +785,16 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               {group.items.map(({ tx, runningBalance }) => {
                 const isGiven = tx.direction === 'given';
                 const armed = armedDeleteTxId === tx.id;
+                const metaParts: string[] = [];
+                if (tx.createdByName) metaParts.push(tx.createdByName);
+                if (tx.gallaSynced) metaParts.push('Galla Synced');
                 return (
                   <div
                     key={tx.id}
                     className={`flex flex-col ${isGiven ? 'items-end' : 'items-start'}`}
                   >
                     <div
-                      className={`max-w-[82%] sm:max-w-[65%] rounded-2xl bg-white dark:bg-slate-900 border px-4 py-3 shadow-xs space-y-1.5 ${
+                      className={`max-w-[82%] sm:max-w-[65%] rounded-2xl bg-[var(--surface)] border px-4 py-3 shadow-xs space-y-1.5 ${
                         isGiven
                           ? 'border-red-200 dark:border-red-900/60'
                           : 'border-emerald-200 dark:border-emerald-900/60'
@@ -787,8 +862,14 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                         </p>
                       )}
 
-                      {tx.billImage && (
-                        brokenImgIds[tx.id] ? (
+                      {metaParts.length > 0 && (
+                        <p className="text-[10px] font-semibold text-slate-400">
+                          {metaParts.join(' · ')}
+                        </p>
+                      )}
+
+                      {tx.billImage &&
+                        (brokenImgIds[tx.id] ? (
                           <span className="inline-block text-[11px] font-semibold text-slate-400 italic pt-1">
                             Bill photo unavailable
                           </span>
@@ -805,11 +886,10 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                               onError={() =>
                                 setBrokenImgIds((prev) => ({ ...prev, [tx.id]: true }))
                               }
-                              className="max-h-28 rounded-lg border border-slate-200 dark:border-slate-700 object-cover"
+                              className="max-h-28 rounded-lg border border-[var(--surface-border)] object-cover"
                             />
                           </button>
-                        )
-                      )}
+                        ))}
                     </div>
 
                     <span className="mt-1 px-1 text-[11px] font-semibold font-tabular text-slate-500 dark:text-slate-400">
@@ -825,7 +905,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
       </div>
 
       {/* Bottom Quick Action Bar + Sticky Received / Voice / Given */}
-      <div className="no-print bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-4 py-3 space-y-3">
+      <div className="no-print bg-[var(--surface)] border-t border-[var(--surface-border)] px-4 py-3 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
             <a
@@ -837,14 +917,14 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 }
               }}
               aria-label="Call customer"
-              className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="w-10 h-10 rounded-full border border-[var(--surface-border)] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
             >
               <Phone className="w-4 h-4" />
             </a>
             <a
               href={`sms:${account.phone || ''}?body=${encodeURIComponent(reminderMsg)}`}
               aria-label="Send SMS reminder"
-              className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="w-10 h-10 rounded-full border border-[var(--surface-border)] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
             >
               <MessageSquare className="w-4 h-4" />
             </a>
@@ -861,24 +941,27 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               type="button"
               onClick={() => setShowQrModal(true)}
               aria-label="Show UPI QR"
-              className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="w-10 h-10 rounded-full border border-[var(--surface-border)] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
             >
               <QrCode className="w-4 h-4" />
             </button>
             <button
               type="button"
-              onClick={() => setShowDueModal(true)}
-              aria-label="Set due date"
-              className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              onClick={() => {
+                setEditDueDate(account.dueDate || '');
+                setEditPromiseDate(account.promiseDate || '');
+                setEditPromiseNote(account.promiseNote || '');
+                setShowDueModal(true);
+              }}
+              aria-label="Set due date or promise date"
+              className="w-10 h-10 rounded-full border border-[var(--surface-border)] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
             >
               <Calendar className="w-4 h-4" />
             </button>
           </div>
 
           <div className="text-right">
-            <p className="text-xs font-semibold text-slate-500">
-              Balance {balLabel}
-            </p>
+            <p className="text-xs font-semibold text-slate-500">Balance {balLabel}</p>
             <p
               className={`text-base font-extrabold font-tabular ${
                 account.balance > 0 ? 'text-red-600' : 'text-emerald-600'
@@ -893,7 +976,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           <button
             type="button"
             onClick={() => openCalculator('received')}
-            className="flex-1 min-h-[50px] rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-extrabold text-sm flex items-center justify-center gap-1.5 transition"
+            className="flex-1 min-h-[50px] rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400 font-extrabold text-sm flex items-center justify-center gap-1.5 transition"
           >
             <ArrowDown className="w-4 h-4" />
             <span>{t.received}</span>
@@ -903,7 +986,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
             type="button"
             onClick={() => onOpenVoiceForCustomer(account.name)}
             aria-label="Voice entry for this customer"
-            className="w-14 min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white flex items-center justify-center shrink-0 shadow-sm"
+            className="w-14 min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] flex items-center justify-center shrink-0 shadow-sm"
           >
             <Mic className="w-5 h-5" />
           </button>
@@ -911,7 +994,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           <button
             type="button"
             onClick={() => openCalculator('given')}
-            className="flex-1 min-h-[50px] rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 font-extrabold text-sm flex items-center justify-center gap-1.5 transition"
+            className="flex-1 min-h-[50px] rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-extrabold text-sm flex items-center justify-center gap-1.5 transition"
           >
             <ArrowUp className="w-4 h-4" />
             <span>{t.given}</span>
@@ -929,7 +1012,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 p-6 space-y-4"
+            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4 max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-extrabold flex items-center gap-2">
@@ -951,13 +1034,11 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full min-h-[46px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-bold"
+                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
-                  Mobile Number
-                </label>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Mobile Number</label>
                 <input
                   type="tel"
                   maxLength={10}
@@ -967,19 +1048,30 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
                   }}
                   placeholder="9876543210"
-                  className="w-full min-h-[46px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-bold font-tabular"
+                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold font-tabular"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
-                  Due Date (Collection Reminder)
-                </label>
-                <input
-                  type="date"
-                  value={editDueDate}
-                  onChange={(e) => setEditDueDate(e.target.value)}
-                  className="w-full min-h-[46px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-tabular"
-                />
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={editDueDate}
+                    onChange={(e) => setEditDueDate(e.target.value)}
+                    className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xs font-tabular"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    Promise-to-Pay Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editPromiseDate}
+                    onChange={(e) => setEditPromiseDate(e.target.value)}
+                    className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xs font-tabular"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">
@@ -991,14 +1083,12 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   value={editCreditLimit}
                   onChange={(e) => setEditCreditLimit(e.target.value)}
                   placeholder="e.g. 5000 (0 = No Limit)"
-                  className="w-full min-h-[46px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-bold font-tabular"
+                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold font-tabular"
                 />
               </div>
             </div>
 
-            {profileError && (
-              <p className="text-xs font-bold text-red-600">{profileError}</p>
-            )}
+            {profileError && <p className="text-xs font-bold text-red-600">{profileError}</p>}
 
             <button
               type="button"
@@ -1015,6 +1105,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     name: editName.trim() || account.name,
                     phone: editPhone.trim(),
                     dueDate: editDueDate,
+                    promiseDate: editPromiseDate,
                     creditLimit: Math.max(0, Number(editCreditLimit) || 0),
                   });
                   setShowProfileDrawer(false);
@@ -1026,12 +1117,12 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   setProfileSaving(false);
                 }
               }}
-              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-white font-bold disabled:opacity-60"
+              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60"
             >
               {profileSaving ? 'Saving...' : 'Save Changes'}
             </button>
 
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="pt-2 border-t border-[var(--surface-border)]">
               {!confirmDeleteCustomer ? (
                 <button
                   type="button"
@@ -1068,7 +1159,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteCustomer(false)}
-                      className="min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 text-sm font-bold"
+                      className="min-h-[44px] rounded-xl bg-black/5 dark:bg-white/10 text-sm font-bold"
                     >
                       Cancel
                     </button>
@@ -1088,7 +1179,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 p-6 text-center space-y-4"
+            className="w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 text-center space-y-4"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-extrabold">Collect via UPI QR</h3>
@@ -1115,7 +1206,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               href={buildWhatsAppUrl(account.phone, reminderMsg)}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-white font-bold flex items-center justify-center gap-2"
+              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold flex items-center justify-center gap-2"
             >
               <MessageCircle className="w-4 h-4" />
               <span>Share Reminder on WhatsApp</span>
@@ -1124,7 +1215,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
         </div>
       )}
 
-      {/* Due Date Quick Picker */}
+      {/* Due Date & Promise-to-Pay Quick Picker */}
       {showDueModal && (
         <div
           onClick={() => {
@@ -1134,15 +1225,45 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 p-6 space-y-4"
+            className="w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4"
           >
-            <h3 className="text-lg font-extrabold">Set Collection Due Date</h3>
-            <input
-              type="date"
-              value={editDueDate}
-              onChange={(e) => setEditDueDate(e.target.value)}
-              className="w-full min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 font-tabular"
-            />
+            <h3 className="text-lg font-extrabold">Due Date &amp; Payment Promise</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">
+                  Collection Due Date
+                </label>
+                <input
+                  type="date"
+                  value={editDueDate}
+                  onChange={(e) => setEditDueDate(e.target.value)}
+                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 font-tabular"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">
+                  Customer Promise-to-Pay Date
+                </label>
+                <input
+                  type="date"
+                  value={editPromiseDate}
+                  onChange={(e) => setEditPromiseDate(e.target.value)}
+                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 font-tabular"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">
+                  Promise Note (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={editPromiseNote}
+                  onChange={(e) => setEditPromiseNote(e.target.value)}
+                  placeholder="e.g. Kal shaam ko UPI karega"
+                  className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
+                />
+              </div>
+            </div>
             {dueError && <p className="text-xs font-bold text-red-600">{dueError}</p>}
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -1152,23 +1273,27 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   setDueError('');
                   setDueSaving(true);
                   try {
-                    await onUpdateAccount({ dueDate: editDueDate });
+                    await onUpdateAccount({
+                      dueDate: editDueDate,
+                      promiseDate: editPromiseDate,
+                      promiseNote: editPromiseNote.trim(),
+                    });
                     setShowDueModal(false);
                   } catch (err) {
-                    setDueError(err instanceof Error ? err.message : 'Failed to save due date.');
+                    setDueError(err instanceof Error ? err.message : 'Failed to save dates.');
                   } finally {
                     setDueSaving(false);
                   }
                 }}
-                className="min-h-[46px] rounded-xl bg-[var(--brand)] text-white font-bold disabled:opacity-60"
+                className="min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60"
               >
-                {dueSaving ? 'Saving...' : 'Save Date'}
+                {dueSaving ? 'Saving...' : 'Save Dates'}
               </button>
               <button
                 type="button"
                 disabled={dueSaving}
                 onClick={() => setShowDueModal(false)}
-                className="min-h-[46px] rounded-xl bg-slate-100 dark:bg-slate-800 font-bold"
+                className="min-h-[46px] rounded-xl bg-black/5 dark:bg-white/10 font-bold"
               >
                 Cancel
               </button>

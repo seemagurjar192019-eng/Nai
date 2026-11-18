@@ -11,7 +11,7 @@ export type LanguageCode =
   | 'kn'
   | 'bn';
 
-export type AccentTheme = 'green' | 'crimson';
+export type AccentTheme = 'obsidian' | 'green' | 'crimson';
 export type AppearanceMode = 'light' | 'dark' | 'system';
 
 export type AccountKind = 'customer' | 'supplier';
@@ -25,20 +25,28 @@ export type LedgerFilterChip =
   | 'due-today'
   | 'pending-due'
   | 'upcoming-due'
-  | 'defaulters';
+  | 'defaulters'
+  | 'high-risk';
 
 export type CollectionFilterChip =
   | 'all'
   | 'due-today'
   | 'pending-due'
   | 'upcoming'
-  | 'defaulters';
+  | 'defaulters'
+  | 'high-risk';
 
 export type SortByOption =
   | 'recommended'
   | 'last-payment'
   | 'latest-activity'
-  | 'due-amount';
+  | 'due-amount'
+  | 'recovery-priority';
+
+export type CashbookEntryType = 'inflow' | 'outflow';
+export type CashbookMode = 'cash' | 'upi' | 'bank';
+export type StaffRole = 'owner' | 'munim' | 'cashier';
+export type ActivityActionType = 'ledger' | 'bill' | 'stock' | 'galla' | 'staff' | 'account';
 
 export interface UserProfile {
   uid: string;
@@ -78,6 +86,8 @@ export interface LedgerAccount {
   phone: string;
   dueDate: string;
   creditLimit?: number;
+  promiseDate?: string;
+  promiseNote?: string;
   balance: number;
   lastNote: string;
   lastActivityAt: string;
@@ -96,6 +106,9 @@ export interface LedgerTransaction {
   billDate: string;
   voiceRaw: string;
   billImage: string;
+  createdByName?: string;
+  createdByRole?: StaffRole;
+  gallaSynced?: boolean;
   createdAt?: unknown;
   updatedAt?: unknown;
 }
@@ -125,6 +138,8 @@ export interface BillDocument {
   totalAmount: number;
   paymentStatus?: BillPaymentStatus;
   linkedTxId?: string;
+  createdByName?: string;
+  estimatedCost?: number;
   templateId: BillTemplateId;
   notes: string;
   billDate: string;
@@ -146,12 +161,115 @@ export interface StockItem {
   updatedAt?: unknown;
 }
 
+export interface CashbookEntry {
+  id: string;
+  ownerId: string;
+  businessId: string;
+  entryType: CashbookEntryType;
+  mode: CashbookMode;
+  category: string;
+  amount: number;
+  note: string;
+  entryDate: string;
+  linkedRefId?: string;
+  actorName?: string;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export interface StaffMember {
+  id: string;
+  ownerId: string;
+  businessId: string;
+  name: string;
+  role: StaffRole;
+  phone: string;
+  pinHash?: string;
+  active: boolean;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export interface ActivityLog {
+  id: string;
+  ownerId: string;
+  businessId: string;
+  actorName: string;
+  actorRole: StaffRole;
+  actionType: ActivityActionType;
+  summary: string;
+  targetName: string;
+  amount?: number;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export interface ActiveOperator {
+  staffId: string;
+  name: string;
+  role: StaffRole;
+}
+
+export type TrustBand = 'reliable' | 'watch' | 'high-risk';
+
+export interface CustomerTrustScore {
+  score: number;
+  band: TrustBand;
+  overdueDays: number;
+  settledRatio: number;
+  lastPaymentDaysAgo: number | null;
+  recoveryTimingHint: string;
+  suggestedTone: 'gentle' | 'firm' | 'urgent';
+  priorityScore: number;
+}
+
+export interface DailyGallaPulse {
+  todayStr: string;
+  cashDrawerBalance: number;
+  upiBankBalance: number;
+  totalLiquidBalance: number;
+  todayInflow: number;
+  todayOutflow: number;
+  todayCashSalesAndVasooli: number;
+  todayExpenses: number;
+  estimatedDailyProfit: number;
+  profitBasisNote: string;
+}
+
+export interface ParchiScanResult {
+  partyName: string;
+  phone: string;
+  direction: TxDirection;
+  billDate: string;
+  notes: string;
+  items: BillLineItem[];
+  totalAmount: number;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface HybridVoiceEntry {
+  name: string;
+  amount: number;
+  type: 'credit' | 'debit';
+  note: string;
+}
+
+export interface HybridVoiceParseResult {
+  intent: 'entries' | 'bill' | 'balance_query' | 'daily_summary';
+  entries: HybridVoiceEntry[];
+  billItems: BillLineItem[];
+  customerName: string;
+  paymentStatus: 'paid' | 'unpaid';
+  confidence: 'high' | 'medium' | 'low';
+  source: 'local' | 'ai';
+}
+
 export interface AppNotificationItem {
   id: string;
   title: string;
   bullets: string[];
   actionLabel: string;
-  targetAction: 'collection' | 'theme' | 'upi' | 'voice';
+  targetAction: 'collection' | 'theme' | 'upi' | 'voice' | 'galla' | 'parchi';
   read: boolean;
   fav: boolean;
   timeLabel: string;

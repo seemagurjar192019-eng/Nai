@@ -1,5 +1,8 @@
 import type { LanguageCode } from './types';
 
+export const UCRED_LOGO_PATH =
+  '/assets/aistudio/Meta_AI_917045015_1478484944227547_3671959198306789604_n_20261118_173633_2bf77e53.webp';
+
 export interface LanguageOption {
   code: LanguageCode;
   nativeName: string;
@@ -66,15 +69,15 @@ export interface UIStrings {
 }
 
 const EN_STRINGS: UIStrings = {
-  appName: 'BolBahi',
+  appName: 'Ucred',
   selectLanguage: 'Select your Language',
   enterMobileTitle: 'Enter Your Mobile Number',
   mobileLabel: 'Mobile Number',
   agreePrefix: 'I agree to share my phone number for login. See our',
   continueGoogle: 'Continue with Google (Free Sync)',
   verificationSuccess: 'Verification Successful',
-  welcomeFamily: 'Welcome to BolBahi Family',
-  welcomeSub: 'Add your business/shop name and start your voice & digital account book',
+  welcomeFamily: 'Welcome to Ucred Family',
+  welcomeSub: 'Add your shop name to start Voice Khata, AI Parchi & Live Galla',
   startBtn: 'Start',
   setupBusiness: 'Setup Business',
   businessPrompt: 'Add your business/shop name',
@@ -97,7 +100,7 @@ const EN_STRINGS: UIStrings = {
   addCustomer: 'Add Customer',
   addSupplier: 'Add Supplier',
   oneClickVasooli: '1-Click Vasooli',
-  voiceEntry: 'Voice Entry',
+  voiceEntry: 'Voice & Counter',
   received: 'Received',
   given: 'Given',
   due: 'Due',
@@ -109,15 +112,15 @@ const EN_STRINGS: UIStrings = {
 };
 
 const HI_STRINGS: UIStrings = {
-  appName: 'बोलबही',
+  appName: 'यूक्रेड (Ucred)',
   selectLanguage: 'अपनी भाषा चुनें',
   enterMobileTitle: 'अपना मोबाइल नंबर दर्ज करें',
   mobileLabel: 'मोबाइल नंबर',
   agreePrefix: 'मैं लॉगिन के लिए अपना फ़ोन नंबर साझा करने से सहमत हूँ। देखें',
   continueGoogle: 'Google से जारी रखें (मुफ़्त सिंक)',
   verificationSuccess: 'सत्यापन सफल रहा',
-  welcomeFamily: 'बोलबही परिवार में आपका स्वागत है',
-  welcomeSub: 'अपनी दुकान का नाम जोड़ें और बोलकर अपना डिजिटल खाता शुरू करें',
+  welcomeFamily: 'Ucred परिवार में आपका स्वागत है',
+  welcomeSub: 'अपनी दुकान का नाम जोड़ें और बोलकर डिजिटल खाता व गल्ला शुरू करें',
   startBtn: 'शुरू करें',
   setupBusiness: 'व्यापार सेटअप',
   businessPrompt: 'अपनी दुकान / व्यापार का नाम लिखें',
@@ -152,15 +155,15 @@ const HI_STRINGS: UIStrings = {
 };
 
 const HINGLISH_STRINGS: UIStrings = {
-  appName: 'BolBahi',
+  appName: 'Ucred',
   selectLanguage: 'Apni Bhasha Chunein',
   enterMobileTitle: 'Apna Mobile Number Daalein',
   mobileLabel: 'Mobile Number',
   agreePrefix: 'Main login ke liye apna phone number share karne se sehmat hoon. Dekhein',
   continueGoogle: 'Google se Continue Karein (Free Sync)',
   verificationSuccess: 'Verification Safal Hua',
-  welcomeFamily: 'BolBahi Family mein Swagat Hai',
-  welcomeSub: 'Apni dukaan ka naam daalein aur bol kar digital khata shuru karein',
+  welcomeFamily: 'Ucred Family mein Swagat Hai',
+  welcomeSub: 'Apni dukaan ka naam daalein aur Voice Khata, AI Parchi & Galla shuru karein',
   startBtn: 'Shuru Karein',
   setupBusiness: 'Dukaan Setup',
   businessPrompt: 'Apni dukaan / business ka naam likhein',
@@ -183,7 +186,7 @@ const HINGLISH_STRINGS: UIStrings = {
   addCustomer: 'Customer Jodein',
   addSupplier: 'Supplier Jodein',
   oneClickVasooli: '1-Click Vasooli',
-  voiceEntry: 'Bol ke Likho',
+  voiceEntry: 'Voice & Counter',
   received: 'Mila (Jama)',
   given: 'Diya (Udhaar)',
   due: 'Baaki',
@@ -201,13 +204,13 @@ export function getUIStrings(lang: LanguageCode): UIStrings {
 }
 
 const AVATAR_COLORS = [
-  '#7C3AED',
-  '#008037',
+  '#161514',
+  '#4A4238',
+  '#0F8A4B',
   '#1D4ED8',
   '#B45309',
   '#9A1B1E',
   '#0F766E',
-  '#BE185D',
 ];
 
 export function getAvatarColor(name: string): string {
@@ -279,7 +282,7 @@ export function buildUpiUri(upiId: string, shopName: string, amount?: number): s
   if (!cleanPa) return '';
   const params = new URLSearchParams({
     pa: cleanPa,
-    pn: (shopName || 'BolBahi Shop').slice(0, 40),
+    pn: (shopName || 'Ucred Shop').slice(0, 40),
     cu: 'INR',
   });
   if (amount && amount > 0) {
@@ -354,16 +357,23 @@ export function buildDailyMunimScript(params: {
   lowStockCount: number;
   shopName: string;
   language: LanguageCode;
+  gallaCash?: number;
 }): string {
   const net = params.receivedToday - params.givenToday;
   const given = Math.round(params.givenToday);
   const rec = Math.round(params.receivedToday);
   const netAbs = Math.round(Math.abs(net));
+  const gallaNote =
+    params.gallaCash !== undefined
+      ? params.language === 'en'
+        ? ` Galla cash drawer balance is ${Math.round(params.gallaCash)} rupees.`
+        : ` Aaj galla mein ${Math.round(params.gallaCash)} rupaye cash hai.`
+      : '';
 
   if (params.language === 'en') {
-    return `${params.shopName} daily closing summary. Today credit given is ${given} rupees, payment received is ${rec} rupees, net cashflow is ${net >= 0 ? 'plus' : 'minus'} ${netAbs} rupees. ${params.overdueCount} customers have overdue balances and ${params.lowStockCount} stock items are low.`;
+    return `${params.shopName} daily closing summary. Today credit given is ${given} rupees, payment received is ${rec} rupees, net cashflow is ${net >= 0 ? 'plus' : 'minus'} ${netAbs} rupees.${gallaNote} ${params.overdueCount} customers have overdue balances and ${params.lowStockCount} stock items are low.`;
   }
-  return `${params.shopName} ka aaj ka hisaab. Aaj kul ${given} rupaye ka udhaar diya gaya, aur ${rec} rupaye vasooli aayi. Aaj ka net cashflow ${net >= 0 ? 'plus' : 'minus'} ${netAbs} rupaye hai. ${params.overdueCount} grahako ka payment overdue hai, aur ${params.lowStockCount} stock items kam hain.`;
+  return `${params.shopName} ka aaj ka hisaab. Aaj kul ${given} rupaye ka udhaar diya gaya, aur ${rec} rupaye vasooli aayi. Aaj ka net cashflow ${net >= 0 ? 'plus' : 'minus'} ${netAbs} rupaye hai.${gallaNote} ${params.overdueCount} grahako ka payment overdue hai, aur ${params.lowStockCount} stock items kam hain.`;
 }
 
 export function speakHinglish(text: string, lang: LanguageCode = 'hinglish'): void {
@@ -372,7 +382,7 @@ export function speakHinglish(text: string, lang: LanguageCode = 'hinglish'): vo
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = lang === 'en' ? 'en-IN' : 'hi-IN';
-    utter.rate = 0.94;
+    utter.rate = 0.96;
     window.speechSynthesis.speak(utter);
   } catch {
     // Ignore speech synthesis errors on unsupported browsers
@@ -388,13 +398,17 @@ export function stopSpeaking(): void {
   }
 }
 
-export async function compressImageToDataUrl(file: File): Promise<string> {
+export async function compressImageToDataUrl(
+  file: File,
+  options?: { maxSide?: number; maxBytes?: number }
+): Promise<string> {
+  const maxSide = options?.maxSide ?? 720;
+  const maxBytes = options?.maxBytes ?? 145000;
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const maxSide = 720;
         let { width, height } = img;
         if (width > maxSide || height > maxSide) {
           if (width > height) {
@@ -414,8 +428,8 @@ export async function compressImageToDataUrl(file: File): Promise<string> {
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
-        const out = canvas.toDataURL('image/jpeg', 0.65);
-        resolve(out.length <= 145000 ? out : canvas.toDataURL('image/jpeg', 0.4));
+        const out = canvas.toDataURL('image/jpeg', 0.72);
+        resolve(out.length <= maxBytes ? out : canvas.toDataURL('image/jpeg', 0.45));
       };
       img.onerror = () => reject(new Error('Failed to load image'));
       img.src = String(reader.result || '');
@@ -433,15 +447,9 @@ export function getLocalDateKey(date: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Salted SHA-256 hash for 4-digit App Lock PIN scoped to Firebase UID. */
-export async function hashPinForUid(pin: string, uid: string): Promise<string> {
-  const cleanPin = pin.trim();
-  if (!cleanPin) return '';
-  if (typeof globalThis === 'undefined' || !globalThis.crypto?.subtle) {
-    return cleanPin;
-  }
+async function sha256Salted(saltPrefix: string, pin: string, uid: string): Promise<string> {
   const encoder = new TextEncoder();
-  const data = encoder.encode(`bolbahi:${uid}:${cleanPin}`);
+  const data = encoder.encode(`${saltPrefix}:${uid}:${pin}`);
   const digest = await globalThis.crypto.subtle.digest('SHA-256', data);
   const hex = Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -449,16 +457,29 @@ export async function hashPinForUid(pin: string, uid: string): Promise<string> {
   return `sha256:${hex}`;
 }
 
-/** Verify entered PIN against stored salted SHA-256 hash (with backward compat for legacy 4-digit PINs). */
+/** Salted SHA-256 hash for 4-digit App Lock PIN scoped to Firebase UID. */
+export async function hashPinForUid(pin: string, uid: string): Promise<string> {
+  const cleanPin = pin.trim();
+  if (!cleanPin) return '';
+  if (typeof globalThis === 'undefined' || !globalThis.crypto?.subtle) {
+    return cleanPin;
+  }
+  return sha256Salted('ucred', cleanPin, uid);
+}
+
+/** Verify entered PIN against stored salted SHA-256 hash (supports Ucred + legacy BolBahi hashes). */
 export async function verifyStoredPin(
   enteredPin: string,
   storedPin: string,
   uid: string
 ): Promise<boolean> {
   if (!storedPin) return true;
-  if (storedPin.startsWith('sha256:')) {
-    const hashed = await hashPinForUid(enteredPin, uid);
-    return hashed === storedPin;
+  if (storedPin.startsWith('sha256:') && typeof globalThis !== 'undefined' && globalThis.crypto?.subtle) {
+    const cleanPin = enteredPin.trim();
+    const ucredHash = await sha256Salted('ucred', cleanPin, uid);
+    if (ucredHash === storedPin) return true;
+    const legacyHash = await sha256Salted('bolbahi', cleanPin, uid);
+    return legacyHash === storedPin;
   }
   return enteredPin === storedPin;
 }
@@ -507,4 +528,3 @@ export function buildBillShareMessage(params: {
       : '';
   return `${params.shopName} — ${heading} #${params.billNumber}\nDate: ${params.billDate}\nCustomer: ${params.customerName}\n\n${lines}\n\nTotal: ${formatINR(params.totalAmount)}${statusLine}${upiLine}\nThank you!`;
 }
-

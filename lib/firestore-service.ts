@@ -21,14 +21,21 @@ import { db, handleFirestoreError, OperationType } from './firebase';
 import type {
   AccentTheme,
   AccountKind,
+  ActivityActionType,
+  ActivityLog,
   AppearanceMode,
   BillDocument,
   BillLineItem,
   BillTemplateId,
   Business,
+  CashbookEntry,
+  CashbookEntryType,
+  CashbookMode,
   LanguageCode,
   LedgerAccount,
   LedgerTransaction,
+  StaffMember,
+  StaffRole,
   StockItem,
   TxDirection,
   UserProfile,
@@ -106,7 +113,7 @@ export async function upsertUserProfile(
           uid,
           mobileNumber: clampStr(patch.mobileNumber, 20),
           language: patch.language || 'en',
-          accentTheme: patch.accentTheme || 'green',
+          accentTheme: patch.accentTheme || 'obsidian',
           appearance: patch.appearance || 'light',
           activeBusinessId: clampStr(patch.activeBusinessId, 128),
           appLockPin: clampStr(patch.appLockPin, 128),
@@ -288,6 +295,60 @@ export function subscribeStockItems(
   );
 }
 
+export function subscribeCashbookEntries(
+  ownerId: string,
+  businessId: string,
+  onData: (rows: CashbookEntry[]) => void
+): Unsubscribe {
+  const q = query(collection(db, 'cashbookEntries'), where('ownerId', '==', ownerId));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<CashbookEntry, 'id'>) }))
+        .filter((item) => item.businessId === businessId);
+      onData(list);
+    },
+    (err) => handleFirestoreError(err, OperationType.LIST, 'cashbookEntries')
+  );
+}
+
+export function subscribeStaffMembers(
+  ownerId: string,
+  businessId: string,
+  onData: (rows: StaffMember[]) => void
+): Unsubscribe {
+  const q = query(collection(db, 'staffMembers'), where('ownerId', '==', ownerId));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<StaffMember, 'id'>) }))
+        .filter((item) => item.businessId === businessId);
+      onData(list);
+    },
+    (err) => handleFirestoreError(err, OperationType.LIST, 'staffMembers')
+  );
+}
+
+export function subscribeActivityLogs(
+  ownerId: string,
+  businessId: string,
+  onData: (rows: ActivityLog[]) => void
+): Unsubscribe {
+  const q = query(collection(db, 'activityLogs'), where('ownerId', '==', ownerId));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<ActivityLog, 'id'>) }))
+        .filter((item) => item.businessId === businessId);
+      onData(list);
+    },
+    (err) => handleFirestoreError(err, OperationType.LIST, 'activityLogs')
+  );
+}
+
 export async function createAccount(params: {
   ownerId: string;
   businessId: string;
@@ -329,7 +390,9 @@ export async function createAccount(params: {
 
 export async function updateAccountMeta(
   accountId: string,
-  patch: Partial<Pick<LedgerAccount, 'name' | 'phone' | 'dueDate' | 'kind' | 'creditLimit'>>
+  patch: Partial<
+    Pick<LedgerAccount, 'name' | 'phone' | 'dueDate' | 'kind' | 'creditLimit' | 'promiseDate' | 'promiseNote'>
+  >
 ): Promise<void> {
   const path = `accounts/${accountId}`;
   try {
@@ -338,6 +401,8 @@ export async function updateAccountMeta(
     if (patch.phone !== undefined) payload.phone = clampStr(patch.phone, 20);
     if (patch.dueDate !== undefined) payload.dueDate = clampStr(patch.dueDate, 24);
     if (patch.kind !== undefined) payload.kind = patch.kind;
+    if (patch.promiseDate !== undefined) payload.promiseDate = clampStr(patch.promiseDate, 24);
+    if (patch.promiseNote !== undefined) payload.promiseNote = clampStr(patch.promiseNote, 160);
     if (patch.creditLimit !== undefined) {
       payload.creditLimit = Math.min(100000000, Math.max(0, Math.round(Number(patch.creditLimit) || 0)));
     }
@@ -359,6 +424,9 @@ export async function addTransactionAtomic(params: {
   billDate?: string;
   voiceRaw?: string;
   billImage?: string;
+  createdByName?: string;
+  createdByRole?: StaffRole;
+  syncToGalla?: { mode: CashbookMode } | null;
 }): Promise<{
   accountId: string;
   txId: string;
@@ -375,6 +443,8 @@ export async function addTransactionAtomic(params: {
   const noteSummary =
     clampStr(params.note, 160) ||
     `${params.direction === 'given' ? 'Credit' : 'Payment'} ₹${cleanAmount.toLocaleString('en-IN')}`;
+
+  const shouldSyncGalla = Boolean(params.syncToGalla);
 
   try {
     const batch = writeBatch(db);
@@ -420,6 +490,9 @@ export async function addTransactionAtomic(params: {
       billDate: clampStr(nowIso, 40),
       voiceRaw: clampStr(params.voiceRaw, 300),
       billImage: clampStr(params.billImage, 150000),
+      ...(params.createdByName ? { createdByName: clampStr(params.createdByName, 80) } : {}),
+      ...(params.createdByRole ? { createdByRole: params.createdByRole } : {}),
+      ...(shouldSyncGalla ? { gallaSynced: true } : {}),
     };
 
     batch.set(doc(db, 'transactions', txId), {
@@ -427,6 +500,36 @@ export async function addTransactionAtomic(params: {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    if (params.syncToGalla) {
+      const cbId = makeSafeId('cb');
+      const entryType: CashbookEntryType =
+        params.direction === 'received' ? 'inflow' : 'outflow';
+      const partyKind = params.existingAccount?.kind || params.kind || 'customer';
+      const category =
+        params.direction === 'received'
+          ? partyKind === 'customer'
+            ? 'Vasooli'
+            : 'Supplier Refund'
+          : partyKind === 'supplier'
+          ? 'Supplier Pay'
+          : 'Cash Credit';
+
+      batch.set(doc(db, 'cashbookEntries', cbId), {
+        ownerId: params.ownerId,
+        businessId: params.businessId,
+        entryType,
+        mode: params.syncToGalla.mode,
+        category,
+        amount: cleanAmount,
+        note: clampStr(`${params.customerName}: ${noteSummary}`, 200),
+        entryDate: clampStr(nowIso, 40),
+        linkedRefId: txId,
+        ...(params.createdByName ? { actorName: clampStr(params.createdByName, 80) } : {}),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
 
     await batch.commit();
     return {
@@ -530,6 +633,8 @@ export async function restoreTransactionAtomic(params: {
       billDate: clampStr(restored.billDate, 40),
       voiceRaw: clampStr(restored.voiceRaw, 300),
       billImage: clampStr(restored.billImage, 150000),
+      ...(restored.createdByName ? { createdByName: clampStr(restored.createdByName, 80) } : {}),
+      ...(restored.createdByRole ? { createdByRole: restored.createdByRole } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -626,6 +731,8 @@ export async function saveBillDocument(params: {
   discountAmount?: number;
   paymentStatus?: 'paid' | 'unpaid' | 'partial';
   linkedTxId?: string;
+  createdByName?: string;
+  syncToGalla?: { mode: CashbookMode } | null;
   templateId: BillTemplateId;
   notes: string;
   billDate: string;
@@ -637,6 +744,7 @@ export async function saveBillDocument(params: {
     qty: Math.max(0.01, Number(i.qty) || 1),
     rate: Math.max(0, Number(i.rate) || 0),
     gstRate: Math.max(0, Number(i.gstRate) || 0),
+    ...(i.stockItemId ? { stockItemId: clampStr(i.stockItemId, 128) } : {}),
   }));
 
   if (cleanItems.length === 0) throw new Error('Add at least one item to the bill.');
@@ -654,6 +762,21 @@ export async function saveBillDocument(params: {
   const totalAmount = Math.max(0, Math.round((subtotal + totalGst - discountAmount) * 100) / 100);
   const paymentStatus = params.paymentStatus || 'paid';
 
+  let estimatedCost = 0;
+  if (params.stockItems && params.stockItems.length > 0) {
+    for (const line of rawFiltered) {
+      const matched = line.stockItemId
+        ? params.stockItems.find((s) => s.id === line.stockItemId)
+        : params.stockItems.find(
+            (s) => s.name.trim().toLowerCase() === line.name.trim().toLowerCase()
+          );
+      if (matched && matched.purchasePrice && matched.purchasePrice > 0) {
+        estimatedCost += matched.purchasePrice * Math.max(0, Number(line.qty) || 0);
+      }
+    }
+    estimatedCost = Math.round(estimatedCost * 100) / 100;
+  }
+
   try {
     const batch = writeBatch(db);
     batch.set(doc(db, 'bills', id), {
@@ -670,12 +793,32 @@ export async function saveBillDocument(params: {
       totalAmount,
       paymentStatus,
       ...(params.linkedTxId ? { linkedTxId: clampStr(params.linkedTxId, 128) } : {}),
+      ...(params.createdByName ? { createdByName: clampStr(params.createdByName, 80) } : {}),
+      ...(estimatedCost > 0 ? { estimatedCost } : {}),
       templateId: params.templateId,
       notes: clampStr(params.notes, 240),
       billDate: clampStr(params.billDate, 40),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    if (params.docType === 'bill' && paymentStatus === 'paid' && params.syncToGalla && totalAmount > 0) {
+      const cbId = makeSafeId('cb');
+      batch.set(doc(db, 'cashbookEntries', cbId), {
+        ownerId: params.ownerId,
+        businessId: params.businessId,
+        entryType: 'inflow',
+        mode: params.syncToGalla.mode,
+        category: 'Bill Sale',
+        amount: totalAmount,
+        note: clampStr(`${params.billNumber} · ${params.customerName}`, 200),
+        entryDate: clampStr(params.billDate, 40),
+        linkedRefId: id,
+        ...(params.createdByName ? { actorName: clampStr(params.createdByName, 80) } : {}),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
 
     let deductedCount = 0;
     if (params.docType === 'bill' && params.stockItems && params.stockItems.length > 0) {
@@ -825,6 +968,136 @@ export async function deleteStockItem(itemId: string): Promise<void> {
   }
 }
 
+export async function addCashbookEntry(params: {
+  ownerId: string;
+  businessId: string;
+  entryType: CashbookEntryType;
+  mode: CashbookMode;
+  category: string;
+  amount: number;
+  note?: string;
+  entryDate?: string;
+  linkedRefId?: string;
+  actorName?: string;
+}): Promise<string> {
+  const cleanAmount = Math.round((Number(params.amount) || 0) * 100) / 100;
+  if (cleanAmount <= 0) throw new Error('Amount must be greater than zero.');
+  const id = makeSafeId('cb');
+  try {
+    await setDoc(doc(db, 'cashbookEntries', id), {
+      ownerId: params.ownerId,
+      businessId: params.businessId,
+      entryType: params.entryType,
+      mode: params.mode,
+      category: clampStr(params.category, 40) || 'General',
+      amount: cleanAmount,
+      note: clampStr(params.note, 200),
+      entryDate: clampStr(params.entryDate || new Date().toISOString(), 40),
+      ...(params.linkedRefId ? { linkedRefId: clampStr(params.linkedRefId, 128) } : {}),
+      ...(params.actorName ? { actorName: clampStr(params.actorName, 80) } : {}),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return id;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.CREATE, `cashbookEntries/${id}`);
+  }
+}
+
+export async function deleteCashbookEntry(entryId: string): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'cashbookEntries', entryId));
+    await batch.commit();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `cashbookEntries/${entryId}`);
+  }
+}
+
+export async function saveStaffMember(params: {
+  ownerId: string;
+  businessId: string;
+  existingId?: string;
+  name: string;
+  role: StaffRole;
+  phone?: string;
+  pinHash?: string;
+  active: boolean;
+}): Promise<string> {
+  const id = params.existingId || makeSafeId('stf');
+  try {
+    if (params.existingId) {
+      const updatePayload: Record<string, unknown> = {
+        name: clampStr(params.name, 80) || 'Staff',
+        role: params.role,
+        phone: clampStr(params.phone, 20),
+        active: params.active,
+        updatedAt: serverTimestamp(),
+      };
+      if (params.pinHash !== undefined) {
+        updatePayload.pinHash = clampStr(params.pinHash, 128);
+      }
+      await updateDoc(doc(db, 'staffMembers', id), updatePayload);
+    } else {
+      await setDoc(doc(db, 'staffMembers', id), {
+        ownerId: params.ownerId,
+        businessId: params.businessId,
+        name: clampStr(params.name, 80) || 'Staff',
+        role: params.role,
+        phone: clampStr(params.phone, 20),
+        ...(params.pinHash ? { pinHash: clampStr(params.pinHash, 128) } : {}),
+        active: params.active,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    return id;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `staffMembers/${id}`);
+  }
+}
+
+export async function deleteStaffMember(staffId: string): Promise<void> {
+  try {
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'staffMembers', staffId));
+    await batch.commit();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `staffMembers/${staffId}`);
+  }
+}
+
+export async function recordActivityLog(params: {
+  ownerId: string;
+  businessId: string;
+  actorName: string;
+  actorRole: StaffRole;
+  actionType: ActivityActionType;
+  summary: string;
+  targetName?: string;
+  amount?: number;
+}): Promise<void> {
+  const id = makeSafeId('log');
+  try {
+    await setDoc(doc(db, 'activityLogs', id), {
+      ownerId: params.ownerId,
+      businessId: params.businessId,
+      actorName: clampStr(params.actorName, 80) || 'Owner',
+      actorRole: params.actorRole,
+      actionType: params.actionType,
+      summary: clampStr(params.summary, 240) || 'Action recorded',
+      targetName: clampStr(params.targetName, 100),
+      ...(params.amount !== undefined && params.amount >= 0
+        ? { amount: Math.min(100000000, Math.round(Number(params.amount) * 100) / 100) }
+        : {}),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.CREATE, `activityLogs/${id}`);
+  }
+}
+
 export async function seedDemoBusinessData(ownerId: string, businessId: string): Promise<void> {
   const now = Date.now();
   const todayStr = getLocalDateKey(new Date(now));
@@ -914,6 +1187,8 @@ export async function seedDemoBusinessData(ownerId: string, businessId: string):
           billDate: dt,
           voiceRaw: tx.voiceRaw,
           billImage: '',
+          createdByName: 'Shop Owner',
+          createdByRole: 'owner',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -948,6 +1223,58 @@ export async function seedDemoBusinessData(ownerId: string, businessId: string):
       });
     }
 
+    // Seed today's initial Galla Cashbook & sample Munim staff member
+    batch.set(doc(db, 'cashbookEntries', makeSafeId('cb')), {
+      ownerId,
+      businessId,
+      entryType: 'inflow',
+      mode: 'cash',
+      category: 'Opening',
+      amount: 2500,
+      note: 'Morning Galla Opening Cash',
+      entryDate: new Date(now).toISOString(),
+      actorName: 'Shop Owner',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, 'cashbookEntries', makeSafeId('cb')), {
+      ownerId,
+      businessId,
+      entryType: 'inflow',
+      mode: 'upi',
+      category: 'Vasooli',
+      amount: 500,
+      note: 'Ramesh Kirana UPI Part Payment',
+      entryDate: new Date(now).toISOString(),
+      actorName: 'Shop Owner',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, 'cashbookEntries', makeSafeId('cb')), {
+      ownerId,
+      businessId,
+      entryType: 'outflow',
+      mode: 'cash',
+      category: 'Expense',
+      amount: 180,
+      note: 'Shop Chai & Tempo Unloading',
+      entryDate: new Date(now).toISOString(),
+      actorName: 'Shop Owner',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    batch.set(doc(db, 'staffMembers', makeSafeId('stf')), {
+      ownerId,
+      businessId,
+      name: 'Ramu Munim',
+      role: 'munim',
+      phone: '9820011122',
+      active: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
     await batch.commit();
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, 'accounts');
@@ -956,7 +1283,15 @@ export async function seedDemoBusinessData(ownerId: string, businessId: string):
 
 export async function clearBusinessData(ownerId: string, businessId: string): Promise<void> {
   try {
-    const colNames = ['transactions', 'accounts', 'bills', 'stockItems'] as const;
+    const colNames = [
+      'transactions',
+      'accounts',
+      'bills',
+      'stockItems',
+      'cashbookEntries',
+      'staffMembers',
+      'activityLogs',
+    ] as const;
     const refs: DocumentReference[] = [];
     for (const colName of colNames) {
       const snap = await getDocs(
@@ -985,7 +1320,16 @@ export async function deleteBusinessCascade(ownerId: string, businessId: string)
 
 export async function deleteUserAccountCascade(ownerId: string): Promise<void> {
   try {
-    const colNames = ['transactions', 'accounts', 'bills', 'stockItems', 'businesses'] as const;
+    const colNames = [
+      'transactions',
+      'accounts',
+      'bills',
+      'stockItems',
+      'cashbookEntries',
+      'staffMembers',
+      'activityLogs',
+      'businesses',
+    ] as const;
     const refs: DocumentReference[] = [];
     for (const colName of colNames) {
       const snap = await getDocs(
@@ -1015,15 +1359,18 @@ export async function restoreBusinessBackup(
     transactions?: unknown[];
     bills?: unknown[];
     stockItems?: unknown[];
+    cashbookEntries?: unknown[];
+    staffMembers?: unknown[];
   };
 
   if (
     !Array.isArray(parsed.accounts) &&
     !Array.isArray(parsed.transactions) &&
     !Array.isArray(parsed.bills) &&
-    !Array.isArray(parsed.stockItems)
+    !Array.isArray(parsed.stockItems) &&
+    !Array.isArray(parsed.cashbookEntries)
   ) {
-    throw new Error('Backup JSON must contain accounts, transactions, bills, or stockItems.');
+    throw new Error('Backup JSON must contain accounts, transactions, bills, stockItems, or cashbookEntries.');
   }
 
   const accIdMap = new Map<string, string>();
@@ -1053,6 +1400,8 @@ export async function restoreBusinessBackup(
         phone: clampStr(String(a.phone || ''), 20),
         dueDate: clampStr(String(a.dueDate || ''), 24),
         ...(creditLimit > 0 ? { creditLimit } : {}),
+        ...(a.promiseDate ? { promiseDate: clampStr(String(a.promiseDate), 24) } : {}),
+        ...(a.promiseNote ? { promiseNote: clampStr(String(a.promiseNote), 160) } : {}),
         balance,
         lastNote: clampStr(String(a.lastNote || 'Restored'), 160),
         lastActivityAt: clampStr(String(a.lastActivityAt || new Date().toISOString()), 40),
@@ -1160,8 +1509,30 @@ export async function restoreBusinessBackup(
     }
   }
 
+  if (Array.isArray(parsed.cashbookEntries)) {
+    for (const rawCb of parsed.cashbookEntries) {
+      if (!rawCb || typeof rawCb !== 'object') continue;
+      const c = rawCb as Record<string, unknown>;
+      const amount = Math.round((Number(c.amount) || 0) * 100) / 100;
+      if (amount <= 0 || amount > 100000000) continue;
+      const newCbId = makeSafeId('cb');
+      const cbData = {
+        ownerId,
+        businessId,
+        entryType: c.entryType === 'outflow' ? 'outflow' : 'inflow',
+        mode: c.mode === 'upi' || c.mode === 'bank' ? c.mode : 'cash',
+        category: clampStr(String(c.category || 'General'), 40) || 'General',
+        amount,
+        note: clampStr(String(c.note || ''), 200),
+        entryDate: clampStr(String(c.entryDate || new Date().toISOString()), 40),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      ops.push((batch) => batch.set(doc(db, 'cashbookEntries', newCbId), cbData));
+    }
+  }
+
   try {
-    // Commit accounts first so Firestore security rule existsAfter(/accounts/...) sees parent accounts cleanly
     const accOps = ops.slice(0, accCount);
     for (let i = 0; i < accOps.length; i += 350) {
       const batch = writeBatch(db);

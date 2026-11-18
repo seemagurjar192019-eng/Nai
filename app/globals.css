@@ -2,35 +2,75 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  --brand: #161514;
+  --brand-hover: #2A2826;
+  --brand-fg: #FFFFFF;
+  --brand-tint: #EDE7DF;
+  --brand-soft: rgba(22, 21, 20, 0.14);
+  --app-bg: #F6F2EC;
+  --surface: #FFFFFF;
+  --surface-border: #E5DEC9;
+  --credit-red: #C62828;
+  --credit-tint: #FEECEC;
+  --debit-green: #0F8A4B;
+  --debit-tint: #E8F5EE;
+}
+
+:root[data-accent="green"] {
   --brand: #008037;
   --brand-hover: #006B2E;
+  --brand-fg: #FFFFFF;
   --brand-tint: #E8F5EE;
   --brand-soft: rgba(0, 128, 55, 0.14);
   --app-bg: #F6F8F7;
-  --credit-red: #C62828;
-  --credit-tint: #FEECEC;
-  --debit-green: #1B8A4B;
-  --debit-tint: #E8F5EE;
+  --surface: #FFFFFF;
+  --surface-border: #E2E8F0;
 }
 
 :root[data-accent="crimson"] {
   --brand: #9A1B1E;
   --brand-hover: #7F1518;
+  --brand-fg: #FFFFFF;
   --brand-tint: #FCECEC;
   --brand-soft: rgba(154, 27, 30, 0.14);
   --app-bg: #F9F6F0;
+  --surface: #FFFFFF;
+  --surface-border: #EADFD7;
 }
 
 .dark {
-  --brand-tint: rgba(0, 128, 55, 0.18);
-  --app-bg: #0D1210;
+  --brand: #F3EDE4;
+  --brand-hover: #E5DDD0;
+  --brand-fg: #161514;
+  --brand-tint: rgba(243, 237, 228, 0.12);
+  --brand-soft: rgba(243, 237, 228, 0.18);
+  --app-bg: #0E0E0D;
+  --surface: #181715;
+  --surface-border: #2A2824;
   --credit-tint: rgba(198, 40, 40, 0.18);
-  --debit-tint: rgba(27, 138, 75, 0.18);
+  --debit-tint: rgba(15, 138, 75, 0.18);
+}
+
+.dark[data-accent="green"] {
+  --brand: #10B981;
+  --brand-hover: #059669;
+  --brand-fg: #042F1E;
+  --brand-tint: rgba(16, 185, 129, 0.16);
+  --brand-soft: rgba(16, 185, 129, 0.22);
+  --app-bg: #0D1210;
+  --surface: #131B17;
+  --surface-border: #1F2D27;
 }
 
 .dark[data-accent="crimson"] {
-  --brand-tint: rgba(154, 27, 30, 0.22);
+  --brand: #E11D48;
+  --brand-hover: #BE123C;
+  --brand-fg: #FFFFFF;
+  --brand-tint: rgba(225, 29, 72, 0.20);
+  --brand-soft: rgba(225, 29, 72, 0.24);
   --app-bg: #141010;
+  --surface: #1E1717;
+  --surface-border: #332425;
 }
 
 body {

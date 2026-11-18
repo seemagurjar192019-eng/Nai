@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import {
   deleteUser,
   onAuthStateChanged,
@@ -13,6 +14,7 @@ import {
   AlertTriangle,
   Bell,
   BookOpen,
+  Camera,
   Check,
   ChevronDown,
   HelpCircle,
@@ -25,13 +27,16 @@ import {
   Search,
   Settings,
   Undo2,
+  UserCheck,
   Users,
   Volume2,
   VolumeX,
+  Wallet,
   X,
 } from 'lucide-react';
 import { auth, googleProvider, testConnection } from '@/lib/firebase';
 import {
+  addCashbookEntry,
   addTransactionAtomic,
   clearBusinessData,
   convertQuoteToBill,
@@ -40,18 +45,25 @@ import {
   deleteAccountWithTransactions,
   deleteBillDocument,
   deleteBusinessCascade,
+  deleteCashbookEntry,
+  deleteStaffMember,
   deleteStockItem,
   deleteTransactionAtomic,
   deleteUserAccountCascade,
   getUserProfile,
+  recordActivityLog,
   restoreBusinessBackup,
   restoreTransactionAtomic,
   saveBillDocument,
+  saveStaffMember,
   saveStockItem,
   seedDemoBusinessData,
   subscribeAccounts,
+  subscribeActivityLogs,
   subscribeBills,
   subscribeBusinesses,
+  subscribeCashbookEntries,
+  subscribeStaffMembers,
   subscribeStockItems,
   subscribeTransactions,
   updateAccountMeta,
@@ -60,6 +72,7 @@ import {
   upsertUserProfile,
 } from '@/lib/firestore-service';
 import {
+  UCRED_LOGO_PATH,
   buildDailyMunimScript,
   buildTransactionSlipMessage,
   buildWhatsAppUrl,
@@ -71,9 +84,12 @@ import {
   speakHinglish,
   stopSpeaking,
 } from '@/lib/i18n';
+import { computeCustomerTrustScore, computeDailyGallaPulse } from '@/lib/ucred-intelligence';
 import type {
   AccentTheme,
   AccountKind,
+  ActiveOperator,
+  ActivityLog,
   AppNotificationItem,
   AppearanceMode,
   BillDocType,
@@ -82,19 +98,25 @@ import type {
   BillPaymentStatus,
   BillTemplateId,
   Business,
+  CashbookEntry,
+  CashbookMode,
+  CustomerTrustScore,
   LanguageCode,
   LedgerAccount,
   LedgerTransaction,
+  StaffMember,
   StockItem,
   TxDirection,
   UserProfile,
 } from '@/lib/types';
 import { AccountChatLedger } from './AccountChatLedger';
-import { BillsView, getNextSequenceNumber } from './BillsView';
+import { BillsView, getNextSequenceNumber, type BillExternalDraft } from './BillsView';
 import { CollectionView } from './CollectionView';
 import { ErrorBoundary } from './ErrorBoundary';
+import { GallaCashbookView } from './GallaCashbookView';
 import { LedgerView } from './LedgerView';
 import { OnboardingFlow, type OnboardingStep } from './OnboardingFlow';
+import { ParchiScannerModal } from './ParchiScannerModal';
 import { OfflineIndicator, PWAInstallButton } from './PwaControls';
 import {
   AccountSummaryView,
@@ -107,6 +129,7 @@ import {
   SettingsView,
   type SecondaryRoute,
 } from './SecondaryViews';
+import { StaffAuditView } from './StaffAuditView';
 import { StockView } from './StockView';
 import { VoiceEntryModal } from './VoiceEntryModal';
 
@@ -119,9 +142,9 @@ function BolBahiAppInner() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  // Preferences & onboarding state
+  // Preferences & onboarding state (Ucred Obsidian default)
   const [language, setLanguage] = useState<LanguageCode>('en');
-  const [accentTheme, setAccentTheme] = useState<AccentTheme>('green');
+  const [accentTheme, setAccentTheme] = useState<AccentTheme>('obsidian');
   const [appearance, setAppearance] = useState<AppearanceMode>('light');
   const [mobileNumber, setMobileNumber] = useState('');
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('splash');
@@ -137,6 +160,16 @@ function BolBahiAppInner() {
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
   const [bills, setBills] = useState<BillDocument[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [cashbookEntries, setCashbookEntries] = useState<CashbookEntry[]>([]);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+
+  // Active Counter Operator (Owner by default or switched Staff/Munim)
+  const [activeOperator, setActiveOperator] = useState<ActiveOperator>({
+    staffId: 'owner',
+    name: 'Shop Owner',
+    role: 'owner',
+  });
 
   // Navigation & overlays
   const [mainTab, setMainTab] = useState<MainTab>('ledger');
@@ -150,10 +183,16 @@ function BolBahiAppInner() {
   const [bizSwitcherOpen, setBizSwitcherOpen] = useState(false);
   const [newBizName, setNewBizName] = useState('');
   const [creatingBiz, setCreatingBiz] = useState(false);
+
+  // Voice, Counter Mode, AI Parchi Scanner & Bill Drafts
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [voiceCounterMode, setVoiceCounterMode] = useState(false);
   const [voicePrefillName, setVoicePrefillName] = useState('');
+  const [parchiScannerOpen, setParchiScannerOpen] = useState(false);
   const [billPrefill, setBillPrefill] = useState<{ name: string; phone: string } | null>(null);
+  const [billDraft, setBillDraft] = useState<BillExternalDraft | null>(null);
   const [dailySummaryOpen, setDailySummaryOpen] = useState(false);
+
   const [actionToast, setActionToast] = useState<
     | {
         kind: 'added';
@@ -194,7 +233,9 @@ function BolBahiAppInner() {
 
       Promise.resolve().then(() => {
         try {
-          const raw = localStorage.getItem('bolbahi_prelogin_prefs');
+          const raw =
+            localStorage.getItem('ucred_prelogin_prefs') ||
+            localStorage.getItem('bolbahi_prelogin_prefs');
           if (raw) {
             const parsed = JSON.parse(raw) as {
               language?: LanguageCode;
@@ -207,7 +248,9 @@ function BolBahiAppInner() {
             if (parsed.appearance) setAppearance(parsed.appearance);
             if (parsed.mobileNumber) setMobileNumber(parsed.mobileNumber);
           }
-          const rawNotifs = localStorage.getItem('bolbahi_notif_prefs');
+          const rawNotifs =
+            localStorage.getItem('ucred_notif_prefs') ||
+            localStorage.getItem('bolbahi_notif_prefs');
           if (rawNotifs) {
             setNotifPrefs(JSON.parse(rawNotifs) as NotifPrefsMap);
           }
@@ -226,12 +269,14 @@ function BolBahiAppInner() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Apply Accent Theme & Dark Mode classes on documentElement
+  // Apply Accent Theme (obsidian default, green, crimson) & Dark Mode classes on documentElement
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
     if (accentTheme === 'crimson') {
       root.setAttribute('data-accent', 'crimson');
+    } else if (accentTheme === 'green') {
+      root.setAttribute('data-accent', 'green');
     } else {
       root.removeAttribute('data-accent');
     }
@@ -265,6 +310,9 @@ function BolBahiAppInner() {
         setTransactions([]);
         setBills([]);
         setStockItems([]);
+        setCashbookEntries([]);
+        setStaffMembers([]);
+        setActivityLogs([]);
         setOnboardingStep((prev) => (prev === 'verified' ? prev : 'language'));
         setAuthReady(true);
         return;
@@ -282,7 +330,7 @@ function BolBahiAppInner() {
         if (existing) {
           setProfile(existing);
           setLanguage(existing.language);
-          setAccentTheme(existing.accentTheme);
+          setAccentTheme(existing.accentTheme || 'obsidian');
           setAppearance(existing.appearance);
           setMobileNumber(existing.mobileNumber || '');
           if (!existing.appLockPin) setPinUnlocked(true);
@@ -327,7 +375,7 @@ function BolBahiAppInner() {
     return matched || businesses[0];
   }, [businesses, profile?.activeBusinessId]);
 
-  // Subscribe to active business collections
+  // Subscribe to active business collections (including Galla, Staff & Activity Audit Logs)
   useEffect(() => {
     if (!user || !activeBusiness?.id) return;
     const bizId = activeBusiness.id;
@@ -335,13 +383,47 @@ function BolBahiAppInner() {
     const u2 = subscribeTransactions(user.uid, bizId, setTransactions);
     const u3 = subscribeBills(user.uid, bizId, setBills);
     const u4 = subscribeStockItems(user.uid, bizId, setStockItems);
+    const u5 = subscribeCashbookEntries(user.uid, bizId, setCashbookEntries);
+    const u6 = subscribeStaffMembers(user.uid, bizId, setStaffMembers);
+    const u7 = subscribeActivityLogs(user.uid, bizId, setActivityLogs);
     return () => {
       u1();
       u2();
       u3();
       u4();
+      u5();
+      u6();
+      u7();
     };
   }, [user, activeBusiness?.id]);
+
+  // Deterministic Intelligence Computations
+  const trustScoresByAccount = useMemo<Record<string, CustomerTrustScore>>(() => {
+    const todayStr = getLocalDateKey();
+    const txByAcc = new Map<string, LedgerTransaction[]>();
+    for (const tx of transactions) {
+      const arr = txByAcc.get(tx.accountId);
+      if (arr) arr.push(tx);
+      else txByAcc.set(tx.accountId, [tx]);
+    }
+    const map: Record<string, CustomerTrustScore> = {};
+    for (const acc of accounts) {
+      map[acc.id] = computeCustomerTrustScore(acc, txByAcc.get(acc.id) || [], todayStr);
+    }
+    return map;
+  }, [accounts, transactions]);
+
+  const gallaPulse = useMemo(
+    () =>
+      computeDailyGallaPulse({
+        todayStr: getLocalDateKey(),
+        cashbookEntries,
+        transactions,
+        bills,
+        stockItems,
+      }),
+    [cashbookEntries, transactions, bills, stockItems]
+  );
 
   const persistPrelogin = (next: {
     language?: LanguageCode;
@@ -357,10 +439,29 @@ function BolBahiAppInner() {
         mobileNumber,
         ...next,
       };
-      localStorage.setItem('bolbahi_prelogin_prefs', JSON.stringify(merged));
+      localStorage.setItem('ucred_prelogin_prefs', JSON.stringify(merged));
     } catch {
       // Ignore storage failures
     }
+  };
+
+  const logActivity = (
+    actionType: ActivityLog['actionType'],
+    summary: string,
+    targetName?: string,
+    amount?: number
+  ) => {
+    if (!user || !activeBusiness) return;
+    recordActivityLog({
+      ownerId: user.uid,
+      businessId: activeBusiness.id,
+      actorName: activeOperator.name,
+      actorRole: activeOperator.role,
+      actionType,
+      summary,
+      targetName,
+      amount,
+    }).catch(() => {});
   };
 
   const handleSelectLanguage = async (lang: LanguageCode) => {
@@ -432,6 +533,7 @@ function BolBahiAppInner() {
   const handleSwitchBusiness = async (bizId: string) => {
     if (!user) return;
     setSelectedAccountId(null);
+    setActiveOperator({ staffId: 'owner', name: 'Shop Owner', role: 'owner' });
     const updated = await upsertUserProfile(user.uid, { activeBusinessId: bizId });
     setProfile(updated);
     setBizSwitcherOpen(false);
@@ -488,8 +590,7 @@ function BolBahiAppInner() {
     setUndoBusy(true);
     dismissActionToast();
     try {
-      const liveAccount =
-        accounts.find((a) => a.id === current.account.id) || current.account;
+      const liveAccount = accounts.find((a) => a.id === current.account.id) || current.account;
       if (current.kind === 'added') {
         const remaining = transactions.filter(
           (item) => item.accountId === liveAccount.id && item.id !== current.tx.id
@@ -504,6 +605,12 @@ function BolBahiAppInner() {
             remainingForAccount: remaining,
           });
         }
+        logActivity(
+          'ledger',
+          `Undid ₹${current.tx.amount} entry for ${liveAccount.name}`,
+          liveAccount.name,
+          current.tx.amount
+        );
       } else {
         const existing = transactions.filter((item) => item.accountId === liveAccount.id);
         await restoreTransactionAtomic({
@@ -511,6 +618,12 @@ function BolBahiAppInner() {
           account: liveAccount,
           existingForAccount: existing,
         });
+        logActivity(
+          'ledger',
+          `Restored ₹${current.tx.amount} entry for ${liveAccount.name}`,
+          liveAccount.name,
+          current.tx.amount
+        );
       }
     } finally {
       setUndoBusy(false);
@@ -572,24 +685,24 @@ function BolBahiAppInner() {
       });
     }
 
-    const overLimitAccs = accounts.filter(
-      (a) => a.creditLimit && a.creditLimit > 0 && a.balance > a.creditLimit
+    const highRiskAccs = accounts.filter(
+      (a) => a.kind === 'customer' && a.balance > 0 && (trustScoresByAccount[a.id]?.score ?? 100) < 50
     );
-    if (overLimitAccs.length > 0) {
+    if (highRiskAccs.length > 0) {
       items.push({
-        id: 'live-credit-limit',
-        title: `${overLimitAccs.length} Party Over Credit Limit`,
-        bullets: overLimitAccs
+        id: 'live-trust-risk',
+        title: `${highRiskAccs.length} High Trust-Risk Party`,
+        bullets: highRiskAccs
           .slice(0, 2)
           .map(
             (a) =>
-              `${a.name}: ${formatINR(a.balance)} vs limit ${formatINR(a.creditLimit || 0)}`
+              `${a.name}: Trust ${trustScoresByAccount[a.id]?.score}/100 (${trustScoresByAccount[a.id]?.recoveryTimingHint})`
           ),
-        actionLabel: 'Review Collection',
+        actionLabel: 'Collect First',
         targetAction: 'collection',
-        read: Boolean(notifPrefs['live-credit-limit']?.read),
-        fav: Boolean(notifPrefs['live-credit-limit']?.fav),
-        timeLabel: 'Limit Alert',
+        read: Boolean(notifPrefs['live-trust-risk']?.read),
+        fav: Boolean(notifPrefs['live-trust-risk']?.fav),
+        timeLabel: 'Recovery Radar',
       });
     }
 
@@ -609,11 +722,23 @@ function BolBahiAppInner() {
     }
 
     items.push({
-      id: 'tip-voice-entry',
-      title: 'Speak in Hinglish or Hindi',
+      id: 'tip-parchi-scanner',
+      title: 'Scan Handwritten Parchi with AI',
       bullets: [
-        'Say "Ramesh 500 udhaar chini" or check balances via "Ramesh ka hisaab batao".',
-        'Supports multi-entry phrases like "Ramesh 500 udhaar aur Suresh 300 mila".',
+        'Snap any handwritten kacha slip or supplier bill to auto-extract party, items & ₹ total.',
+      ],
+      actionLabel: 'Open Scanner',
+      targetAction: 'parchi',
+      read: Boolean(notifPrefs['tip-parchi-scanner']?.read),
+      fav: Boolean(notifPrefs['tip-parchi-scanner']?.fav),
+      timeLabel: 'Ucred AI',
+    });
+
+    items.push({
+      id: 'tip-voice-entry',
+      title: 'Hands-Free Counter Mode & AI Voice Bills',
+      bullets: [
+        'Say "Ramesh 500 udhaar aur Suresh 300 mila" or "Ramesh ka bill 2kg chini 90".',
       ],
       actionLabel: 'Try Voice Entry',
       targetAction: 'voice',
@@ -622,21 +747,8 @@ function BolBahiAppInner() {
       timeLabel: 'Voice Munim',
     });
 
-    items.push({
-      id: 'tip-themes',
-      title: 'Customize Emerald Green, Crimson & Dark Mode',
-      bullets: [
-        'Switch shop theme colors and set a 4-digit PIN lock in Settings.',
-      ],
-      actionLabel: 'Open Settings',
-      targetAction: 'theme',
-      read: Boolean(notifPrefs['tip-themes']?.read),
-      fav: Boolean(notifPrefs['tip-themes']?.fav),
-      timeLabel: 'Tip',
-    });
-
     return items;
-  }, [accounts, activeBusiness?.upiId, dailyStats.todayKey, notifPrefs]);
+  }, [accounts, activeBusiness?.upiId, dailyStats.todayKey, notifPrefs, trustScoresByAccount]);
 
   const updateNotifPref = (id: string, patch: { read?: boolean; fav?: boolean }) => {
     setNotifPrefs((prev) => {
@@ -645,7 +757,7 @@ function BolBahiAppInner() {
         [id]: { ...prev[id], ...patch },
       };
       try {
-        localStorage.setItem('bolbahi_notif_prefs', JSON.stringify(next));
+        localStorage.setItem('ucred_notif_prefs', JSON.stringify(next));
       } catch {
         // Ignore storage write error
       }
@@ -653,7 +765,7 @@ function BolBahiAppInner() {
     });
   };
 
-  // Apply deep-linked PWA shortcuts (?action=voice or ?tab=bills) once authenticated & unlocked
+  // Apply deep-linked PWA shortcuts (?action=voice|parchi|counter or ?tab=bills|galla|...) once authenticated & unlocked
   const shellReady =
     splashDone &&
     authReady &&
@@ -667,14 +779,24 @@ function BolBahiAppInner() {
     const { action, tab } = pendingLaunchRef.current;
     pendingLaunchRef.current = null;
     const timer = setTimeout(() => {
-      if (tab === 'bills' || tab === 'collection' || tab === 'stock' || tab === 'ledger') {
+      if (tab === 'galla') {
+        setSelectedAccountId(null);
+        setSecondaryRoute('galla');
+      } else if (tab === 'bills' || tab === 'collection' || tab === 'stock' || tab === 'ledger') {
         setSecondaryRoute(null);
         setSelectedAccountId(null);
         setMainTab(tab);
       }
       if (action === 'voice') {
         setVoicePrefillName('');
+        setVoiceCounterMode(false);
         setVoiceModalOpen(true);
+      } else if (action === 'counter') {
+        setVoicePrefillName('');
+        setVoiceCounterMode(true);
+        setVoiceModalOpen(true);
+      } else if (action === 'parchi') {
+        setParchiScannerOpen(true);
       }
       if (typeof window !== 'undefined' && window.location.search) {
         window.history.replaceState(null, '', '/');
@@ -684,7 +806,7 @@ function BolBahiAppInner() {
   }, [shellReady]);
 
   const openDailyMunimSummary = () => {
-    const shopName = activeBusiness?.name || businesses[0]?.name || 'BolBahi Shop';
+    const shopName = activeBusiness?.name || businesses[0]?.name || 'Ucred Shop';
     setDailySummaryOpen(true);
     speakHinglish(
       buildDailyMunimScript({
@@ -720,6 +842,7 @@ function BolBahiAppInner() {
   // Android hardware Back / browser popstate handling for nested views
   const hasNestedLayer = Boolean(
     voiceModalOpen ||
+      parchiScannerOpen ||
       dailySummaryOpen ||
       bizSwitcherOpen ||
       moreOpen ||
@@ -731,10 +854,11 @@ function BolBahiAppInner() {
   useEffect(() => {
     if (!shellReady || !hasNestedLayer) return;
     if (window.location.hash !== '#nav') {
-      window.history.pushState({ bolbahiNav: true }, '', '#nav');
+      window.history.pushState({ ucredNav: true }, '', '#nav');
     }
     const onPopState = () => {
-      if (voiceModalOpen) setVoiceModalOpen(false);
+      if (parchiScannerOpen) setParchiScannerOpen(false);
+      else if (voiceModalOpen) setVoiceModalOpen(false);
       else if (dailySummaryOpen) closeDailyMunimSummary();
       else if (bizSwitcherOpen) setBizSwitcherOpen(false);
       else if (moreOpen) setMoreOpen(false);
@@ -747,6 +871,7 @@ function BolBahiAppInner() {
   }, [
     shellReady,
     hasNestedLayer,
+    parchiScannerOpen,
     voiceModalOpen,
     dailySummaryOpen,
     bizSwitcherOpen,
@@ -783,6 +908,8 @@ function BolBahiAppInner() {
       amount: entry.amount,
       note: composedNote,
       voiceRaw: entry.voiceRaw,
+      createdByName: activeOperator.name,
+      createdByRole: activeOperator.role,
     });
     const accSnapshot: LedgerAccount = match
       ? { ...match, balance: res.newBalance }
@@ -805,12 +932,41 @@ function BolBahiAppInner() {
       newBalance: res.newBalance,
       accountCreated: res.accountCreated,
     });
+    logActivity(
+      'ledger',
+      `Voice ${entry.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${entry.amount} for ${entry.customerName}`,
+      entry.customerName,
+      entry.amount
+    );
+    return { txId: res.txId, accountId: res.accountId };
+  };
+
+  const handleUndoVoiceQueueItem = async (item: { txId: string; accountId: string }) => {
+    const liveAcc = accounts.find((a) => a.id === item.accountId);
+    const liveTx = transactions.find((t) => t.id === item.txId);
+    if (!liveAcc || !liveTx) return;
+    const remaining = transactions.filter(
+      (t) => t.accountId === liveAcc.id && t.id !== liveTx.id
+    );
+    await deleteTransactionAtomic({
+      tx: liveTx,
+      account: liveAcc,
+      remainingForAccount: remaining,
+    });
+    logActivity(
+      'ledger',
+      `Queue Undo ₹${liveTx.amount} for ${liveAcc.name}`,
+      liveAcc.name,
+      liveTx.amount
+    );
   };
 
   const handleExportCsv = () => {
     if (!activeBusiness) return;
     const rows: string[] = [
-      ['Type', 'Account Name', 'Phone', 'Direction', 'Amount (INR)', 'Date', 'Note'].join(','),
+      ['Type', 'Account Name', 'Phone', 'Direction', 'Amount (INR)', 'Date', 'Note', 'Operator'].join(
+        ','
+      ),
     ];
     const accMap = new Map(accounts.map((a) => [a.id, a]));
     for (const tx of transactions) {
@@ -825,6 +981,7 @@ function BolBahiAppInner() {
           String(tx.amount),
           escape(tx.billDate),
           escape(tx.note || tx.voiceRaw),
+          escape(tx.createdByName || 'Shop Owner'),
         ].join(',')
       );
     }
@@ -832,7 +989,7 @@ function BolBahiAppInner() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${activeBusiness.name.replace(/\s+/g, '_')}_bolbahi_ledger.csv`;
+    a.download = `${activeBusiness.name.replace(/\s+/g, '_')}_ucred_ledger.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -841,11 +998,14 @@ function BolBahiAppInner() {
     if (!activeBusiness) return;
     const payload = {
       exportedAt: new Date().toISOString(),
+      app: 'Ucred',
       business: activeBusiness,
       accounts,
       transactions,
       bills,
       stockItems,
+      cashbookEntries,
+      staffMembers,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: 'application/json',
@@ -853,7 +1013,7 @@ function BolBahiAppInner() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${activeBusiness.name.replace(/\s+/g, '_')}_bolbahi_backup.json`;
+    a.download = `${activeBusiness.name.replace(/\s+/g, '_')}_ucred_backup.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -863,6 +1023,7 @@ function BolBahiAppInner() {
     const text = await file.text();
     const parsed: unknown = JSON.parse(text);
     await restoreBusinessBackup(user.uid, activeBusiness.id, parsed);
+    logActivity('account', 'Restored JSON cloud backup');
   };
 
   const t = getUIStrings(language);
@@ -960,7 +1121,7 @@ function BolBahiAppInner() {
     );
   }
 
-  // 4. Main OkCredit-Style Production App Shell
+  // 4. Main Ucred Production App Shell
   const currentBusiness: Business = activeBusiness || businesses[0];
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || null;
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -970,16 +1131,21 @@ function BolBahiAppInner() {
       <OfflineIndicator />
 
       {/* Desktop Sidebar Rail (md+) */}
-      <aside className="no-print hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 justify-between z-30">
-        <div className="space-y-6">
+      <aside className="no-print hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-[var(--surface)] border-r border-[var(--surface-border)] p-4 justify-between z-30">
+        <div className="space-y-5 overflow-y-auto no-scrollbar">
           <div className="flex items-center gap-2.5 px-1">
-            <span className="w-9 h-9 rounded-xl bg-[var(--brand)] text-white flex items-center justify-center font-extrabold">
-              <BookOpen className="w-5 h-5" />
-            </span>
+            <Image
+              src={UCRED_LOGO_PATH}
+              alt="Ucred"
+              width={38}
+              height={38}
+              referrerPolicy="no-referrer"
+              className="w-9 h-9 rounded-xl object-cover border border-[var(--surface-border)]"
+            />
             <div>
-              <p className="text-lg font-extrabold leading-none">BolBahi</p>
+              <p className="text-lg font-extrabold leading-none tracking-tight">Ucred</p>
               <p className="text-[11px] font-semibold text-slate-500">
-                Voice Digital Khata
+                Smart Voice Khata &amp; Galla
               </p>
             </div>
           </div>
@@ -987,7 +1153,7 @@ function BolBahiAppInner() {
           <button
             type="button"
             onClick={() => setBizSwitcherOpen(true)}
-            className="w-full rounded-2xl bg-[var(--brand-tint)] border border-[var(--brand)]/30 p-3 flex items-center justify-between gap-2 text-left"
+            className="w-full rounded-2xl bg-[var(--brand-tint)] border border-[var(--brand)]/25 p-3 flex items-center justify-between gap-2 text-left"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div
@@ -1028,10 +1194,10 @@ function BolBahiAppInner() {
                     setSelectedAccountId(null);
                     setMainTab(item.id);
                   }}
-                  className={`w-full min-h-[46px] px-3.5 rounded-xl flex items-center gap-3 text-sm font-bold transition ${
+                  className={`w-full min-h-[44px] px-3.5 rounded-xl flex items-center gap-3 text-sm font-bold transition ${
                     active
-                      ? 'bg-[var(--brand)] text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -1044,12 +1210,53 @@ function BolBahiAppInner() {
               type="button"
               onClick={() => {
                 setSelectedAccountId(null);
+                setSecondaryRoute('galla');
+              }}
+              className={`w-full min-h-[44px] px-3.5 rounded-xl flex items-center gap-3 text-sm font-bold transition ${
+                secondaryRoute === 'galla'
+                  ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10'
+              }`}
+            >
+              <Wallet className="w-4 h-4" />
+              <span>Galla Cashbook</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAccountId(null);
+                setSecondaryRoute('staff-audit');
+              }}
+              className={`w-full min-h-[44px] px-3.5 rounded-xl flex items-center gap-3 text-sm font-bold transition ${
+                secondaryRoute === 'staff-audit'
+                  ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Staff &amp; Audit</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setParchiScannerOpen(true)}
+              className="w-full min-h-[44px] px-3.5 rounded-xl flex items-center gap-3 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10 transition"
+            >
+              <Camera className="w-4 h-4" />
+              <span>Scan Parchi (AI)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAccountId(null);
                 setSecondaryRoute('settings');
               }}
-              className={`w-full min-h-[46px] px-3.5 rounded-xl flex items-center gap-3 text-sm font-bold transition ${
+              className={`w-full min-h-[44px] px-3.5 rounded-xl flex items-center gap-3 text-sm font-bold transition ${
                 secondaryRoute === 'settings'
-                  ? 'bg-[var(--brand)] text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10'
               }`}
             >
               <Settings className="w-4 h-4" />
@@ -1062,34 +1269,38 @@ function BolBahiAppInner() {
           type="button"
           onClick={() => {
             setVoicePrefillName('');
+            setVoiceCounterMode(false);
             setVoiceModalOpen(true);
           }}
-          className="w-full min-h-[54px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md voice-fab-pulse"
+          className="w-full min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 shadow-md voice-fab-pulse mt-4 shrink-0"
         >
           <Mic className="w-5 h-5" />
-          <span>{t.voiceEntry}</span>
+          <span>Voice &amp; Counter</span>
         </button>
       </aside>
 
       {/* Main Content Area */}
       <div className="flex-1 md:pl-64 flex flex-col min-h-screen w-full">
-        {/* Sticky Top App Bar (OkCredit video 00:34) */}
-        <header className="no-print sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 px-4 py-2.5">
+        {/* Clean 3-Zone Sticky Top App Bar */}
+        <header className="no-print sticky top-0 z-20 bg-[var(--surface)]/95 backdrop-blur border-b border-[var(--surface-border)] px-4 py-2.5">
           <div className="max-w-5xl mx-auto flex items-center justify-between gap-2">
+            {/* Zone 1: Ucred Logo + Shop Switcher */}
             <button
               type="button"
               onClick={() => setBizSwitcherOpen(true)}
               className="flex items-center gap-2.5 min-w-0 text-left"
             >
-              <div
-                style={{ backgroundColor: getAvatarColor(currentBusiness.name) }}
-                className="w-9 h-9 rounded-full text-white font-extrabold flex items-center justify-center shrink-0"
-              >
-                {currentBusiness.name.charAt(0).toUpperCase()}
-              </div>
+              <Image
+                src={UCRED_LOGO_PATH}
+                alt="Ucred"
+                width={36}
+                height={36}
+                referrerPolicy="no-referrer"
+                className="w-9 h-9 rounded-xl object-cover border border-[var(--surface-border)] shrink-0"
+              />
               <div className="min-w-0">
                 <div className="flex items-center gap-1">
-                  <span className="text-base font-extrabold truncate max-w-[170px] sm:max-w-xs">
+                  <span className="text-base font-extrabold truncate max-w-[145px] sm:max-w-xs">
                     {currentBusiness.name}
                   </span>
                   <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
@@ -1104,14 +1315,37 @@ function BolBahiAppInner() {
               </div>
             </button>
 
+            {/* Zone 2 & 3: Active Operator Switcher + Search/Bell/Help */}
             <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedAccountId(null);
+                  setSecondaryRoute('staff-audit');
+                }}
+                title="Switch Counter Staff / View Audit Log"
+                className="hidden sm:inline-flex min-h-[36px] px-2.5 rounded-xl border border-[var(--surface-border)] text-[11px] font-extrabold items-center gap-1.5 hover:border-[var(--brand)] transition mr-1"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-[var(--brand)]" />
+                <span className="max-w-[100px] truncate">{activeOperator.name}</span>
+              </button>
+
               <PWAInstallButton compact />
+
+              <button
+                type="button"
+                onClick={() => setSearchOpen((v) => !v)}
+                aria-label="Search accounts"
+                className="min-w-[38px] min-h-[38px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <Search className="w-5 h-5" />
+              </button>
 
               <button
                 type="button"
                 onClick={() => setNotifOpen(true)}
                 aria-label="Open notifications"
-                className="relative min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="relative min-w-[38px] min-h-[38px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
@@ -1126,18 +1360,9 @@ function BolBahiAppInner() {
                   setSecondaryRoute('help-support');
                 }}
                 aria-label="Help and Support"
-                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="min-w-[38px] min-h-[38px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <HelpCircle className="w-5 h-5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSearchOpen((v) => !v)}
-                aria-label="Search accounts"
-                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <Search className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -1149,7 +1374,7 @@ function BolBahiAppInner() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search customer or supplier name / mobile..."
-                className="w-full min-h-[42px] rounded-xl bg-slate-100 dark:bg-slate-800 px-3.5 text-sm outline-none"
+                className="w-full min-h-[42px] rounded-xl bg-[var(--app-bg)] border border-[var(--surface-border)] px-3.5 text-sm outline-none focus:border-[var(--brand)]"
               />
             </div>
           )}
@@ -1157,6 +1382,74 @@ function BolBahiAppInner() {
 
         {/* Active View Body */}
         <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-4">
+          {secondaryRoute === 'galla' && (
+            <GallaCashbookView
+              cashbookEntries={cashbookEntries}
+              transactions={transactions}
+              bills={bills}
+              stockItems={stockItems}
+              activeOperatorName={activeOperator.name}
+              onAddEntry={async (payload) => {
+                await addCashbookEntry({
+                  ownerId: user.uid,
+                  businessId: currentBusiness.id,
+                  entryType: payload.entryType,
+                  mode: payload.mode,
+                  category: payload.category,
+                  amount: payload.amount,
+                  note: payload.note,
+                  entryDate: payload.entryDate,
+                  actorName: activeOperator.name,
+                });
+                logActivity(
+                  'galla',
+                  `Galla ${payload.entryType} ₹${payload.amount} (${payload.category})`,
+                  payload.category,
+                  payload.amount
+                );
+              }}
+              onDeleteEntry={async (entryId) => {
+                await deleteCashbookEntry(entryId);
+                logActivity('galla', 'Deleted Galla cashbook entry');
+              }}
+              onBack={() => setSecondaryRoute(null)}
+            />
+          )}
+
+          {secondaryRoute === 'staff-audit' && (
+            <StaffAuditView
+              uid={user.uid}
+              staffMembers={staffMembers}
+              activityLogs={activityLogs}
+              activeOperator={activeOperator}
+              onSwitchOperator={(op) => {
+                setActiveOperator(op);
+                logActivity('staff', `Counter switched to ${op.name} (${op.role})`, op.name);
+              }}
+              onSaveStaff={async (payload) => {
+                await saveStaffMember({
+                  ownerId: user.uid,
+                  businessId: currentBusiness.id,
+                  ...payload,
+                });
+                logActivity(
+                  'staff',
+                  `${payload.existingId ? 'Updated' : 'Added'} staff ${payload.name} (${payload.role})`,
+                  payload.name
+                );
+              }}
+              onDeleteStaff={async (staffId) => {
+                const st = staffMembers.find((s) => s.id === staffId);
+                await deleteStaffMember(staffId);
+                if (activeOperator.staffId === staffId) {
+                  setActiveOperator({ staffId: 'owner', name: 'Shop Owner', role: 'owner' });
+                }
+                logActivity('staff', `Removed staff ${st?.name || ''}`, st?.name);
+              }}
+              onBack={() => setSecondaryRoute(null)}
+            />
+          )}
+
           {secondaryRoute === 'settings' && (
             <SettingsView
               key={currentBusiness.id}
@@ -1206,6 +1499,7 @@ function BolBahiAppInner() {
               }}
               onLoadDemo={async () => {
                 await seedDemoBusinessData(user.uid, currentBusiness.id);
+                logActivity('account', 'Loaded Ucred demo shop data');
               }}
               onExportCsv={handleExportCsv}
               onExportJson={handleExportJson}
@@ -1234,6 +1528,8 @@ function BolBahiAppInner() {
                   }
                 }
                 try {
+                  localStorage.removeItem('ucred_prelogin_prefs');
+                  localStorage.removeItem('ucred_notif_prefs');
                   localStorage.removeItem('bolbahi_prelogin_prefs');
                   localStorage.removeItem('bolbahi_notif_prefs');
                 } catch {
@@ -1260,6 +1556,7 @@ function BolBahiAppInner() {
               onBack={() => setSecondaryRoute(null)}
               onSave={async (patch) => {
                 await updateBusiness(currentBusiness.id, patch);
+                logActivity('account', 'Updated business profile', patch.name || currentBusiness.name);
               }}
               onDeleteBusiness={async () => {
                 const fallback = businesses.find((b) => b.id !== currentBusiness.id);
@@ -1305,7 +1602,9 @@ function BolBahiAppInner() {
               business={currentBusiness}
               language={language}
               transactions={transactions.filter((tx) => tx.accountId === selectedAccount.id)}
+              trustScore={trustScoresByAccount[selectedAccount.id]}
               onBack={() => setSelectedAccountId(null)}
+              onOpenParchiScanner={() => setParchiScannerOpen(true)}
               onAddTransaction={async (payload) => {
                 const res = await addTransactionAtomic({
                   ownerId: user.uid,
@@ -1318,6 +1617,9 @@ function BolBahiAppInner() {
                   note: payload.note,
                   billDate: payload.billDate,
                   billImage: payload.billImage,
+                  createdByName: activeOperator.name,
+                  createdByRole: activeOperator.role,
+                  syncToGalla: payload.syncToGalla,
                 });
                 showActionToast({
                   kind: 'added',
@@ -1326,6 +1628,12 @@ function BolBahiAppInner() {
                   newBalance: res.newBalance,
                   accountCreated: false,
                 });
+                logActivity(
+                  'ledger',
+                  `${payload.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${payload.amount} for ${selectedAccount.name}`,
+                  selectedAccount.name,
+                  payload.amount
+                );
               }}
               onUpdateTransaction={async (tx, patch) => {
                 await updateTransactionAtomic({
@@ -1336,6 +1644,12 @@ function BolBahiAppInner() {
                   ),
                   patch,
                 });
+                logActivity(
+                  'ledger',
+                  `Edited ₹${patch.amount} entry for ${selectedAccount.name}`,
+                  selectedAccount.name,
+                  patch.amount
+                );
               }}
               onDeleteTransaction={async (tx) => {
                 const remaining = transactions.filter(
@@ -1351,22 +1665,34 @@ function BolBahiAppInner() {
                   tx,
                   account: selectedAccount,
                 });
+                logActivity(
+                  'ledger',
+                  `Deleted ₹${tx.amount} entry for ${selectedAccount.name}`,
+                  selectedAccount.name,
+                  tx.amount
+                );
               }}
               onUpdateAccount={async (patch) => {
                 await updateAccountMeta(selectedAccount.id, patch);
+                logActivity(
+                  'account',
+                  `Updated party details for ${selectedAccount.name}`,
+                  selectedAccount.name
+                );
               }}
               onDeleteAccount={async () => {
-                const accTxs = transactions.filter(
-                  (tx) => tx.accountId === selectedAccount.id
-                );
+                const accTxs = transactions.filter((tx) => tx.accountId === selectedAccount.id);
                 await deleteAccountWithTransactions(selectedAccount.id, accTxs);
+                logActivity('account', `Deleted party ${selectedAccount.name}`, selectedAccount.name);
                 setSelectedAccountId(null);
               }}
               onOpenVoiceForCustomer={(name) => {
                 setVoicePrefillName(name);
+                setVoiceCounterMode(false);
                 setVoiceModalOpen(true);
               }}
               onOpenCreateBill={(customerName, customerPhone) => {
+                setBillDraft(null);
                 setBillPrefill({ name: customerName, phone: customerPhone });
                 setSelectedAccountId(null);
                 setMainTab('bills');
@@ -1381,6 +1707,8 @@ function BolBahiAppInner() {
               stockItems={stockItems}
               language={language}
               searchQuery={searchQuery}
+              gallaPulse={gallaPulse}
+              trustScoresByAccount={trustScoresByAccount}
               onSelectAccount={(acc) => setSelectedAccountId(acc.id)}
               onCreateAccount={async (payload) => {
                 const created = await createAccount({
@@ -1392,12 +1720,28 @@ function BolBahiAppInner() {
                   dueDate: payload.dueDate,
                   creditLimit: payload.creditLimit,
                 });
+                logActivity(
+                  'account',
+                  `Added ${payload.kind} ${payload.name}`,
+                  payload.name
+                );
                 setSelectedAccountId(created.id);
               }}
               onOpenCollection={() => setMainTab('collection')}
               onOpenVoiceEntry={() => {
                 setVoicePrefillName('');
+                setVoiceCounterMode(false);
                 setVoiceModalOpen(true);
+              }}
+              onOpenCounterMode={() => {
+                setVoicePrefillName('');
+                setVoiceCounterMode(true);
+                setVoiceModalOpen(true);
+              }}
+              onOpenParchiScanner={() => setParchiScannerOpen(true)}
+              onOpenGalla={() => {
+                setSelectedAccountId(null);
+                setSecondaryRoute('galla');
               }}
               onOpenDailySummary={openDailyMunimSummary}
             />
@@ -1409,8 +1753,15 @@ function BolBahiAppInner() {
               accounts={accounts}
               business={currentBusiness}
               language={language}
+              trustScoresByAccount={trustScoresByAccount}
               onUpdateAccountDue={async (accountId, dueDate) => {
                 await updateAccountMeta(accountId, { dueDate });
+                const target = accounts.find((a) => a.id === accountId);
+                logActivity(
+                  'account',
+                  `Set due date ${dueDate} for ${target?.name || 'Party'}`,
+                  target?.name
+                );
               }}
               onSaveUpiId={async (upiId) => {
                 await updateBusiness(currentBusiness.id, { upiId });
@@ -1424,12 +1775,18 @@ function BolBahiAppInner() {
 
           {!secondaryRoute && !selectedAccount && mainTab === 'bills' && (
             <BillsView
-              key={`${currentBusiness.id}_${billPrefill?.name || 'none'}`}
+              key={`${currentBusiness.id}_${billDraft?.customerName || billPrefill?.name || 'none'}_${
+                billDraft ? billDraft.items?.length || 0 : 0
+              }`}
               bills={bills}
               stockItems={stockItems}
               business={currentBusiness}
               prefillCustomer={billPrefill}
-              onClearPrefill={() => setBillPrefill(null)}
+              externalDraft={billDraft}
+              onClearPrefill={() => {
+                setBillPrefill(null);
+                setBillDraft(null);
+              }}
               onSaveBill={async (payload: {
                 docType: BillDocType;
                 billNumber: string;
@@ -1438,56 +1795,63 @@ function BolBahiAppInner() {
                 items: BillLineItem[];
                 discountAmount: number;
                 paymentStatus: BillPaymentStatus;
+                syncToGalla?: { mode: CashbookMode } | null;
                 templateId: BillTemplateId;
                 notes: string;
                 billDate: string;
               }) => {
                 let linkedTxId: string | undefined;
-                if (payload.docType === 'bill' && payload.paymentStatus === 'unpaid') {
-                  const sub = payload.items.reduce(
-                    (s, it) => s + (Number(it.qty) || 0) * (Number(it.rate) || 0),
-                    0
+                const sub = payload.items.reduce(
+                  (s, it) => s + (Number(it.qty) || 0) * (Number(it.rate) || 0),
+                  0
+                );
+                const gst = payload.items.reduce(
+                  (s, it) =>
+                    s +
+                    ((Number(it.qty) || 0) * (Number(it.rate) || 0) * (Number(it.gstRate) || 0)) /
+                      100,
+                  0
+                );
+                const netBill = Math.max(
+                  0,
+                  Math.round((sub + gst - (payload.discountAmount || 0)) * 100) / 100
+                );
+
+                if (payload.docType === 'bill' && payload.paymentStatus === 'unpaid' && netBill > 0) {
+                  const matched = accounts.find(
+                    (a) =>
+                      a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
+                      (payload.customerPhone && a.phone === payload.customerPhone)
                   );
-                  const gst = payload.items.reduce(
-                    (s, it) =>
-                      s +
-                      ((Number(it.qty) || 0) *
-                        (Number(it.rate) || 0) *
-                        (Number(it.gstRate) || 0)) /
-                        100,
-                    0
-                  );
-                  const netBill = Math.max(
-                    0,
-                    Math.round((sub + gst - (payload.discountAmount || 0)) * 100) / 100
-                  );
-                  if (netBill > 0) {
-                    const matched = accounts.find(
-                      (a) =>
-                        a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
-                        (payload.customerPhone && a.phone === payload.customerPhone)
-                    );
-                    const txRes = await addTransactionAtomic({
-                      ownerId: user.uid,
-                      businessId: currentBusiness.id,
-                      existingAccount: matched || null,
-                      customerName: payload.customerName,
-                      kind: matched?.kind || 'customer',
-                      direction: 'given',
-                      amount: netBill,
-                      note: `Bill ${payload.billNumber}`,
-                      billDate: payload.billDate,
-                    });
-                    linkedTxId = txRes.txId;
-                  }
+                  const txRes = await addTransactionAtomic({
+                    ownerId: user.uid,
+                    businessId: currentBusiness.id,
+                    existingAccount: matched || null,
+                    customerName: payload.customerName,
+                    kind: matched?.kind || 'customer',
+                    direction: 'given',
+                    amount: netBill,
+                    note: `Bill ${payload.billNumber}`,
+                    billDate: payload.billDate,
+                    createdByName: activeOperator.name,
+                    createdByRole: activeOperator.role,
+                  });
+                  linkedTxId = txRes.txId;
                 }
                 const res = await saveBillDocument({
                   ownerId: user.uid,
                   businessId: currentBusiness.id,
                   stockItems,
                   linkedTxId,
+                  createdByName: activeOperator.name,
                   ...payload,
                 });
+                logActivity(
+                  'bill',
+                  `Created ${payload.docType} ${payload.billNumber} for ${payload.customerName}`,
+                  payload.customerName,
+                  netBill
+                );
                 return { deductedCount: res.deductedCount };
               }}
               onConvertQuote={async (quote) => {
@@ -1497,9 +1861,24 @@ function BolBahiAppInner() {
                   newBillNumber,
                   stockItems,
                 });
+                logActivity(
+                  'bill',
+                  `Converted ${quote.billNumber} -> ${newBillNumber}`,
+                  quote.customerName,
+                  quote.totalAmount
+                );
                 return { billNumber: newBillNumber, deductedCount };
               }}
-              onDeleteBill={deleteBillDocument}
+              onDeleteBill={async (billId) => {
+                const target = bills.find((b) => b.id === billId);
+                await deleteBillDocument(billId);
+                logActivity(
+                  'bill',
+                  `Deleted ${target?.billNumber || 'bill'}`,
+                  target?.customerName,
+                  target?.totalAmount
+                );
+              }}
             />
           )}
 
@@ -1512,15 +1891,24 @@ function BolBahiAppInner() {
                   businessId: currentBusiness.id,
                   ...payload,
                 });
+                logActivity(
+                  'stock',
+                  `${payload.existingId ? 'Updated' : 'Added'} stock ${payload.name} (${payload.quantity} ${payload.unit})`,
+                  payload.name
+                );
               }}
-              onDeleteItem={deleteStockItem}
+              onDeleteItem={async (itemId) => {
+                const stk = stockItems.find((s) => s.id === itemId);
+                await deleteStockItem(itemId);
+                logActivity('stock', `Deleted stock item ${stk?.name || ''}`, stk?.name);
+              }}
             />
           )}
         </main>
       </div>
 
-      {/* Mobile Sticky 4-Tab Bottom Navigation (OkCredit video 00:34: Ledger | Collection | Bills | More) */}
-      <nav className="no-print md:hidden fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 grid grid-cols-4 h-16">
+      {/* Mobile Sticky 4-Tab Bottom Navigation (Ledger | Collection | Bills | More) */}
+      <nav className="no-print md:hidden fixed bottom-0 inset-x-0 z-30 bg-[var(--surface)] border-t border-[var(--surface-border)] grid grid-cols-4 h-16">
         {(
           [
             { id: 'ledger', label: t.tabLedger, icon: BookOpen },
@@ -1540,9 +1928,7 @@ function BolBahiAppInner() {
                 setMainTab(tab.id);
               }}
               className={`flex flex-col items-center justify-center gap-1 text-[11px] font-bold transition ${
-                active
-                  ? 'text-[var(--brand)]'
-                  : 'text-slate-500 dark:text-slate-400'
+                active ? 'text-[var(--brand)]' : 'text-slate-500 dark:text-slate-400'
               }`}
             >
               <Icon className="w-5 h-5" />
@@ -1565,10 +1951,10 @@ function BolBahiAppInner() {
         </button>
       </nav>
 
-      {/* Business Switcher Modal (OkCredit video 00:46 - 00:50) */}
+      {/* Business Switcher Modal */}
       {bizSwitcherOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 p-6 space-y-4">
+          <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-extrabold">Switch Business</h3>
               <button type="button" onClick={() => setBizSwitcherOpen(false)}>
@@ -1587,7 +1973,7 @@ function BolBahiAppInner() {
                     className={`w-full min-h-[54px] px-4 rounded-2xl border flex items-center justify-between gap-3 ${
                       active
                         ? 'bg-[var(--brand-tint)] border-[var(--brand)]'
-                        : 'border-slate-200 dark:border-slate-800'
+                        : 'border-[var(--surface-border)]'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -1605,23 +1991,21 @@ function BolBahiAppInner() {
               })}
             </div>
 
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
-              <p className="text-xs font-bold uppercase text-slate-500">
-                Create New Business
-              </p>
+            <div className="pt-2 border-t border-[var(--surface-border)] space-y-2">
+              <p className="text-xs font-bold uppercase text-slate-500">Create New Business</p>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={newBizName}
                   onChange={(e) => setNewBizName(e.target.value)}
                   placeholder="e.g. Sharma Wholesale"
-                  className="flex-1 min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3 text-sm font-bold outline-none"
+                  className="flex-1 min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold outline-none"
                 />
                 <button
                   type="button"
                   disabled={creatingBiz || !newBizName.trim()}
                   onClick={handleCreateExtraBusiness}
-                  className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-white text-xs font-bold inline-flex items-center gap-1 disabled:opacity-50"
+                  className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold inline-flex items-center gap-1 disabled:opacity-50"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Create</span>
@@ -1638,6 +2022,10 @@ function BolBahiAppInner() {
         onClose={() => setMoreOpen(false)}
         onNavigate={(target) => {
           setSelectedAccountId(null);
+          if (target === 'scan-parchi') {
+            setParchiScannerOpen(true);
+            return;
+          }
           if (target === 'bills' || target === 'stock' || target === 'collection') {
             setSecondaryRoute(null);
             setMainTab(target);
@@ -1653,19 +2041,23 @@ function BolBahiAppInner() {
         items={notifications}
         onClose={() => setNotifOpen(false)}
         onToggleRead={(id) => updateNotifPref(id, { read: true })}
-        onToggleFav={(id) =>
-          updateNotifPref(id, { fav: !notifPrefs[id]?.fav })
-        }
+        onToggleFav={(id) => updateNotifPref(id, { fav: !notifPrefs[id]?.fav })}
         onTriggerAction={(target) => {
           if (target === 'collection') {
             setSecondaryRoute(null);
             setSelectedAccountId(null);
             setMainTab('collection');
+          } else if (target === 'galla') {
+            setSelectedAccountId(null);
+            setSecondaryRoute('galla');
+          } else if (target === 'parchi') {
+            setParchiScannerOpen(true);
           } else if (target === 'theme' || target === 'upi') {
             setSelectedAccountId(null);
             setSecondaryRoute('settings');
           } else if (target === 'voice') {
             setVoicePrefillName('');
+            setVoiceCounterMode(false);
             setVoiceModalOpen(true);
           }
         }}
@@ -1674,14 +2066,14 @@ function BolBahiAppInner() {
       {/* Floating Undo + Instant WhatsApp Receipt Snackbar */}
       {actionToast && (
         <div className="no-print fixed bottom-20 md:bottom-6 inset-x-3 md:left-72 md:right-6 z-40 flex justify-center pointer-events-none">
-          <div className="pointer-events-auto w-full max-w-xl rounded-2xl bg-slate-900 dark:bg-slate-800 text-white shadow-xl border border-slate-700 px-3.5 py-2.5 flex items-center justify-between gap-2">
+          <div className="pointer-events-auto w-full max-w-xl rounded-2xl bg-[#161514] text-[#F6F2EC] shadow-xl border border-[#2A2824] px-3.5 py-2.5 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-xs font-extrabold truncate">
                 {actionToast.kind === 'added'
                   ? `Saved ${formatINR(actionToast.tx.amount)} · ${actionToast.account.name}`
                   : `Deleted ${formatINR(actionToast.tx.amount)} · ${actionToast.account.name}`}
               </p>
-              <p className="text-[11px] text-slate-300 truncate">
+              <p className="text-[11px] text-[#B8B0A4] truncate">
                 {actionToast.kind === 'added'
                   ? `Balance: ${formatINR(Math.abs(actionToast.newBalance))} ${
                       actionToast.newBalance > 0
@@ -1722,7 +2114,7 @@ function BolBahiAppInner() {
                 type="button"
                 disabled={undoBusy}
                 onClick={handleUndoToast}
-                className="min-h-[36px] px-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-extrabold inline-flex items-center gap-1 disabled:opacity-50"
+                className="min-h-[36px] px-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-[#161514] text-[11px] font-extrabold inline-flex items-center gap-1 disabled:opacity-50"
               >
                 <Undo2 className="w-3.5 h-3.5" />
                 <span>Undo</span>
@@ -1732,7 +2124,7 @@ function BolBahiAppInner() {
                 type="button"
                 onClick={dismissActionToast}
                 aria-label="Dismiss notification"
-                className="min-w-[32px] min-h-[32px] rounded-lg text-slate-400 hover:text-white flex items-center justify-center"
+                className="min-w-[32px] min-h-[32px] rounded-lg text-[#B8B0A4] hover:text-white flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1744,7 +2136,7 @@ function BolBahiAppInner() {
       {/* Daily Munim Closing Summary Modal */}
       {dailySummaryOpen && (
         <div className="no-print fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
+          <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
@@ -1761,34 +2153,29 @@ function BolBahiAppInner() {
                 type="button"
                 onClick={closeDailyMunimSummary}
                 aria-label="Close Munim Summary"
-                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500 hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3 text-center">
+              <div className="rounded-2xl border border-[var(--surface-border)] p-3 text-center">
                 <p className="text-[11px] font-bold text-slate-500 uppercase">Given Today</p>
-                <p className="text-base font-extrabold text-red-600 tabular-nums mt-0.5">
+                <p className="text-base font-extrabold text-red-600 font-tabular mt-0.5">
                   {formatINR(dailyStats.givenToday)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3 text-center">
+              <div className="rounded-2xl border border-[var(--surface-border)] p-3 text-center">
                 <p className="text-[11px] font-bold text-slate-500 uppercase">Vasooli Today</p>
-                <p className="text-base font-extrabold text-emerald-600 tabular-nums mt-0.5">
+                <p className="text-base font-extrabold text-emerald-600 font-tabular mt-0.5">
                   {formatINR(dailyStats.receivedToday)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3 text-center">
-                <p className="text-[11px] font-bold text-slate-500 uppercase">Net Flow</p>
-                <p
-                  className={`text-base font-extrabold tabular-nums mt-0.5 ${
-                    dailyStats.netToday >= 0 ? 'text-emerald-600' : 'text-red-600'
-                  }`}
-                >
-                  {dailyStats.netToday >= 0 ? '+' : '-'}
-                  {formatINR(Math.abs(dailyStats.netToday))}
+              <div className="rounded-2xl border border-[var(--surface-border)] p-3 text-center">
+                <p className="text-[11px] font-bold text-slate-500 uppercase">Galla Cash</p>
+                <p className="text-base font-extrabold text-[var(--brand)] font-tabular mt-0.5">
+                  {formatINR(gallaPulse.cashDrawerBalance)}
                 </p>
               </div>
             </div>
@@ -1855,7 +2242,7 @@ function BolBahiAppInner() {
                     language
                   )
                 }
-                className="min-h-[48px] rounded-2xl bg-[var(--brand)] text-white text-sm font-extrabold flex items-center justify-center gap-2"
+                className="min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold flex items-center justify-center gap-2"
               >
                 <Volume2 className="w-4 h-4" />
                 <span>Replay Audio</span>
@@ -1863,7 +2250,7 @@ function BolBahiAppInner() {
               <button
                 type="button"
                 onClick={stopSpeaking}
-                className="min-h-[48px] rounded-2xl border border-slate-200 dark:border-slate-700 text-sm font-bold flex items-center justify-center gap-2"
+                className="min-h-[48px] rounded-2xl border border-[var(--surface-border)] text-sm font-bold flex items-center justify-center gap-2"
               >
                 <VolumeX className="w-4 h-4" />
                 <span>Stop Voice</span>
@@ -1873,14 +2260,19 @@ function BolBahiAppInner() {
         </div>
       )}
 
-      {/* Voice Entry Modal */}
+      {/* Voice & Hands-Free Counter Modal */}
       <VoiceEntryModal
         open={voiceModalOpen}
         language={language}
         accounts={accounts}
+        stockNames={stockItems.map((s) => s.name)}
         business={currentBusiness}
         prefillCustomerName={voicePrefillName}
-        onClose={() => setVoiceModalOpen(false)}
+        initialCounterMode={voiceCounterMode}
+        onClose={() => {
+          setVoiceModalOpen(false);
+          setVoiceCounterMode(false);
+        }}
         onOpenAccount={(acc) => {
           setSecondaryRoute(null);
           setMainTab('ledger');
@@ -1888,6 +2280,96 @@ function BolBahiAppInner() {
         }}
         onOpenDailySummary={openDailyMunimSummary}
         onSaveEntry={handleVoiceSave}
+        onUndoQueueItem={handleUndoVoiceQueueItem}
+        onCreateBillFromVoice={(draft) => {
+          setVoiceModalOpen(false);
+          setVoiceCounterMode(false);
+          setBillPrefill(null);
+          setBillDraft({
+            customerName: draft.customerName,
+            items: draft.items,
+            paymentStatus: draft.paymentStatus,
+          });
+          setSecondaryRoute(null);
+          setSelectedAccountId(null);
+          setMainTab('bills');
+        }}
+      />
+
+      {/* AI Parchi & Receipt Scanner Modal */}
+      <ParchiScannerModal
+        open={parchiScannerOpen}
+        onClose={() => setParchiScannerOpen(false)}
+        accounts={accounts}
+        onPostToKhata={async (payload) => {
+          const match = accounts.find(
+            (a) =>
+              a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
+              (payload.phone && a.phone === payload.phone)
+          );
+          const res = await addTransactionAtomic({
+            ownerId: user.uid,
+            businessId: currentBusiness.id,
+            existingAccount: match || null,
+            customerName: payload.customerName,
+            kind: match?.kind || 'customer',
+            direction: payload.direction,
+            amount: payload.amount,
+            note: payload.note || 'AI Parchi Scan',
+            billDate: payload.billDate,
+            billImage: payload.billImage,
+            createdByName: activeOperator.name,
+            createdByRole: activeOperator.role,
+          });
+          if (!match && payload.phone) {
+            await updateAccountMeta(res.accountId, { phone: payload.phone }).catch(() => {});
+          }
+          const accSnapshot: LedgerAccount = match
+            ? { ...match, balance: res.newBalance }
+            : {
+                id: res.accountId,
+                ownerId: user.uid,
+                businessId: currentBusiness.id,
+                kind: 'customer',
+                name: payload.customerName,
+                phone: payload.phone || '',
+                dueDate: '',
+                balance: res.newBalance,
+                lastNote: res.tx.note,
+                lastActivityAt: res.tx.billDate,
+              };
+          showActionToast({
+            kind: 'added',
+            tx: res.tx,
+            account: accSnapshot,
+            newBalance: res.newBalance,
+            accountCreated: res.accountCreated,
+          });
+          logActivity(
+            'ledger',
+            `Scanned Parchi ₹${payload.amount} for ${payload.customerName}`,
+            payload.customerName,
+            payload.amount
+          );
+          setParchiScannerOpen(false);
+          setSecondaryRoute(null);
+          setMainTab('ledger');
+          setSelectedAccountId(res.accountId);
+        }}
+        onCreateBillFromScan={(draft) => {
+          setParchiScannerOpen(false);
+          setBillPrefill(null);
+          setBillDraft({
+            customerName: draft.customerName,
+            customerPhone: draft.customerPhone,
+            items: draft.items,
+            paymentStatus: draft.paymentStatus,
+            notes: draft.notes,
+          });
+          setSecondaryRoute(null);
+          setSelectedAccountId(null);
+          setMainTab('bills');
+        }}
       />
     </div>
   );

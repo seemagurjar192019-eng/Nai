@@ -148,7 +148,7 @@ export const StockView: React.FC<StockViewProps> = ({
         <button
           type="button"
           onClick={openAddModal}
-          className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white text-sm font-extrabold inline-flex items-center gap-1.5"
+          className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" />
           <span>Add New Item</span>
@@ -217,7 +217,7 @@ export const StockView: React.FC<StockViewProps> = ({
             <button
               type="button"
               onClick={openAddModal}
-              className="min-h-[44px] px-5 rounded-xl bg-[var(--brand)] text-white text-sm font-bold inline-flex items-center gap-1.5"
+              className="min-h-[44px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" />
               <span>Add New Item</span>
@@ -400,7 +400,7 @@ export const StockView: React.FC<StockViewProps> = ({
               type="button"
               disabled={saving}
               onClick={handleSave}
-              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-white font-extrabold disabled:opacity-60"
+              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold disabled:opacity-60"
             >
               {saving ? 'Saving...' : editingItemId ? 'Update Stock Item' : 'Save Stock Item'}
             </button>

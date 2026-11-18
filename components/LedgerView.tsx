@@ -2,15 +2,18 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Camera,
   Check,
   Eye,
   EyeOff,
+  Filter,
   MessageCircle,
   Mic,
   Plus,
-  SlidersHorizontal,
+  Repeat,
   UserPlus,
   Volume2,
+  Wallet,
   X,
 } from 'lucide-react';
 import {
@@ -22,6 +25,8 @@ import {
 } from '@/lib/i18n';
 import type {
   AccountKind,
+  CustomerTrustScore,
+  DailyGallaPulse,
   LanguageCode,
   LedgerAccount,
   LedgerFilterChip,
@@ -36,6 +41,8 @@ interface LedgerViewProps {
   stockItems: StockItem[];
   language: LanguageCode;
   searchQuery: string;
+  gallaPulse: DailyGallaPulse;
+  trustScoresByAccount: Record<string, CustomerTrustScore>;
   onSelectAccount: (account: LedgerAccount) => void;
   onCreateAccount: (payload: {
     kind: AccountKind;
@@ -46,8 +53,29 @@ interface LedgerViewProps {
   }) => Promise<void>;
   onOpenCollection: () => void;
   onOpenVoiceEntry: () => void;
+  onOpenCounterMode: () => void;
+  onOpenParchiScanner: () => void;
+  onOpenGalla: () => void;
   onOpenDailySummary: () => void;
 }
+
+const FILTER_OPTIONS: Array<{ id: LedgerFilterChip; label: string }> = [
+  { id: 'customer', label: 'All Customers' },
+  { id: 'supplier', label: 'All Suppliers' },
+  { id: 'due-today', label: 'Due Today' },
+  { id: 'pending-due', label: 'Pending Due' },
+  { id: 'upcoming-due', label: 'Upcoming Due' },
+  { id: 'defaulters', label: 'Defaulters (Overdue)' },
+  { id: 'high-risk', label: 'High Trust Risk (<50)' },
+];
+
+const SORT_OPTIONS: Array<{ id: SortByOption; label: string }> = [
+  { id: 'recommended', label: 'Recommended' },
+  { id: 'recovery-priority', label: 'Recovery Priority (Smart)' },
+  { id: 'latest-activity', label: 'Latest Activity' },
+  { id: 'due-amount', label: 'Due Amount (Highest First)' },
+  { id: 'last-payment', label: 'Last Payment' },
+];
 
 export const LedgerView: React.FC<LedgerViewProps> = ({
   accounts,
@@ -55,19 +83,25 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   stockItems,
   language,
   searchQuery,
+  gallaPulse,
+  trustScoresByAccount,
   onSelectAccount,
   onCreateAccount,
   onOpenCollection,
   onOpenVoiceEntry,
+  onOpenCounterMode,
+  onOpenParchiScanner,
+  onOpenGalla,
   onOpenDailySummary,
 }) => {
   const t = getUIStrings(language);
   const [filterChip, setFilterChip] = useState<LedgerFilterChip>('customer');
   const [sortBy, setSortBy] = useState<SortByOption>('latest-activity');
-  const [showSortSheet, setShowSortSheet] = useState(false);
+  const [showFilterSortSheet, setShowFilterSortSheet] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [hideBalance, setHideBalance] = useState(false);
 
-  // Add Customer / Supplier Modal (OkCredit video 01:54 - 01:57)
+  // Add Customer / Supplier Modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKind, setNewKind] = useState<AccountKind>('customer');
   const [newName, setNewName] = useState('');
@@ -82,12 +116,13 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (showSortSheet) setShowSortSheet(false);
+      if (showFilterSortSheet) setShowFilterSortSheet(false);
+      else if (quickActionsOpen) setQuickActionsOpen(false);
       else if (showAddModal && !addingBusy) setShowAddModal(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showSortSheet, showAddModal, addingBusy]);
+  }, [showFilterSortSheet, quickActionsOpen, showAddModal, addingBusy]);
 
   const todayStats = useMemo(() => {
     let givenToday = 0;
@@ -120,6 +155,10 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       list = list.filter((a) => a.balance > 0 && a.dueDate > todayStr);
     } else if (filterChip === 'defaulters') {
       list = list.filter((a) => a.balance > 0 && a.dueDate !== '' && a.dueDate < todayStr);
+    } else if (filterChip === 'high-risk') {
+      list = list.filter(
+        (a) => a.balance > 0 && (trustScoresByAccount[a.id]?.score ?? 100) < 50
+      );
     }
 
     if (searchQuery.trim()) {
@@ -130,6 +169,11 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     }
 
     list.sort((a, b) => {
+      if (sortBy === 'recovery-priority') {
+        const pa = trustScoresByAccount[a.id]?.priorityScore || 0;
+        const pb = trustScoresByAccount[b.id]?.priorityScore || 0;
+        return pb - pa;
+      }
       if (sortBy === 'due-amount') return b.balance - a.balance;
       if (sortBy === 'last-payment') return (a.balance || 0) - (b.balance || 0);
       if (sortBy === 'recommended') return Math.abs(b.balance) - Math.abs(a.balance);
@@ -137,20 +181,19 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     });
 
     return list;
-  }, [accounts, filterChip, searchQuery, sortBy, todayStr]);
+  }, [accounts, filterChip, searchQuery, sortBy, todayStr, trustScoresByAccount]);
 
   const netSum = useMemo(() => {
-    return Math.round(
-      filteredAccounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0) * 100
-    ) / 100;
+    return (
+      Math.round(filteredAccounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0) * 100) /
+      100
+    );
   }, [filteredAccounts]);
 
   const totalUdhaar = useMemo(
     () =>
       Math.round(
-        accounts
-          .filter((a) => a.balance > 0)
-          .reduce((sum, a) => sum + a.balance, 0) * 100
+        accounts.filter((a) => a.balance > 0).reduce((sum, a) => sum + a.balance, 0) * 100
       ) / 100,
     [accounts]
   );
@@ -158,9 +201,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   const totalJama = useMemo(
     () =>
       Math.round(
-        accounts
-          .filter((a) => a.balance < 0)
-          .reduce((sum, a) => sum + Math.abs(a.balance), 0) * 100
+        accounts.filter((a) => a.balance < 0).reduce((sum, a) => sum + Math.abs(a.balance), 0) * 100
       ) / 100,
     [accounts]
   );
@@ -202,141 +243,163 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     }
   };
 
-  const chips: Array<{ id: LedgerFilterChip; label: string }> = [
-    { id: 'customer', label: t.customer },
-    { id: 'supplier', label: t.supplier },
-    { id: 'due-today', label: t.dueToday },
-    { id: 'pending-due', label: t.pendingDue },
-    { id: 'upcoming-due', label: t.upcomingDue },
-    { id: 'defaulters', label: t.defaulters },
-  ];
+  const activeFilterLabel =
+    FILTER_OPTIONS.find((f) => f.id === filterChip)?.label || 'All Customers';
+  const hasSecondaryFilter = filterChip !== 'customer' && filterChip !== 'supplier';
 
   return (
     <div className="space-y-4 pb-28">
-      {/* Filter Tabs (OkCredit video 00:34 / 01:05) */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-        {chips.map((chip) => {
-          const active = filterChip === chip.id;
-          return (
-            <button
-              key={chip.id}
-              type="button"
-              onClick={() => setFilterChip(chip.id)}
-              className={`min-h-[40px] px-4 py-1.5 rounded-xl text-sm font-bold whitespace-nowrap shrink-0 border transition ${
-                active
-                  ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              {chip.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Dual Summary + Net Balance Strip */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <div className="lg:col-span-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 flex items-center justify-between gap-4 shadow-xs">
-          <div>
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-              {t.netBalance}
-            </p>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              {filteredAccounts.length} {t.accounts}
-            </p>
-          </div>
-
+      {/* Unified Financial Pulse Strip (Ledger + Galla + Daily Profit + Munim Sunao) */}
+      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4 shadow-xs space-y-3.5">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                {t.netBalance} ({filteredAccounts.length} {t.accounts})
+              </p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <p
+                  className={`text-2xl font-extrabold font-tabular ${
+                    netSum >= 0 ? 'text-red-600' : 'text-emerald-600'
+                  }`}
+                >
+                  {hideBalance ? '₹••••' : formatINR(Math.abs(netSum))}
+                </p>
+                <span className="text-xs font-bold text-slate-500">
+                  {netSum >= 0 ? t.youGet : t.youPay}
+                </span>
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => setHideBalance((v) => !v)}
               aria-label={hideBalance ? 'Show balance' : 'Hide balance'}
-              className="min-w-[38px] min-h-[38px] rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center text-slate-500 hover:bg-black/5 dark:hover:bg-white/10"
             >
               {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
+          </div>
 
-            <div className="text-right">
-              <p
-                className={`text-xl font-extrabold font-tabular ${
-                  netSum >= 0 ? 'text-red-600' : 'text-emerald-600'
-                }`}
-              >
-                {hideBalance ? '₹••••' : formatINR(Math.abs(netSum))}
-              </p>
-              <p className="text-xs font-semibold text-slate-500">
-                {netSum >= 0 ? t.youGet : t.youPay}
+          <div className="flex items-center gap-5 font-tabular">
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase">{t.youGet}</p>
+              <p className="text-base font-extrabold text-red-600">
+                {hideBalance ? '₹•••' : formatINR(totalUdhaar)}
               </p>
             </div>
+            <div className="h-7 w-px bg-[var(--surface-border)]" />
+            <div>
+              <p className="text-[11px] font-bold text-slate-500 uppercase">{t.youPay}</p>
+              <p className="text-base font-extrabold text-emerald-600">
+                {hideBalance ? '₹•••' : formatINR(totalJama)}
+              </p>
+            </div>
+          </div>
+        </div>
 
+        {/* Live Galla + Today's Profit + Munim Sunao Strip */}
+        <div className="pt-3 border-t border-[var(--surface-border)] flex items-center justify-between gap-3 flex-wrap">
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-xs font-bold text-slate-800 dark:text-slate-100 font-tabular">
+              Galla Cash {hideBalance ? '₹••' : formatINR(gallaPulse.cashDrawerBalance)} · Today
+              Profit{' '}
+              <span
+                className={
+                  gallaPulse.estimatedDailyProfit >= 0 ? 'text-emerald-600' : 'text-red-600'
+                }
+              >
+                {hideBalance
+                  ? '₹••'
+                  : `${gallaPulse.estimatedDailyProfit >= 0 ? '+' : '-'}${formatINR(
+                      Math.abs(gallaPulse.estimatedDailyProfit)
+                    )}`}
+              </span>
+            </p>
+            <p className="text-[11px] font-medium text-slate-500 font-tabular truncate">
+              Given {hideBalance ? '₹••' : formatINR(todayStats.givenToday)} · Vasooli{' '}
+              {hideBalance ? '₹••' : formatINR(todayStats.receivedToday)}
+              {todayStats.overdueCount > 0 ? ` · ${todayStats.overdueCount} Overdue` : ''}
+              {todayStats.lowStockCount > 0 ? ` · ${todayStats.lowStockCount} Low Stock` : ''}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setShowSortSheet(true)}
-              aria-label="Sort accounts"
-              className="min-w-[40px] min-h-[40px] rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+              onClick={onOpenGalla}
+              className="min-h-[36px] px-3 rounded-xl border border-[var(--surface-border)] text-xs font-extrabold inline-flex items-center gap-1.5 hover:border-[var(--brand)] transition"
             >
-              <SlidersHorizontal className="w-4 h-4" />
+              <Wallet className="w-3.5 h-3.5 text-[var(--brand)]" />
+              <span>Open Galla</span>
+            </button>
+            <button
+              type="button"
+              onClick={onOpenDailySummary}
+              className="min-h-[36px] px-3 rounded-xl bg-[var(--brand-tint)] text-[var(--brand)] text-xs font-extrabold inline-flex items-center gap-1.5"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>Munim Sunao</span>
             </button>
           </div>
         </div>
+      </section>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3.5 shadow-xs">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-              {t.youGet}
-            </p>
-            <p className="text-xl font-extrabold font-tabular text-red-600 mt-1">
-              {hideBalance ? '₹••••' : formatINR(totalUdhaar)}
-            </p>
-          </div>
-          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3.5 shadow-xs">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-              {t.youPay}
-            </p>
-            <p className="text-xl font-extrabold font-tabular text-emerald-600 mt-1">
-              {hideBalance ? '₹••••' : formatINR(totalJama)}
-            </p>
-          </div>
+      {/* Clean Segment & Unified Filter/Sort Strip */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="inline-flex rounded-xl bg-black/5 dark:bg-white/10 p-1">
+          <button
+            type="button"
+            onClick={() => setFilterChip('customer')}
+            className={`min-h-[36px] px-4 rounded-lg text-xs sm:text-sm font-bold transition ${
+              filterChip === 'customer'
+                ? 'bg-[var(--surface)] text-[var(--brand)] shadow-xs'
+                : 'text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            {t.customer}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterChip('supplier')}
+            className={`min-h-[36px] px-4 rounded-lg text-xs sm:text-sm font-bold transition ${
+              filterChip === 'supplier'
+                ? 'bg-[var(--surface)] text-[var(--brand)] shadow-xs'
+                : 'text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            {t.supplier}
+          </button>
         </div>
-      </div>
 
-      {/* BolBahi Daily Spoken Munim Summary Strip */}
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between gap-3 flex-wrap shadow-xs">
-        <div className="min-w-0">
-          <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100">
-            Aaj Ka Munim Hisaab
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-tabular truncate">
-            Given {hideBalance ? '₹••' : formatINR(todayStats.givenToday)} · Vasooli{' '}
-            {hideBalance ? '₹••' : formatINR(todayStats.receivedToday)}
-            {todayStats.overdueCount > 0 ? ` · ${todayStats.overdueCount} Overdue` : ''}
-            {todayStats.lowStockCount > 0 ? ` · ${todayStats.lowStockCount} Low Stock` : ''}
-          </p>
-        </div>
         <button
           type="button"
-          onClick={onOpenDailySummary}
-          className="min-h-[38px] px-3.5 rounded-xl bg-[var(--brand-tint)] text-[var(--brand)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0"
+          onClick={() => setShowFilterSortSheet(true)}
+          className={`min-h-[40px] px-3.5 rounded-xl border text-xs font-extrabold inline-flex items-center gap-1.5 transition ${
+            hasSecondaryFilter || sortBy !== 'latest-activity'
+              ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
+              : 'bg-[var(--surface)] border-[var(--surface-border)] text-slate-700 dark:text-slate-200'
+          }`}
         >
-          <Volume2 className="w-4 h-4" />
-          <span>Munim Sunao</span>
+          <Filter className="w-3.5 h-3.5" />
+          <span>{hasSecondaryFilter ? activeFilterLabel : 'Filter & Sort'}</span>
         </button>
       </div>
 
       {/* Accounts List */}
       {filteredAccounts.length === 0 ? (
-        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center space-y-3">
-          <p className="text-base font-bold text-slate-700 dark:text-slate-200">
-            No {filterChip === 'supplier' ? 'suppliers' : 'customers'} found here.
+        <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-8 text-center space-y-3">
+          <p className="text-base font-bold text-slate-800 dark:text-slate-100">
+            No {filterChip === 'supplier' ? 'suppliers' : 'parties'} matched this view.
           </p>
           <p className="text-sm text-slate-500">
-            Tap <strong>Voice Entry</strong> to speak an entry, or add a customer manually.
+            Tap <strong>Voice &amp; Counter</strong> to speak an entry, scan a parchi, or add a
+            party manually.
           </p>
           <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
             <button
               type="button"
               onClick={onOpenVoiceEntry}
-              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-white text-sm font-bold inline-flex items-center gap-2"
+              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-2"
             >
               <Mic className="w-4 h-4" />
               <span>{t.voiceEntry}</span>
@@ -346,7 +409,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               onClick={() =>
                 handleOpenAddModal(filterChip === 'supplier' ? 'supplier' : 'customer')
               }
-              className="min-h-[44px] px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-bold inline-flex items-center gap-2"
+              className="min-h-[44px] px-4 rounded-xl border border-[var(--surface-border)] text-sm font-bold inline-flex items-center gap-2"
             >
               <UserPlus className="w-4 h-4" />
               <span>{filterChip === 'supplier' ? t.addSupplier : t.addCustomer}</span>
@@ -362,12 +425,28 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
             const overLimit = Boolean(
               acc.creditLimit && acc.creditLimit > 0 && acc.balance > acc.creditLimit
             );
+            const trust = trustScoresByAccount[acc.id];
+            const subtextParts: string[] = [];
+            if (trust && acc.kind === 'customer') {
+              subtextParts.push(`Trust ${trust.score}/100`);
+              subtextParts.push(trust.recoveryTimingHint);
+            } else if (acc.lastNote) {
+              subtextParts.push(acc.lastNote);
+            } else if (acc.phone) {
+              subtextParts.push(`+91 ${acc.phone}`);
+            } else {
+              subtextParts.push('Tap to view ledger');
+            }
+            if (overLimit) {
+              subtextParts.push(`Over Limit (${formatINR(acc.creditLimit || 0)})`);
+            }
+
             return (
               <button
                 key={acc.id}
                 type="button"
                 onClick={() => onSelectAccount(acc)}
-                className="w-full text-left rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-3.5 flex items-center justify-between gap-3 hover:border-[var(--brand)] transition shadow-xs"
+                className="w-full text-left rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] px-4 py-3.5 flex items-center justify-between gap-3 hover:border-[var(--brand)] transition shadow-xs"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div
@@ -380,12 +459,15 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     <p className="text-base font-bold text-slate-900 dark:text-white truncate">
                       {acc.name}
                     </p>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
+                    <p
+                      className={`text-xs font-medium truncate flex items-center gap-1 ${
+                        trust?.band === 'high-risk' && acc.balance > 0
+                          ? 'text-red-600 dark:text-red-400'
+                          : 'text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
                       <Check className="w-3.5 h-3.5 text-[var(--brand)] shrink-0" />
-                      <span>
-                        {acc.lastNote || (acc.phone ? `+91 ${acc.phone}` : 'Tap to view ledger')}
-                        {overLimit ? ` · Over Limit (${formatINR(acc.creditLimit || 0)})` : ''}
-                      </span>
+                      <span className="truncate">{subtextParts.join(' · ')}</span>
                     </p>
                   </div>
                 </div>
@@ -402,7 +484,11 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   >
                     {hideBalance ? '₹••' : formatINR(absBal)}
                   </p>
-                  <p className={`text-xs font-semibold ${overLimit ? 'text-amber-600' : 'text-slate-500'}`}>
+                  <p
+                    className={`text-xs font-semibold ${
+                      overLimit ? 'text-amber-600' : 'text-slate-500'
+                    }`}
+                  >
                     {overLimit ? 'Over Limit' : statusText}
                   </p>
                 </div>
@@ -412,90 +498,171 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
         </div>
       )}
 
-      {/* OkCredit Floating Quick Action Cluster (Bottom Right above Bottom Nav) */}
-      <div className="no-print fixed bottom-20 right-4 z-30 flex flex-col items-end gap-2.5">
-        <button
-          type="button"
-          onClick={onOpenCollection}
-          className="min-h-[42px] px-4 py-2 rounded-2xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100 shadow-md text-xs font-extrabold flex items-center gap-2 hover:scale-[1.02] transition"
-        >
-          <MessageCircle className="w-4 h-4 text-emerald-600" />
-          <span>{t.oneClickVasooli}</span>
-        </button>
+      {/* Managed 2-Button Thumb Dock (Voice & Counter + Quick Actions Sheet) */}
+      <div className="no-print fixed bottom-20 right-4 z-30 flex flex-col items-end gap-2">
+        {quickActionsOpen && (
+          <div className="w-60 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] shadow-2xl p-2 space-y-1">
+            <button
+              type="button"
+              onClick={() => {
+                setQuickActionsOpen(false);
+                handleOpenAddModal(filterChip === 'supplier' ? 'supplier' : 'customer');
+              }}
+              className="w-full min-h-[42px] px-3 rounded-xl flex items-center gap-2.5 text-xs font-extrabold hover:bg-black/5 dark:hover:bg-white/10 text-left"
+            >
+              <UserPlus className="w-4 h-4 text-[var(--brand)] shrink-0" />
+              <span>{filterChip === 'supplier' ? t.addSupplier : t.addCustomer}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setQuickActionsOpen(false);
+                onOpenParchiScanner();
+              }}
+              className="w-full min-h-[42px] px-3 rounded-xl flex items-center gap-2.5 text-xs font-extrabold hover:bg-black/5 dark:hover:bg-white/10 text-left"
+            >
+              <Camera className="w-4 h-4 text-[var(--brand)] shrink-0" />
+              <span>Scan Parchi (AI Photo)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setQuickActionsOpen(false);
+                onOpenGalla();
+              }}
+              className="w-full min-h-[42px] px-3 rounded-xl flex items-center gap-2.5 text-xs font-extrabold hover:bg-black/5 dark:hover:bg-white/10 text-left"
+            >
+              <Wallet className="w-4 h-4 text-[var(--brand)] shrink-0" />
+              <span>Galla Cash / Expense</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setQuickActionsOpen(false);
+                onOpenCollection();
+              }}
+              className="w-full min-h-[42px] px-3 rounded-xl flex items-center gap-2.5 text-xs font-extrabold hover:bg-black/5 dark:hover:bg-white/10 text-left"
+            >
+              <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{t.oneClickVasooli}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setQuickActionsOpen(false);
+                onOpenCounterMode();
+              }}
+              className="w-full min-h-[42px] px-3 rounded-xl flex items-center gap-2.5 text-xs font-extrabold hover:bg-black/5 dark:hover:bg-white/10 text-left"
+            >
+              <Repeat className="w-4 h-4 text-[var(--brand)] shrink-0" />
+              <span>Hands-Free Counter Mode</span>
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() =>
-              handleOpenAddModal(filterChip === 'supplier' ? 'supplier' : 'customer')
-            }
-            className="min-h-[48px] px-4 rounded-2xl bg-[var(--brand-tint)] border border-[var(--brand)] text-[var(--brand)] shadow-md text-sm font-extrabold flex items-center gap-1.5 hover:scale-[1.02] transition"
+            onClick={() => setQuickActionsOpen((v) => !v)}
+            className="min-h-[50px] px-4 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] text-slate-900 dark:text-white shadow-lg text-xs sm:text-sm font-extrabold flex items-center gap-1.5 hover:border-[var(--brand)] transition"
           >
-            <Plus className="w-4 h-4" />
-            <span>{filterChip === 'supplier' ? t.addSupplier : t.addCustomer}</span>
+            {quickActionsOpen ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            <span>Quick Actions</span>
           </button>
 
           <button
             type="button"
-            onClick={onOpenVoiceEntry}
-            className="min-h-[52px] px-5 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white shadow-lg text-sm font-extrabold flex items-center gap-2 voice-fab-pulse transition"
+            onClick={() => {
+              setQuickActionsOpen(false);
+              onOpenVoiceEntry();
+            }}
+            className="min-h-[50px] px-5 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] shadow-lg text-xs sm:text-sm font-extrabold flex items-center gap-2 voice-fab-pulse transition"
           >
-            <Mic className="w-5 h-5" />
-            <span>{t.voiceEntry}</span>
+            <Mic className="w-4 h-4" />
+            <span>Voice &amp; Counter</span>
           </button>
         </div>
       </div>
 
-      {/* Sort By Sheet (OkCredit video 00:44 / 01:07) */}
-      {showSortSheet && (
+      {/* Unified Filter & Sort Modal */}
+      {showFilterSortSheet && (
         <div
-          onClick={() => setShowSortSheet(false)}
+          onClick={() => setShowFilterSortSheet(false)}
           className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 p-6 space-y-3"
+            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-5 max-h-[88vh] overflow-y-auto"
           >
-            <div className="flex items-center justify-between pb-1">
-              <h3 className="text-lg font-extrabold">Sort By</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-extrabold">Filter &amp; Sort Ledger</h3>
               <button
                 type="button"
-                onClick={() => setShowSortSheet(false)}
+                onClick={() => setShowFilterSortSheet(false)}
+                aria-label="Close filter and sort"
                 className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {(
-              [
-                { id: 'recommended', label: 'Recommended' },
-                { id: 'last-payment', label: 'Last Payment' },
-                { id: 'latest-activity', label: 'Latest Activity' },
-                { id: 'due-amount', label: 'Due Amount (Highest First)' },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => {
-                  setSortBy(opt.id);
-                  setShowSortSheet(false);
-                }}
-                className={`w-full min-h-[48px] px-4 rounded-xl flex items-center justify-between text-sm font-bold ${
-                  sortBy === opt.id
-                    ? 'bg-[var(--brand-tint)] text-[var(--brand)]'
-                    : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
-                }`}
-              >
-                <span>{opt.label}</span>
-                {sortBy === opt.id && <Check className="w-4 h-4" />}
-              </button>
-            ))}
+
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Filter Parties
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {FILTER_OPTIONS.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFilterChip(f.id)}
+                    className={`min-h-[42px] px-3 rounded-xl text-xs font-bold border text-left flex items-center justify-between ${
+                      filterChip === f.id
+                        ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
+                        : 'border-[var(--surface-border)] text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    <span className="truncate">{f.label}</span>
+                    {filterChip === f.id && <Check className="w-3.5 h-3.5 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Sort Order
+              </p>
+              <div className="space-y-1.5">
+                {SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      setSortBy(opt.id);
+                      setShowFilterSortSheet(false);
+                    }}
+                    className={`w-full min-h-[46px] px-4 rounded-xl flex items-center justify-between text-sm font-bold ${
+                      sortBy === opt.id
+                        ? 'bg-[var(--brand-tint)] text-[var(--brand)]'
+                        : 'hover:bg-black/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    {sortBy === opt.id && <Check className="w-4 h-4" />}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Add Customer / Supplier Modal (OkCredit video 01:54) */}
+      {/* Add Customer / Supplier Modal */}
       {showAddModal && (
         <div
           onClick={() => {
@@ -505,7 +672,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 p-6 space-y-4"
+            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-extrabold">
@@ -527,7 +694,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 className={`min-h-[42px] rounded-xl text-sm font-bold border ${
                   newKind === 'customer'
                     ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                    : 'border-slate-200 dark:border-slate-700'
+                    : 'border-[var(--surface-border)]'
                 }`}
               >
                 Customer
@@ -538,7 +705,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 className={`min-h-[42px] rounded-xl text-sm font-bold border ${
                   newKind === 'supplier'
                     ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                    : 'border-slate-200 dark:border-slate-700'
+                    : 'border-[var(--surface-border)]'
                 }`}
               >
                 Supplier
@@ -566,7 +733,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   placeholder="9876543210"
-                  className="w-full min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3.5 text-base font-bold font-tabular outline-none"
+                  className="w-full min-h-[48px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3.5 text-base font-bold font-tabular outline-none"
                 />
               </div>
               <div>
@@ -577,7 +744,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   type="date"
                   value={newDueDate}
                   onChange={(e) => setNewDueDate(e.target.value)}
-                  className="w-full min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3.5 text-sm font-tabular outline-none"
+                  className="w-full min-h-[48px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3.5 text-sm font-tabular outline-none"
                 />
               </div>
               <div>
@@ -590,7 +757,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   value={newCreditLimit}
                   onChange={(e) => setNewCreditLimit(e.target.value)}
                   placeholder="e.g. 5000"
-                  className="w-full min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent px-3.5 text-sm font-tabular font-bold outline-none"
+                  className="w-full min-h-[48px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3.5 text-sm font-tabular font-bold outline-none"
                 />
               </div>
             </div>
@@ -601,7 +768,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               type="button"
               disabled={addingBusy}
               onClick={handleAddSubmit}
-              className="w-full min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-white font-extrabold text-base"
+              className="w-full min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-base"
             >
               {addingBusy ? 'Adding...' : 'Confirm'}
             </button>

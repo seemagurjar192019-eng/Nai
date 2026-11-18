@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import {
   ArrowLeft,
-  BookOpenCheck,
   Check,
   ChevronDown,
   Heart,
@@ -18,7 +18,7 @@ import {
   UserCheck,
   Volume2,
 } from 'lucide-react';
-import { LANGUAGE_OPTIONS, getUIStrings, speakHinglish } from '@/lib/i18n';
+import { LANGUAGE_OPTIONS, UCRED_LOGO_PATH, getUIStrings, speakHinglish } from '@/lib/i18n';
 import type { AccentTheme, LanguageCode } from '@/lib/types';
 
 export type OnboardingStep =
@@ -93,7 +93,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 
     setAudioPlaying(true);
     speakHinglish(
-      'BolBahi mein aapka swagat hai. Agar aap ek dukandar hain aur aapka len-den udhaar mein hota hai, toh apni dukaan ka naam jod kar bol kar apna digital khata shuru karein.',
+      'Ucred mein aapka swagat hai. Agar aap ek dukandar hain aur aapka len-den udhaar mein hota hai, toh apni dukaan ka naam jod kar bol kar apna digital khata, AI parchi aur galla shuru karein.',
       language
     );
     if (audioTimerRef.current) clearInterval(audioTimerRef.current);
@@ -126,15 +126,23 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   // 1. SPLASH SCREEN (OkCredit video 00:02 - 00:05)
   if (step === 'splash') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-between bg-white dark:bg-slate-950 px-6 py-12 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-between bg-[var(--app-bg)] px-6 py-12 text-center">
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <motion.div
             initial={{ scale: 0.85, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.45 }}
-            className="w-24 h-24 rounded-3xl bg-[var(--brand)] text-white flex items-center justify-center shadow-lg"
+            className="w-24 h-24 rounded-3xl overflow-hidden bg-[#F6F2EC] border border-[var(--surface-border)] shadow-lg flex items-center justify-center p-2"
           >
-            <BookOpenCheck className="w-12 h-12" />
+            <Image
+              src={UCRED_LOGO_PATH}
+              alt="Ucred logo"
+              width={88}
+              height={88}
+              priority
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain rounded-2xl"
+            />
           </motion.div>
           <motion.div
             initial={{ y: 10, opacity: 0 }}
@@ -146,7 +154,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               {t.appName}
             </h1>
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-              Voice-First Digital Khata · Built for Indian Businesses
+              Voice Khata, AI Parchi &amp; Live Galla · Built for Indian Shops
             </p>
           </motion.div>
         </div>
@@ -186,15 +194,22 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   // 2. LANGUAGE SELECTION GRID (OkCredit video 00:06 - 00:07)
   if (step === 'language') {
     return (
-      <div className="min-h-screen flex flex-col bg-white dark:bg-slate-950 px-5 py-8">
+      <div className="min-h-screen flex flex-col bg-[var(--app-bg)] px-5 py-8">
         <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col gap-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-[var(--brand)] text-white flex items-center justify-center">
-                <BookOpenCheck className="w-5 h-5" />
+              <span className="w-9 h-9 rounded-xl overflow-hidden bg-[#F6F2EC] border border-[var(--surface-border)] p-1 flex items-center justify-center">
+                <Image
+                  src={UCRED_LOGO_PATH}
+                  alt="Ucred"
+                  width={32}
+                  height={32}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-contain"
+                />
               </span>
               <span className="text-lg font-extrabold text-slate-900 dark:text-white">
-                BolBahi
+                Ucred
               </span>
             </div>
             <Link
@@ -220,7 +235,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   className={`relative text-left rounded-2xl p-4 min-h-[84px] flex flex-col justify-center transition border-2 ${
                     selected
                       ? 'bg-[var(--brand-tint)] border-[var(--brand)] shadow-sm'
-                      : 'bg-slate-50 dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      : 'bg-[var(--surface)] border-[var(--surface-border)] hover:border-slate-400 dark:hover:border-slate-600'
                   }`}
                 >
                   <span
@@ -238,7 +253,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                     </span>
                   )}
                   {selected && (
-                    <span className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-[var(--brand)] text-white flex items-center justify-center">
+                    <span className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] flex items-center justify-center">
                       <Check className="w-3.5 h-3.5 stroke-[3]" />
                     </span>
                   )}
@@ -251,7 +266,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             <button
               type="button"
               onClick={() => onStepChange('login')}
-              className="w-full min-h-[54px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white text-base font-bold shadow-sm transition"
+              className="w-full min-h-[54px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-base font-bold shadow-sm transition"
             >
               Continue ({LANGUAGE_OPTIONS.find((o) => o.code === language)?.nativeName || 'English'})
             </button>
@@ -267,16 +282,23 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       LANGUAGE_OPTIONS.find((l) => l.code === language) || LANGUAGE_OPTIONS[0];
 
     return (
-      <div className="min-h-screen flex flex-col bg-white dark:bg-slate-950 px-5 py-6">
+      <div className="min-h-screen flex flex-col bg-[var(--app-bg)] px-5 py-6">
         <div className="w-full max-w-lg mx-auto flex-1 flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between gap-4 pb-8">
             <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-[var(--brand)] text-white flex items-center justify-center">
-                <BookOpenCheck className="w-5 h-5" />
+              <span className="w-9 h-9 rounded-xl overflow-hidden bg-[#F6F2EC] border border-[var(--surface-border)] p-1 flex items-center justify-center">
+                <Image
+                  src={UCRED_LOGO_PATH}
+                  alt="Ucred"
+                  width={32}
+                  height={32}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-contain"
+                />
               </span>
               <span className="text-xl font-extrabold text-[var(--brand)]">
-                BolBahi
+                Ucred
               </span>
             </div>
 
@@ -406,13 +428,20 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               type="button"
               disabled={authBusy}
               onClick={handleContinueClick}
-              className="w-full min-h-[56px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-white text-base font-bold shadow-sm transition flex items-center justify-center gap-2"
+              className="w-full min-h-[56px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] text-base font-bold shadow-sm transition flex items-center justify-center gap-2"
             >
               {authBusy ? 'Verifying with Google...' : t.continueGoogle}
             </button>
 
             <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2">
-              <span>Theme: {accentTheme === 'green' ? 'OkCredit Green' : 'BolBahi Crimson'}</span>
+              <span>
+                Theme:{' '}
+                {accentTheme === 'green'
+                  ? 'OkCredit Green'
+                  : accentTheme === 'crimson'
+                  ? 'Crimson'
+                  : 'Ucred Obsidian'}
+              </span>
               <div className="flex items-center gap-3">
                 <Link href="/terms" className="font-semibold text-[var(--brand)] hover:underline">
                   Terms
@@ -427,19 +456,19 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
 
         {showLegalModal && (
           <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-xl space-y-4">
+            <div className="w-full max-w-md rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 shadow-xl space-y-4">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                 {showLegalModal === 'terms' ? 'Terms & Conditions' : 'Privacy Policy & Security'}
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                 {showLegalModal === 'terms'
-                  ? 'BolBahi stores your shop ledger, customer accounts, bills, and stock privately under your authenticated account. WhatsApp & SMS reminders are initiated directly from your device.'
+                  ? 'Ucred stores your shop ledger, customer accounts, bills, Galla cashbook, and stock privately under your authenticated account. WhatsApp & SMS reminders are initiated directly from your device.'
                   : 'Your khata records are encrypted in transit and scoped strictly to your signed-in account in Cloud Firestore, with local offline caching on your device. No third-party ad tracking is used.'}
               </p>
               <button
                 type="button"
                 onClick={() => setShowLegalModal(null)}
-                className="w-full min-h-[44px] rounded-xl bg-[var(--brand)] text-white font-bold"
+                className="w-full min-h-[44px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold"
               >
                 Close
               </button>
@@ -450,10 +479,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     );
   }
 
-  // 4. VERIFICATION SUCCESSFUL (OkCredit video 00:17 - 00:18)
+  // 4. VERIFICATION SUCCESSFUL
   if (step === 'verified') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-950 px-6 text-center gap-6">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--app-bg)] px-6 text-center gap-6">
         <motion.div
           initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -469,16 +498,16 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     );
   }
 
-  // 5. WELCOME AUDIO INTRO (OkCredit video 00:19 - 00:26)
+  // 5. WELCOME AUDIO INTRO
   if (step === 'welcome') {
     const mmss = `00:${String(audioSeconds).padStart(2, '0')}`;
     return (
-      <div className="min-h-screen flex flex-col justify-between bg-white dark:bg-slate-950 px-6 py-10">
+      <div className="min-h-screen flex flex-col justify-between bg-[var(--app-bg)] px-6 py-10">
         <div className="max-w-md w-full mx-auto flex-1 flex flex-col items-center justify-center text-center gap-6">
-          <div className="w-40 h-40 rounded-full bg-sky-50 dark:bg-slate-900 border border-sky-100 dark:border-slate-800 flex flex-col items-center justify-center gap-2 shadow-inner">
+          <div className="w-40 h-40 rounded-full bg-[var(--surface)] border border-[var(--surface-border)] flex flex-col items-center justify-center gap-2 shadow-sm">
             <Store className="w-16 h-16 text-[var(--brand)]" />
             <span className="text-xs font-bold uppercase tracking-widest text-[var(--brand)]">
-              Digital Khata
+              Ucred Khata
             </span>
           </div>
 
@@ -491,12 +520,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             </p>
           </div>
 
-          <div className="w-full rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 flex items-center gap-3">
+          <div className="w-full rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4 flex items-center gap-3">
             <button
               type="button"
               onClick={toggleWelcomeAudio}
               aria-label={audioPlaying ? 'Pause audio intro' : 'Play audio intro'}
-              className="w-11 h-11 rounded-full bg-[var(--brand)] text-white flex items-center justify-center shrink-0 hover:bg-[var(--brand-hover)] transition"
+              className="w-11 h-11 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] flex items-center justify-center shrink-0 hover:bg-[var(--brand-hover)] transition"
             >
               {audioPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
             </button>
@@ -527,7 +556,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               }
               onWelcomeDone();
             }}
-            className="w-full min-h-[54px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white text-base font-bold transition shadow-sm"
+            className="w-full min-h-[54px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-base font-bold transition shadow-sm"
           >
             {t.startBtn}
           </button>
@@ -536,9 +565,9 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     );
   }
 
-  // 6. SETUP BUSINESS NAME (OkCredit video 00:27 - 00:29)
+  // 6. SETUP BUSINESS NAME
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-slate-950 px-5 py-6">
+    <div className="min-h-screen flex flex-col bg-[var(--app-bg)] px-5 py-6">
       <div className="max-w-md w-full mx-auto flex-1 flex flex-col">
         <div className="flex items-center justify-between pb-10">
           <button
@@ -554,7 +583,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             type="button"
             onClick={onSkipBusiness}
             disabled={authBusy}
-            className="min-h-[40px] px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold text-[var(--brand)] hover:bg-[var(--brand-tint)] transition"
+            className="min-h-[40px] px-4 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-sm font-bold text-[var(--brand)] hover:bg-[var(--brand-tint)] transition"
           >
             {t.skip}
           </button>
@@ -575,7 +604,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex-1 flex items-center gap-2 rounded-2xl border-2 border-[var(--brand)] bg-white dark:bg-slate-900 px-3.5 min-h-[56px]">
+            <div className="flex-1 flex items-center gap-2 rounded-2xl border-2 border-[var(--brand)] bg-[var(--surface)] px-3.5 min-h-[56px]">
               <Store className="w-5 h-5 text-[var(--brand)] shrink-0" />
               <input
                 type="text"
@@ -591,7 +620,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               disabled={authBusy}
               onClick={() => onCreateBusiness(shopNameInput.trim() || 'My Shop')}
               aria-label="Save business name"
-              className="w-14 h-14 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-50 text-white flex items-center justify-center shrink-0 shadow-sm transition"
+              className="w-14 h-14 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-50 text-[var(--brand-fg)] flex items-center justify-center shrink-0 shadow-sm transition"
             >
               <Check className="w-6 h-6 stroke-[2.8]" />
             </button>

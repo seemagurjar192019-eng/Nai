@@ -7,10 +7,14 @@ import {
   ArrowRight,
   Check,
   Edit3,
+  FileText,
+  Loader2,
   MessageCircle,
   Mic,
   MicOff,
   Repeat,
+  Sparkles,
+  Undo2,
   Volume2,
   X,
 } from 'lucide-react';
@@ -29,7 +33,9 @@ import {
 } from '@/lib/i18n';
 import type {
   AccountKind,
+  BillLineItem,
   Business,
+  HybridVoiceParseResult,
   LanguageCode,
   LedgerAccount,
   TxDirection,
@@ -61,13 +67,24 @@ interface SpeechRecognitionLike {
   stop: () => void;
 }
 
+interface SessionQueueSavedItem {
+  id: string;
+  customerName: string;
+  direction: TxDirection;
+  amount: number;
+  txId?: string;
+  accountId?: string;
+}
+
 interface VoiceEntryModalProps {
   open: boolean;
   language: LanguageCode;
   accounts: LedgerAccount[];
+  stockNames?: string[];
   business: Business;
   prefillCustomerName?: string;
   defaultKind?: AccountKind;
+  initialCounterMode?: boolean;
   onClose: () => void;
   onOpenAccount: (account: LedgerAccount) => void;
   onOpenDailySummary: () => void;
@@ -78,7 +95,13 @@ interface VoiceEntryModalProps {
     note?: string;
     voiceRaw: string;
     kind: AccountKind;
-  }) => Promise<void>;
+  }) => Promise<{ txId?: string; accountId?: string } | void>;
+  onUndoQueueItem?: (item: { txId: string; accountId: string }) => Promise<void>;
+  onCreateBillFromVoice?: (draft: {
+    customerName: string;
+    paymentStatus: 'paid' | 'unpaid';
+    items: BillLineItem[];
+  }) => void;
 }
 
 interface BatchItemState extends ParsedHinglishEntry {
@@ -90,23 +113,29 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   open,
   language,
   accounts,
+  stockNames = [],
   business,
   prefillCustomerName = '',
   defaultKind = 'customer',
+  initialCounterMode = false,
   onClose,
   onOpenAccount,
   onOpenDailySummary,
   onSaveEntry,
+  onUndoQueueItem,
+  onCreateBillFromVoice,
 }) => {
   const t = getUIStrings(language);
-  const [stage, setStage] = useState<'listen' | 'confirm' | 'batch' | 'balance' | 'saved'>('listen');
-  const [continuousMode, setContinuousMode] = useState(false);
-  const [queueSavedCount, setQueueSavedCount] = useState(0);
+  const [stage, setStage] = useState<'listen' | 'confirm' | 'batch' | 'bill' | 'balance' | 'saved'>('listen');
+  const [continuousMode, setContinuousMode] = useState(initialCounterMode);
+  const [sessionQueue, setSessionQueue] = useState<SessionQueueSavedItem[]>([]);
   const [listening, setListening] = useState(false);
   const [statusText, setStatusText] = useState('Starting microphone...');
   const [transcript, setTranscript] = useState('');
   const [manualText, setManualText] = useState('');
   const [voiceError, setVoiceError] = useState('');
+  const [aiParsing, setAiParsing] = useState(false);
+  const [parseSource, setParseSource] = useState<'local' | 'ai'>('local');
 
   // Single Confirm fields
   const [name, setName] = useState('');
@@ -118,9 +147,15 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmError, setConfirmError] = useState('');
+  const [undoingId, setUndoingId] = useState<string | null>(null);
 
   // Multi-entry batch fields
   const [batchItems, setBatchItems] = useState<BatchItemState[]>([]);
+
+  // Voice bill fields
+  const [voiceBillCustomer, setVoiceBillCustomer] = useState('');
+  const [voiceBillStatus, setVoiceBillStatus] = useState<'paid' | 'unpaid'>('paid');
+  const [voiceBillItems, setVoiceBillItems] = useState<BillLineItem[]>([]);
 
   // Balance query state
   const [queriedName, setQueriedName] = useState('');
@@ -173,9 +208,133 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
     return null;
   }, [matchedAccount, direction, amount]);
 
+  const queueTotal = useMemo(
+    () => sessionQueue.reduce((sum, item) => sum + item.amount, 0),
+    [sessionQueue]
+  );
+
+  const applyAiFallback = async (phrase: string) => {
+    setAiParsing(true);
+    setVoiceError('');
+    setConfirmError('');
+    try {
+      const res = await fetch('/api/ucred/voice-parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript: phrase,
+          partyNames: accounts.map((a) => a.name).slice(0, 35),
+          stockNames: stockNames.slice(0, 35),
+          language,
+        }),
+      });
+      const json = (await res.json()) as Partial<HybridVoiceParseResult> & { error?: string };
+      if (!res.ok) {
+        throw new Error(json.error || 'Smart AI voice parse failed.');
+      }
+
+      setParseSource('ai');
+
+      if (json.intent === 'daily_summary') {
+        stopSpeaking();
+        onClose();
+        onOpenDailySummary();
+        return;
+      }
+
+      if (json.intent === 'balance_query') {
+        const targetName = json.customerName || prefillCustomerName || '';
+        const found =
+          accounts.find((a) => a.name.toLowerCase() === targetName.toLowerCase()) ||
+          accounts.find((a) =>
+            targetName ? a.name.toLowerCase().includes(targetName.toLowerCase()) : false
+          ) ||
+          null;
+        setQueriedName(found?.name || targetName);
+        setRawPhrase(phrase);
+        setStage('balance');
+        return;
+      }
+
+      if (json.intent === 'bill' && Array.isArray(json.billItems) && json.billItems.length > 0) {
+        setVoiceBillCustomer(json.customerName || prefillCustomerName || 'Walk-in Customer');
+        setVoiceBillStatus(json.paymentStatus === 'paid' ? 'paid' : 'unpaid');
+        setVoiceBillItems(json.billItems);
+        setRawPhrase(phrase);
+        setStage('bill');
+        speakHinglish(
+          `${json.customerName || 'Customer'} ke ${json.billItems.length} items ka bill taiyaar hai.`,
+          language
+        );
+        return;
+      }
+
+      const aiEntries = Array.isArray(json.entries) ? json.entries : [];
+      if (aiEntries.length > 1) {
+        setBatchItems(
+          aiEntries.map((entry) => ({
+            name: entry.name,
+            amount: entry.amount,
+            type: entry.type,
+            note: entry.note,
+            raw: phrase,
+            selected: entry.amount > 0 && Boolean(entry.name),
+            direction: entry.type === 'debit' ? 'received' : 'given',
+          }))
+        );
+        setRawPhrase(phrase);
+        setConfirmError('');
+        setStage('batch');
+        speakHinglish(`${aiEntries.length} entries AI se samajh aayi hain.`, language);
+        return;
+      }
+
+      const first = aiEntries[0];
+      if (first) {
+        const resolvedName = first.name || prefillCustomerName || 'Customer';
+        const resolvedDir: TxDirection = first.type === 'debit' ? 'received' : 'given';
+        setName(resolvedName);
+        setAmount(first.amount);
+        setDirection(resolvedDir);
+        setNote(first.note || '');
+        setRawPhrase(phrase);
+        setEditing(first.amount <= 0 || !first.name);
+        setStage('confirm');
+        const words = first.amount > 0 ? amountToHinglishWords(first.amount) : 'shunya';
+        speakHinglish(
+          `${resolvedName}, ${words} rupaye, ${resolvedDir === 'given' ? 'Udhaar' : 'Mila'}. Sahi hai?`,
+          language
+        );
+        return;
+      }
+
+      setVoiceError('AI could not extract an amount from that speech. Please check and edit manually.');
+      setStage('confirm');
+      setEditing(true);
+    } catch (err) {
+      setVoiceError(
+        err instanceof Error ? err.message : 'Smart AI parse failed. Edit manually below.'
+      );
+      setStage('confirm');
+      setEditing(true);
+    } finally {
+      setAiParsing(false);
+    }
+  };
+
   const applyTranscriptToConfirm = (phrase: string) => {
     stopMic();
+    setParseSource('local');
     const cmd = parseVoiceCommand(phrase);
+
+    const looksLikeSpokenBill =
+      /\b(bill|invoice|parchi|bana\s*do|banao|ka\s+bill)\b/i.test(phrase) &&
+      (phrase.match(/\d+/g)?.length || 0) >= 2;
+
+    if (looksLikeSpokenBill && onCreateBillFromVoice) {
+      void applyAiFallback(phrase);
+      return;
+    }
 
     if (cmd.intent === 'daily_summary') {
       stopSpeaking();
@@ -227,6 +386,16 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
     }
 
     const parsed = cmd.entries[0] || { name: '', amount: 0, type: 'credit' as const, raw: phrase };
+
+    // Hybrid AI fallback if local offline parser couldn't find clear amount or name
+    if ((parsed.amount <= 0 || !parsed.name) && phrase.trim().length > 3) {
+      setName(parsed.name || prefillCustomerName || '');
+      setAmount(parsed.amount);
+      setRawPhrase(phrase);
+      void applyAiFallback(phrase);
+      return;
+    }
+
     const resolvedName = parsed.name || prefillCustomerName || 'Customer';
     const resolvedDir: TxDirection = parsed.type === 'debit' ? 'received' : 'given';
     setName(resolvedName);
@@ -260,7 +429,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
     if (!SR) {
       setListening(false);
       setStatusText('Voice recognition unavailable on this browser.');
-      setVoiceError('Type any Hinglish entry, balance query, or "Aaj ka hisaab" below.');
+      setVoiceError('Type any Hinglish entry, spoken bill, or "Aaj ka hisaab" below.');
       setTimeout(() => manualInputRef.current?.focus(), 60);
       return;
     }
@@ -332,8 +501,9 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       return () => stopMic();
     }
     const timer = setTimeout(() => {
+      setContinuousMode(initialCounterMode);
       setStage('listen');
-      setQueueSavedCount(0);
+      setSessionQueue([]);
       setManualText('');
       setNote('');
       setMicDenied(false);
@@ -352,7 +522,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       stopSpeaking();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, initialCounterMode]);
 
   if (!open) return null;
 
@@ -378,7 +548,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
 
     setSaving(true);
     try {
-      await onSaveEntry({
+      const savedMeta = await onSaveEntry({
         customerName: name.trim(),
         direction,
         amount,
@@ -392,8 +562,17 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       }
       setSaving(false);
 
+      const qItem: SessionQueueSavedItem = {
+        id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        customerName: name.trim(),
+        direction,
+        amount,
+        txId: savedMeta && typeof savedMeta === 'object' ? savedMeta.txId : undefined,
+        accountId: savedMeta && typeof savedMeta === 'object' ? savedMeta.accountId : undefined,
+      };
+
       if (keepGoing || continuousMode) {
-        setQueueSavedCount((c) => c + 1);
+        setSessionQueue((prev) => [qItem, ...prev]);
         setManualText('');
         setNote('');
         setTranscript('');
@@ -423,7 +602,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
     setConfirmError('');
     try {
       for (const item of valid) {
-        await onSaveEntry({
+        const meta = await onSaveEntry({
           customerName: item.name.trim(),
           direction: item.direction,
           amount: item.amount,
@@ -431,8 +610,27 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
           voiceRaw: item.raw || rawPhrase,
           kind: defaultKind,
         });
+        setSessionQueue((prev) => [
+          {
+            id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            customerName: item.name.trim(),
+            direction: item.direction,
+            amount: item.amount,
+            txId: meta && typeof meta === 'object' ? meta.txId : undefined,
+            accountId: meta && typeof meta === 'object' ? meta.accountId : undefined,
+          },
+          ...prev,
+        ]);
       }
       setSaving(false);
+      if (continuousMode) {
+        setManualText('');
+        setTranscript('');
+        setStage('listen');
+        speakHinglish('Sab save ho gaya. Agla boliye.', language);
+        setTimeout(() => startMic(), 350);
+        return;
+      }
       setStage('saved');
       setTimeout(() => {
         onClose();
@@ -450,73 +648,80 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Voice Khata Entry"
+      aria-label="Voice Khata and Counter Entry"
       className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
     >
       <motion.div
         initial={{ y: 28, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto"
+        className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto"
       >
         {stage === 'listen' && (
           <>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                  Bolne Wala Munim
+                  {continuousMode ? 'Hands-Free Counter Mode' : 'Bolne Wala Munim'}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Entry, Balance Check, or Daily Closing Summary
+                  Instant offline Hinglish + Hybrid AI for bills &amp; complex speech
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close voice entry"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-500 hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Single vs Continuous Queue Switch */}
-            <div className="flex items-center justify-between gap-2 rounded-2xl bg-slate-100 dark:bg-slate-800/70 px-3.5 py-2">
+            {/* Hands-Free Counter Queue Toggle */}
+            <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] px-3.5 py-2">
               <button
                 type="button"
                 onClick={() => setContinuousMode((v) => !v)}
                 className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 min-h-[36px]"
               >
                 <Repeat className={`w-4 h-4 ${continuousMode ? 'text-[var(--brand)]' : 'text-slate-400'}`} />
-                <span>Continuous Queue Mode: {continuousMode ? 'ON' : 'OFF'}</span>
+                <span>Hands-Free Counter Queue: {continuousMode ? 'ON' : 'OFF'}</span>
               </button>
-              {queueSavedCount > 0 && (
+              {sessionQueue.length > 0 && (
                 <span className="text-xs font-extrabold font-tabular text-[var(--brand)]">
-                  Saved {queueSavedCount}
+                  {sessionQueue.length} saved · {formatINR(queueTotal)}
                 </span>
               )}
             </div>
 
-            <div className="flex flex-col items-center justify-center py-3 gap-3">
+            <div className="flex flex-col items-center justify-center py-2 gap-3">
               <button
                 type="button"
+                disabled={aiParsing}
                 onClick={() => (listening ? stopMic() : startMic())}
                 aria-label={listening ? 'Stop listening' : 'Start listening'}
-                className={`w-24 h-24 rounded-full flex items-center justify-center text-white shadow-lg transition ${
+                className={`w-24 h-24 rounded-full flex items-center justify-center shadow-lg transition ${
                   listening
-                    ? 'bg-red-600 voice-fab-pulse scale-105'
-                    : 'bg-[var(--brand)] hover:bg-[var(--brand-hover)]'
+                    ? 'bg-red-600 text-white voice-fab-pulse scale-105'
+                    : 'bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)]'
                 }`}
               >
-                {listening ? <Mic className="w-10 h-10" /> : <MicOff className="w-9 h-9" />}
+                {aiParsing ? (
+                  <Loader2 className="w-9 h-9 animate-spin" />
+                ) : listening ? (
+                  <Mic className="w-10 h-10" />
+                ) : (
+                  <MicOff className="w-9 h-9" />
+                )}
               </button>
               <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                {statusText}
+                {aiParsing ? 'Smart AI parsing your speech...' : statusText}
               </span>
             </div>
 
-            <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 p-4 min-h-[76px] flex items-center justify-center text-center">
-              <p className="text-lg font-bold text-slate-900 dark:text-white">
-                {transcript || 'Speak entry, balance check, or "Aaj ka hisaab"...'}
+            <div className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 min-h-[72px] flex items-center justify-center text-center">
+              <p className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                {transcript || 'Speak entry, multi-item bill, balance check, or "Aaj ka hisaab"...'}
               </p>
             </div>
 
@@ -526,7 +731,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 {micDenied && (
                   <div className="flex items-center justify-between gap-2 flex-wrap text-[11px] font-medium">
                     <span>
-                      Tap the Lock / Site Settings icon in your browser bar → Permissions → Allow Microphone.
+                      Tap Lock / Site Settings in browser bar → Permissions → Allow Microphone.
                     </span>
                     <button
                       type="button"
@@ -564,14 +769,15 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       ? `${prefillCustomerName} paanch sau udhaar`
                       : 'Ramesh 500 udhaar aur Suresh 300 mila'
                   }
-                  className="flex-1 min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 text-base font-medium text-slate-900 dark:text-white outline-none focus:border-[var(--brand)]"
+                  className="flex-1 min-h-[48px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3.5 text-sm sm:text-base font-medium text-slate-900 dark:text-white outline-none focus:border-[var(--brand)]"
                 />
                 <button
                   type="button"
+                  disabled={aiParsing}
                   onClick={() => {
                     if (manualText.trim()) applyTranscriptToConfirm(manualText.trim());
                   }}
-                  className="min-h-[48px] px-5 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white font-bold whitespace-nowrap"
+                  className="min-h-[48px] px-5 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-bold whitespace-nowrap"
                 >
                   Next
                 </button>
@@ -582,38 +788,111 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                   'Ramesh 500 udhaar',
                   'Ramesh ka hisaab batao',
                   'Aaj ka hisaab',
+                  'Verma ka 2 atta 480 aur 1 oil 175 bill banao',
                 ].map((sample) => (
                   <button
                     key={sample}
                     type="button"
                     onClick={() => applyTranscriptToConfirm(sample)}
-                    className="min-h-[34px] px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-[var(--brand)] hover:text-[var(--brand)] whitespace-nowrap shrink-0"
+                    className="min-h-[34px] px-3 rounded-lg border border-[var(--surface-border)] text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-[var(--brand)] hover:text-[var(--brand)] whitespace-nowrap shrink-0"
                   >
                     {sample}
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* Live Rush-Hour Session Queue with 1-Tap Undo */}
+            {sessionQueue.length > 0 && (
+              <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--app-bg)] p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                  <span>Session Queue ({sessionQueue.length})</span>
+                  <span className="font-tabular text-slate-900 dark:text-white">
+                    Total {formatINR(queueTotal)}
+                  </span>
+                </div>
+                <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  {sessionQueue.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-2 text-xs bg-[var(--surface)] rounded-xl px-3 py-2 border border-[var(--surface-border)]"
+                    >
+                      <span className="font-bold truncate">
+                        {item.customerName} · {item.direction === 'given' ? 'Udhaar' : 'Mila'}
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`font-extrabold font-tabular ${
+                            item.direction === 'given' ? 'text-red-600' : 'text-emerald-600'
+                          }`}
+                        >
+                          {formatINR(item.amount)}
+                        </span>
+                        {onUndoQueueItem && item.txId && item.accountId && (
+                          <button
+                            type="button"
+                            disabled={undoingId === item.id}
+                            onClick={async () => {
+                              if (!item.txId || !item.accountId) return;
+                              setUndoingId(item.id);
+                              try {
+                                await onUndoQueueItem({ txId: item.txId, accountId: item.accountId });
+                                setSessionQueue((prev) => prev.filter((q) => q.id !== item.id));
+                              } finally {
+                                setUndoingId(null);
+                              }
+                            }}
+                            aria-label={`Undo ${item.customerName}`}
+                            className="text-[11px] font-bold text-amber-600 hover:underline inline-flex items-center gap-0.5"
+                          >
+                            <Undo2 className="w-3 h-3" />
+                            <span>{undoingId === item.id ? '...' : 'Undo'}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
 
         {stage === 'confirm' && (
           <>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                Confirm Voice Entry
-              </h2>
-              <button
-                type="button"
-                onClick={() => setEditing((v) => !v)}
-                className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl text-sm font-bold text-[var(--brand)] hover:bg-[var(--brand-tint)]"
-              >
-                <Edit3 className="w-4 h-4" />
-                <span>{editing ? 'Done' : 'Edit'}</span>
-              </button>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                  Confirm Voice Entry
+                </h2>
+                <p className="text-[11px] font-medium text-slate-500">
+                  Parsed via {parseSource === 'ai' ? 'Hybrid Gemini AI' : 'Instant Offline Parser'}
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                {rawPhrase && parseSource !== 'ai' && (
+                  <button
+                    type="button"
+                    disabled={aiParsing}
+                    onClick={() => applyAiFallback(rawPhrase)}
+                    className="inline-flex items-center gap-1 min-h-[38px] px-2.5 rounded-xl bg-[var(--brand-tint)] text-[var(--brand)] text-xs font-bold"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{aiParsing ? 'Parsing...' : 'AI Parse'}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setEditing((v) => !v)}
+                  className="inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-xl text-xs font-bold text-[var(--brand)] hover:bg-[var(--brand-tint)]"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  <span>{editing ? 'Done' : 'Edit'}</span>
+                </button>
+              </div>
             </div>
 
-            <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 p-4 space-y-2.5">
+            <div className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 space-y-2.5">
               <p className="text-lg font-extrabold text-slate-900 dark:text-white">
                 {readbackText}
               </p>
@@ -625,7 +904,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     language
                   )
                 }
-                className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200"
+                className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] text-xs font-bold text-slate-700 dark:text-slate-200"
               >
                 <Volume2 className="w-4 h-4 text-[var(--brand)]" />
                 <span>Listen Again</span>
@@ -638,13 +917,14 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 <div className="text-xs font-semibold">
                   <p className="font-extrabold">Credit Limit Alert for {matchedAccount?.name}</p>
                   <p className="font-tabular mt-0.5">
-                    New balance {formatINR(willExceedLimit.projected)} exceeds limit {formatINR(willExceedLimit.limit)} by {formatINR(willExceedLimit.excess)}.
+                    New balance {formatINR(willExceedLimit.projected)} exceeds limit{' '}
+                    {formatINR(willExceedLimit.limit)} by {formatINR(willExceedLimit.excess)}.
                   </p>
                 </div>
               </div>
             )}
 
-            <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 px-4">
+            <div className="divide-y divide-[var(--surface-border)] rounded-2xl border border-[var(--surface-border)] px-4">
               <div className="py-3 flex items-center justify-between">
                 <span className="text-sm font-semibold text-slate-500">Name</span>
                 <span className="text-lg font-extrabold text-slate-900 dark:text-white">
@@ -682,7 +962,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
             </div>
 
             {editing && (
-              <div className="space-y-3 pt-1 border-t border-slate-200 dark:border-slate-800">
+              <div className="space-y-3 pt-1 border-t border-[var(--surface-border)]">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
                     Customer / Party Name
@@ -691,7 +971,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full min-h-[46px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 text-base font-bold"
+                    className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-base font-bold"
                   />
                 </div>
                 <div>
@@ -703,7 +983,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     min="1"
                     value={amount || ''}
                     onChange={(e) => setAmount(Number(e.target.value) || 0)}
-                    className="w-full min-h-[46px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 text-xl font-extrabold font-tabular"
+                    className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xl font-extrabold font-tabular"
                   />
                 </div>
                 <div>
@@ -715,7 +995,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="e.g. Chini 2kg"
-                    className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 text-sm font-medium"
+                    className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-medium"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -725,7 +1005,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     className={`min-h-[46px] rounded-xl font-bold text-sm border-2 ${
                       direction === 'given'
                         ? 'bg-red-600 border-red-600 text-white'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+                        : 'border-[var(--surface-border)] text-slate-700 dark:text-slate-200'
                     }`}
                   >
                     Given (Udhaar)
@@ -736,7 +1016,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     className={`min-h-[46px] rounded-xl font-bold text-sm border-2 ${
                       direction === 'received'
                         ? 'bg-emerald-600 border-emerald-600 text-white'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+                        : 'border-[var(--surface-border)] text-slate-700 dark:text-slate-200'
                     }`}
                   >
                     Received (Mila)
@@ -763,7 +1043,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 type="button"
                 disabled={saving}
                 onClick={() => handleSave(true)}
-                className="min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-white font-extrabold text-sm flex items-center justify-center gap-1.5"
+                className="min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-1.5"
               >
                 <Repeat className="w-4 h-4" />
                 <span>Save &amp; Next</span>
@@ -773,7 +1053,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
               type="button"
               disabled={saving}
               onClick={() => setStage('listen')}
-              className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm"
+              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] text-slate-700 dark:text-slate-200 font-bold text-sm"
             >
               Re-Record Voice
             </button>
@@ -805,7 +1085,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
               {batchItems.map((item, idx) => (
                 <div
                   key={idx}
-                  className="rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 flex items-center justify-between gap-3"
+                  className="rounded-2xl border border-[var(--surface-border)] p-3.5 flex items-center justify-between gap-3"
                 >
                   <label className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer">
                     <input
@@ -822,6 +1102,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       <p className="font-extrabold text-sm truncate">{item.name || 'Customer'}</p>
                       <p className="text-xs text-slate-500 truncate">
                         {item.direction === 'given' ? 'Given (Udhaar)' : 'Received (Mila)'}
+                        {item.note ? ` · ${item.note}` : ''}
                       </p>
                     </div>
                   </label>
@@ -845,7 +1126,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 type="button"
                 disabled={saving}
                 onClick={handleSaveBatch}
-                className="min-h-[50px] rounded-2xl bg-[var(--brand)] text-white font-extrabold text-sm"
+                className="min-h-[50px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm"
               >
                 {saving ? 'Saving...' : `Save All (${batchItems.filter((i) => i.selected).length})`}
               </button>
@@ -853,7 +1134,71 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 type="button"
                 disabled={saving}
                 onClick={() => setStage('listen')}
-                className="min-h-[50px] rounded-2xl border border-slate-300 dark:border-slate-700 font-bold text-sm"
+                className="min-h-[50px] rounded-2xl border border-[var(--surface-border)] font-bold text-sm"
+              >
+                Re-Record
+              </button>
+            </div>
+          </>
+        )}
+
+        {stage === 'bill' && (
+          <>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-[var(--brand)]" />
+                  <span>Spoken Multi-Item Bill</span>
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Party: <strong>{voiceBillCustomer}</strong> ·{' '}
+                  {voiceBillStatus === 'paid' ? 'Paid Cash/UPI' : 'Post as Udhaar'}
+                </p>
+              </div>
+              <button type="button" onClick={onClose} aria-label="Close voice bill">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--surface-border)] divide-y divide-[var(--surface-border)]">
+              {voiceBillItems.map((it, idx) => (
+                <div key={idx} className="px-3.5 py-2.5 flex items-center justify-between text-xs">
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-white">{it.name}</p>
+                    <p className="text-slate-500 font-tabular">
+                      {it.qty} × {formatINR(it.rate)}
+                      {it.gstRate > 0 ? ` (+${it.gstRate}% GST)` : ''}
+                    </p>
+                  </div>
+                  <span className="font-extrabold font-tabular text-sm">
+                    {formatINR(it.qty * it.rate * (1 + it.gstRate / 100))}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onCreateBillFromVoice) {
+                    onCreateBillFromVoice({
+                      customerName: voiceBillCustomer,
+                      paymentStatus: voiceBillStatus,
+                      items: voiceBillItems,
+                    });
+                  }
+                  onClose();
+                }}
+                className="min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-xs inline-flex items-center justify-center gap-1.5"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Open in GST Bill Builder</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStage('listen')}
+                className="min-h-[48px] rounded-xl border border-[var(--surface-border)] font-bold text-xs"
               >
                 Re-Record
               </button>
@@ -878,7 +1223,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
             </div>
 
             {matchedAccount ? (
-              <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 p-5 space-y-3">
+              <div className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-5 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-lg font-extrabold">{matchedAccount.name}</p>
@@ -923,7 +1268,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       onClose();
                       onOpenAccount(matchedAccount);
                     }}
-                    className="flex-1 min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-white text-xs font-extrabold inline-flex items-center justify-center gap-1.5"
+                    className="flex-1 min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center justify-center gap-1.5"
                   >
                     <span>Open Ledger</span>
                     <ArrowRight className="w-4 h-4" />
@@ -951,7 +1296,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 p-6 text-center space-y-2">
+              <div className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-6 text-center space-y-2">
                 <p className="text-base font-extrabold">
                   No party found matching &quot;{queriedName || 'Customer'}&quot;
                 </p>
@@ -967,7 +1312,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 setStage('listen');
                 startMic();
               }}
-              className="w-full min-h-[46px] rounded-xl border border-slate-300 dark:border-slate-700 font-bold text-sm"
+              className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] font-bold text-sm"
             >
               Ask Another Question
             </button>
