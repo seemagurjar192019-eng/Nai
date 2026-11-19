@@ -15,6 +15,7 @@ import {
 import {
   computeCustomerTrustScore,
   computeDailyGallaPulse,
+  computeNetCashflowSummary,
 } from './ucred-intelligence';
 import type { BillDocument, CashbookEntry, LedgerAccount, LedgerTransaction, StockItem } from './types';
 
@@ -277,4 +278,60 @@ test('computeDailyGallaPulse aggregates cash drawer, UPI, and stock profit margi
   assert.equal(pulse.todayExpenses, 350);
   // 20 * (165 - 140) = 500 margin - 350 expense = 150 profit
   assert.equal(pulse.estimatedDailyProfit, 150);
+});
+
+test('Ucred Royal Indigo palette satisfies WCAG AA contrast and Zod phone/OTP validation', async () => {
+  const { verifyPaletteContrast, indianMobileSchema, otpCodeSchema } = await import('./design-system');
+  const contrast = verifyPaletteContrast();
+  assert.ok(contrast.lightBodyRatio >= 12, `Light body contrast too low: ${contrast.lightBodyRatio}`);
+  assert.ok(contrast.lightBrandRatio >= 7, `Light brand contrast too low: ${contrast.lightBrandRatio}`);
+  assert.ok(contrast.lightAccentRatio >= 7, `Light accent contrast too low: ${contrast.lightAccentRatio}`);
+  assert.ok(contrast.darkBodyRatio >= 12, `Dark body contrast too low: ${contrast.darkBodyRatio}`);
+  assert.ok(contrast.darkBrandRatio >= 4.5, `Dark brand contrast too low: ${contrast.darkBrandRatio}`);
+  assert.ok(contrast.darkAccentRatio >= 4.5, `Dark accent contrast too low: ${contrast.darkAccentRatio}`);
+
+  assert.equal(indianMobileSchema.safeParse('9876543210').success, true);
+  assert.equal(indianMobileSchema.safeParse('1234567890').success, false);
+  assert.equal(otpCodeSchema.safeParse('482910').success, true);
+  assert.equal(otpCodeSchema.safeParse('4829').success, false);
+});
+
+test('computeNetCashflowSummary calculates receivable, payable, net cashflow, and ratio shares', () => {
+  const sample: LedgerAccount[] = [
+    {
+      id: 'a1',
+      ownerId: 'u1',
+      businessId: 'b1',
+      kind: 'customer',
+      name: 'Ramesh',
+      phone: '9876543210',
+      dueDate: '',
+      balance: 3000,
+      lastNote: '',
+      lastActivityAt: '',
+    },
+    {
+      id: 'a2',
+      ownerId: 'u1',
+      businessId: 'b1',
+      kind: 'supplier',
+      name: 'Gupta Traders',
+      phone: '',
+      dueDate: '',
+      balance: -1000,
+      lastNote: '',
+      lastActivityAt: '',
+    },
+  ];
+  const summary = computeNetCashflowSummary(sample);
+  assert.equal(summary.totalReceivable, 3000);
+  assert.equal(summary.totalPayable, 1000);
+  assert.equal(summary.netCashflow, 2000);
+  assert.equal(summary.receivableSharePct, 75);
+  assert.equal(summary.payableSharePct, 25);
+
+  const emptySummary = computeNetCashflowSummary([]);
+  assert.equal(emptySummary.netCashflow, 0);
+  assert.equal(emptySummary.receivableSharePct, 50);
+  assert.equal(emptySummary.payableSharePct, 50);
 });

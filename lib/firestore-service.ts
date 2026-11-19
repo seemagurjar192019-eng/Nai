@@ -2,6 +2,7 @@
 
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocFromServer,
@@ -16,10 +17,10 @@ import {
   type DocumentReference,
   type Unsubscribe,
 } from 'firebase/firestore';
+import { accountInputSchema } from './design-system';
 import { getLocalDateKey } from './i18n';
 import { db, handleFirestoreError, OperationType } from './firebase';
 import type {
-  AccentTheme,
   AccountKind,
   ActivityActionType,
   ActivityLog,
@@ -77,7 +78,18 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   try {
     const snap = await getDoc(doc(db, 'users', uid));
     if (!snap.exists()) return null;
-    return snap.data() as UserProfile;
+    const raw = snap.data() as Record<string, unknown>;
+    return {
+      uid: String(raw.uid || uid),
+      mobileNumber: String(raw.mobileNumber || ''),
+      language: (raw.language as LanguageCode) || 'en',
+      appearance: raw.appearance === 'dark' ? 'dark' : 'light',
+      activeBusinessId: String(raw.activeBusinessId || ''),
+      appLockPin: String(raw.appLockPin || ''),
+      onboardingDone: Boolean(raw.onboardingDone),
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+    };
   } catch (err) {
     handleFirestoreError(err, OperationType.GET, path);
   }
@@ -88,7 +100,6 @@ export async function upsertUserProfile(
   patch: {
     mobileNumber?: string;
     language?: LanguageCode;
-    accentTheme?: AccentTheme;
     appearance?: AppearanceMode;
     activeBusinessId?: string;
     appLockPin?: string;
@@ -113,8 +124,7 @@ export async function upsertUserProfile(
           uid,
           mobileNumber: clampStr(patch.mobileNumber, 20),
           language: patch.language || 'en',
-          accentTheme: patch.accentTheme || 'obsidian',
-          appearance: patch.appearance || 'light',
+          appearance: patch.appearance === 'dark' ? 'dark' : 'light',
           activeBusinessId: clampStr(patch.activeBusinessId, 128),
           appLockPin: clampStr(patch.appLockPin, 128),
           onboardingDone: Boolean(patch.onboardingDone),
@@ -127,23 +137,81 @@ export async function upsertUserProfile(
         return created;
       }
 
-      const existing = snap.data() as UserProfile;
+      const rawExisting = snap.data() as Record<string, unknown>;
+      const validLangs = new Set<string>([
+        'en',
+        'hi',
+        'hinglish',
+        'mr',
+        'gu',
+        'ta',
+        'te',
+        'pa',
+        'ml',
+        'kn',
+        'bn',
+      ]);
+      const normalizedExistingLang = validLangs.has(String(rawExisting.language || ''))
+        ? (rawExisting.language as LanguageCode)
+        : 'en';
+      const existingAppearance: AppearanceMode =
+        rawExisting.appearance === 'dark' ? 'dark' : 'light';
+      const nextAppearance: AppearanceMode =
+        patch.appearance !== undefined
+          ? patch.appearance === 'dark'
+            ? 'dark'
+            : 'light'
+          : existingAppearance;
+      const nextLanguage: LanguageCode =
+        patch.language !== undefined ? patch.language : normalizedExistingLang;
+      const nextMobile =
+        patch.mobileNumber !== undefined
+          ? clampStr(patch.mobileNumber, 20)
+          : clampStr(String(rawExisting.mobileNumber || ''), 20);
+      const nextBizId =
+        patch.activeBusinessId !== undefined
+          ? clampStr(patch.activeBusinessId, 128)
+          : clampStr(String(rawExisting.activeBusinessId || ''), 128);
+      const nextOnboardingDone =
+        patch.onboardingDone !== undefined
+          ? patch.onboardingDone
+          : Boolean(rawExisting.onboardingDone);
+
       const updatePayload: Record<string, unknown> = {
+        uid,
+        mobileNumber: nextMobile,
+        language: nextLanguage,
+        appearance: nextAppearance,
+        activeBusinessId: nextBizId,
+        onboardingDone: nextOnboardingDone,
         updatedAt: serverTimestamp(),
       };
-      if (patch.mobileNumber !== undefined) updatePayload.mobileNumber = clampStr(patch.mobileNumber, 20);
-      if (patch.language !== undefined) updatePayload.language = patch.language;
-      if (patch.accentTheme !== undefined) updatePayload.accentTheme = patch.accentTheme;
-      if (patch.appearance !== undefined) updatePayload.appearance = patch.appearance;
-      if (patch.activeBusinessId !== undefined) updatePayload.activeBusinessId = clampStr(patch.activeBusinessId, 128);
-      if (patch.appLockPin !== undefined) updatePayload.appLockPin = clampStr(patch.appLockPin, 128);
-      if (patch.onboardingDone !== undefined) updatePayload.onboardingDone = patch.onboardingDone;
+      if (!rawExisting.createdAt) {
+        updatePayload.createdAt = serverTimestamp();
+      }
+      for (const legacyKey of ['accentTheme', 'email', 'displayName', 'photoURL', 'name']) {
+        if (legacyKey in rawExisting) {
+          updatePayload[legacyKey] = deleteField();
+        }
+      }
+      if (patch.appLockPin !== undefined) {
+        updatePayload.appLockPin = clampStr(patch.appLockPin, 128);
+      } else if (typeof rawExisting.appLockPin === 'string' && rawExisting.appLockPin.length > 128) {
+        updatePayload.appLockPin = clampStr(rawExisting.appLockPin, 128);
+      }
 
       await updateDoc(ref, updatePayload);
       return {
-        ...existing,
-        ...patch,
         uid,
+        mobileNumber: nextMobile,
+        language: nextLanguage,
+        appearance: nextAppearance,
+        activeBusinessId: nextBizId,
+        appLockPin:
+          patch.appLockPin !== undefined
+            ? clampStr(patch.appLockPin, 128)
+            : clampStr(String(rawExisting.appLockPin || ''), 128),
+        onboardingDone: nextOnboardingDone,
       };
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
@@ -358,19 +426,29 @@ export async function createAccount(params: {
   dueDate?: string;
   creditLimit?: number;
 }): Promise<LedgerAccount> {
+  const parsed = accountInputSchema.safeParse({
+    kind: params.kind,
+    name: params.name,
+    phone: params.phone || '',
+    dueDate: params.dueDate || '',
+    creditLimit: Number(params.creditLimit) || 0,
+  });
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message || 'Invalid party details.');
+  }
   const id = makeSafeId('acc');
   const nowIso = new Date().toISOString();
   const limitVal =
-    params.creditLimit !== undefined && Number(params.creditLimit) > 0
-      ? Math.min(100000000, Math.round(Number(params.creditLimit)))
+    parsed.data.creditLimit > 0
+      ? Math.min(100000000, Math.round(parsed.data.creditLimit))
       : 0;
   const payload: Omit<LedgerAccount, 'id'> = {
     ownerId: params.ownerId,
     businessId: params.businessId,
-    kind: params.kind,
-    name: clampStr(params.name, 100) || 'Customer',
-    phone: clampStr(params.phone, 20),
-    dueDate: clampStr(params.dueDate, 24),
+    kind: parsed.data.kind,
+    name: parsed.data.name,
+    phone: parsed.data.phone,
+    dueDate: parsed.data.dueDate,
     ...(limitVal > 0 ? { creditLimit: limitVal } : {}),
     balance: 0,
     lastNote: 'Added Today',
@@ -1095,189 +1173,6 @@ export async function recordActivityLog(params: {
     });
   } catch (err) {
     handleFirestoreError(err, OperationType.CREATE, `activityLogs/${id}`);
-  }
-}
-
-export async function seedDemoBusinessData(ownerId: string, businessId: string): Promise<void> {
-  const now = Date.now();
-  const todayStr = getLocalDateKey(new Date(now));
-  const yesterdayDate = getLocalDateKey(new Date(now - 86400000));
-
-  const demoAccounts: Array<{
-    id: string;
-    kind: AccountKind;
-    name: string;
-    phone: string;
-    dueDate: string;
-    txs: Array<{ direction: TxDirection; amount: number; note: string; voiceRaw: string; minsAgo: number }>;
-  }> = [
-    {
-      id: makeSafeId('acc'),
-      kind: 'customer',
-      name: 'Ramesh Kirana',
-      phone: '9876543210',
-      dueDate: todayStr,
-      txs: [
-        { direction: 'given', amount: 2500, note: 'Atta, Rice & Oil 25kg', voiceRaw: 'Ramesh dhai hazaar udhaar', minsAgo: 45 },
-        { direction: 'received', amount: 500, note: 'UPI Cash Part Payment', voiceRaw: 'Ramesh se paanch sau mila', minsAgo: 12 },
-      ],
-    },
-    {
-      id: makeSafeId('acc'),
-      kind: 'customer',
-      name: 'Suresh',
-      phone: '9822011223',
-      dueDate: todayStr,
-      txs: [
-        { direction: 'given', amount: 1200, note: 'Monthly Ration', voiceRaw: 'Suresh ek hazaar do sau diya', minsAgo: 110 },
-      ],
-    },
-    {
-      id: makeSafeId('acc'),
-      kind: 'customer',
-      name: 'Mohan',
-      phone: '9811122233',
-      dueDate: '',
-      txs: [
-        { direction: 'received', amount: 650, note: 'Advance Deposit', voiceRaw: 'Mohan se chhe sau pachaas jama', minsAgo: 180 },
-      ],
-    },
-    {
-      id: makeSafeId('acc'),
-      kind: 'customer',
-      name: 'Anita',
-      phone: '9765432109',
-      dueDate: yesterdayDate,
-      txs: [
-        { direction: 'given', amount: 3400, note: 'Festival Grocery Box', voiceRaw: 'Anita teen hazaar char sau bakaya', minsAgo: 320 },
-      ],
-    },
-    {
-      id: makeSafeId('acc'),
-      kind: 'supplier',
-      name: 'Mahavir Wholesale',
-      phone: '9988776655',
-      dueDate: todayStr,
-      txs: [
-        { direction: 'received', amount: 8500, note: 'Stock Delivery #402', voiceRaw: '', minsAgo: 500 },
-        { direction: 'given', amount: 4000, note: 'Bank Transfer Paid', voiceRaw: '', minsAgo: 200 },
-      ],
-    },
-  ];
-
-  try {
-    const batch = writeBatch(db);
-    for (const acc of demoAccounts) {
-      let bal = 0;
-      let latestIso = new Date(now).toISOString();
-      let lastNote = '';
-      for (const tx of acc.txs) {
-        bal += tx.direction === 'given' ? tx.amount : -tx.amount;
-        const dt = new Date(now - tx.minsAgo * 60000).toISOString();
-        latestIso = dt;
-        lastNote = tx.note;
-        const txId = makeSafeId('tx');
-        batch.set(doc(db, 'transactions', txId), {
-          ownerId,
-          businessId,
-          accountId: acc.id,
-          direction: tx.direction,
-          amount: tx.amount,
-          note: tx.note,
-          billDate: dt,
-          voiceRaw: tx.voiceRaw,
-          billImage: '',
-          createdByName: 'Shop Owner',
-          createdByRole: 'owner',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      }
-      batch.set(doc(db, 'accounts', acc.id), {
-        ownerId,
-        businessId,
-        kind: acc.kind,
-        name: acc.name,
-        phone: acc.phone,
-        dueDate: acc.dueDate,
-        balance: Math.round(bal * 100) / 100,
-        lastNote,
-        lastActivityAt: latestIso,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    const demoStock = [
-      { name: 'Toor Dal - 1 kg', unit: 'kg', salePrice: 165, purchasePrice: 145, quantity: 42, lowStockThreshold: 10 },
-      { name: 'Mustard Oil - 1 L', unit: 'bottle', salePrice: 175, purchasePrice: 158, quantity: 8, lowStockThreshold: 12 },
-      { name: 'Aashirvaad Atta - 5 kg', unit: 'bag', salePrice: 245, purchasePrice: 222, quantity: 24, lowStockThreshold: 5 },
-    ];
-    for (const item of demoStock) {
-      batch.set(doc(db, 'stockItems', makeSafeId('stk')), {
-        ownerId,
-        businessId,
-        ...item,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-
-    // Seed today's initial Galla Cashbook & sample Munim staff member
-    batch.set(doc(db, 'cashbookEntries', makeSafeId('cb')), {
-      ownerId,
-      businessId,
-      entryType: 'inflow',
-      mode: 'cash',
-      category: 'Opening',
-      amount: 2500,
-      note: 'Morning Galla Opening Cash',
-      entryDate: new Date(now).toISOString(),
-      actorName: 'Shop Owner',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    batch.set(doc(db, 'cashbookEntries', makeSafeId('cb')), {
-      ownerId,
-      businessId,
-      entryType: 'inflow',
-      mode: 'upi',
-      category: 'Vasooli',
-      amount: 500,
-      note: 'Ramesh Kirana UPI Part Payment',
-      entryDate: new Date(now).toISOString(),
-      actorName: 'Shop Owner',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    batch.set(doc(db, 'cashbookEntries', makeSafeId('cb')), {
-      ownerId,
-      businessId,
-      entryType: 'outflow',
-      mode: 'cash',
-      category: 'Expense',
-      amount: 180,
-      note: 'Shop Chai & Tempo Unloading',
-      entryDate: new Date(now).toISOString(),
-      actorName: 'Shop Owner',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    batch.set(doc(db, 'staffMembers', makeSafeId('stf')), {
-      ownerId,
-      businessId,
-      name: 'Ramu Munim',
-      role: 'munim',
-      phone: '9820011122',
-      active: true,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    await batch.commit();
-  } catch (err) {
-    handleFirestoreError(err, OperationType.WRITE, 'accounts');
   }
 }
 

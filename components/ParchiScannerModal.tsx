@@ -266,17 +266,23 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="AI Parchi and Receipt Scanner"
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end justify-center"
     >
-      <div className="w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+      <div className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-4 max-h-[92dvh] overflow-y-auto pb-safe">
+        <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-[var(--brand)]" />
-              <span>AI Parchi &amp; Receipt Scanner</span>
+            <h2 className="font-display text-xl font-extrabold text-[var(--ink)] flex items-center gap-2.5">
+              <span
+                style={{ background: 'var(--munim-gradient)' }}
+                className="w-9 h-9 rounded-2xl text-white flex items-center justify-center shadow-inner shrink-0"
+              >
+                <Receipt className="w-4 h-4" />
+              </span>
+              <span>AI Parchi Scanner</span>
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Snap a handwritten parchi or supplier bill · Post to Khata or GST Bill in 1 tap
+            <p className="text-xs text-[var(--ink-muted)] mt-0.5">
+              Snap a handwritten parchi or supplier bill · Post to Khata or GST Bill
             </p>
           </div>
           <button
@@ -287,7 +293,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
               onClose();
             }}
             aria-label="Close Parchi Scanner"
-            className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500 hover:bg-black/5 dark:hover:bg-white/10"
+            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -310,23 +316,27 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
         />
 
         {!thumbDataUrl ? (
-          <div className="rounded-2xl border-2 border-dashed border-[var(--surface-border)] bg-[var(--app-bg)] p-8 text-center space-y-4">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
+          <div className="rounded-[26px] bg-[var(--app-bg)] ring-1 ring-indigo-500/20 p-7 text-center space-y-4">
+            <div
+              style={{ background: 'var(--munim-gradient)' }}
+              className="mx-auto w-14 h-14 rounded-2xl text-white flex items-center justify-center shadow-lg"
+            >
               <Camera className="w-7 h-7" />
             </div>
             <div className="space-y-1">
-              <p className="text-base font-extrabold text-slate-900 dark:text-white">
+              <p className="font-display text-base font-extrabold text-[var(--ink)]">
                 Capture Handwritten Parchi or Invoice
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                Supports Hindi, Hinglish, and English kirana slips, supplier invoices, and thermal receipts.
+              <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
+                Supports Hindi, Hinglish, and English kirana slips, supplier invoices, and thermal
+                receipts.
               </p>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
-                className="min-h-[46px] px-5 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm inline-flex items-center gap-2 shadow-sm"
+                className="min-h-[48px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm inline-flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
               >
                 <Camera className="w-4 h-4" />
                 <span>Take Photo</span>
@@ -334,188 +344,210 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
               <button
                 type="button"
                 onClick={() => galleryInputRef.current?.click()}
-                className="min-h-[46px] px-5 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] font-extrabold text-sm inline-flex items-center gap-2"
+                className="min-h-[48px] px-4 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 font-extrabold text-sm text-[var(--ink)] inline-flex items-center justify-center gap-2 active:scale-95 transition"
               >
-                <Upload className="w-4 h-4 text-[var(--brand)]" />
-                <span>Upload Image</span>
+                <Upload className="w-4 h-4 text-[var(--brand-accent)]" />
+                <span>Upload</span>
               </button>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Image Preview + Scan Status */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-              <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--app-bg)] p-2 space-y-2">
+            {/* Image Preview with Animated Glowing Cyan/Indigo Laser Overlay while scanning */}
+            <div className="rounded-[24px] bg-[var(--app-bg)] p-2.5 space-y-2.5">
+              <div
+                className={`relative rounded-2xl overflow-hidden bg-black/5 dark:bg-white/5 ${
+                  scanning ? 'ring-2 ring-cyan-400/80 shadow-[0_0_24px_rgba(6,182,212,0.28)]' : ''
+                }`}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={thumbDataUrl}
                   alt="Scanned Parchi preview"
-                  className="w-full max-h-44 object-contain rounded-xl bg-black/5"
+                  className="w-full max-h-52 object-contain"
                 />
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    disabled={scanning}
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="min-h-[34px] rounded-lg border border-[var(--surface-border)] text-[11px] font-bold"
-                  >
-                    Retake
-                  </button>
-                  <button
-                    type="button"
-                    disabled={scanning || !scanDataUrl}
-                    onClick={() => runAiScan(scanDataUrl)}
-                    className="min-h-[34px] rounded-lg bg-[var(--brand-tint)] text-[var(--brand)] text-[11px] font-bold inline-flex items-center justify-center gap-1"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    <span>Re-Scan</span>
-                  </button>
-                </div>
+                {scanning && (
+                  <div className="absolute inset-0 pointer-events-none bg-indigo-950/15">
+                    <div
+                      style={{ background: 'var(--munim-gradient)' }}
+                      className="parchi-laser absolute left-0 right-0 h-1 shadow-[0_0_16px_4px_rgba(6,182,212,0.75)]"
+                    />
+                  </div>
+                )}
               </div>
 
-              <div className="sm:col-span-2 space-y-3">
-                {scanning && (
-                  <div className="rounded-2xl bg-[var(--brand-tint)] border border-[var(--brand)]/25 p-5 flex items-center gap-3">
-                    <Loader2 className="w-6 h-6 text-[var(--brand)] animate-spin shrink-0" />
-                    <div>
-                      <p className="text-sm font-extrabold text-slate-900 dark:text-white">
-                        Reading Parchi with Ucred AI...
-                      </p>
-                      <p className="text-xs text-slate-600 dark:text-slate-300">
-                        Extracting party name, line items, quantities, and total amount.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {scanError && (
-                  <div
-                    role="alert"
-                    className="rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 p-4 space-y-2"
-                  >
-                    <div className="flex items-start gap-2 text-xs font-bold text-red-700 dark:text-red-300">
-                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{scanError}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => scanDataUrl && runAiScan(scanDataUrl)}
-                        className="min-h-[36px] px-3 rounded-lg bg-red-600 text-white text-xs font-bold inline-flex items-center gap-1.5"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Retry AI Scan</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setScanError('');
-                          setHasScanResult(true);
-                          if (items.length === 0) {
-                            setItems([{ name: 'Parchi Item', qty: 1, rate: 0, gstRate: 0 }]);
-                          }
-                        }}
-                        className="min-h-[36px] px-3 rounded-lg border border-[var(--surface-border)] bg-[var(--surface)] text-xs font-bold"
-                      >
-                        Fill Manually
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {hasScanResult && !scanning && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                      <span>
-                        AI Confidence:{' '}
-                        <strong className="text-slate-900 dark:text-white capitalize">
-                          {confidence}
-                        </strong>
-                        {matchedAccount ? ` · Matched Khata: ${matchedAccount.name}` : ' · New/Manual Party'}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 mb-1">
-                          Party / Customer Name
-                        </label>
-                        <input
-                          type="text"
-                          value={partyName}
-                          onChange={(e) => setPartyName(e.target.value)}
-                          placeholder="Ramesh Kirana"
-                          className="w-full min-h-[42px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 mb-1">
-                          Mobile (Optional)
-                        </label>
-                        <input
-                          type="tel"
-                          maxLength={10}
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                          placeholder="9876543210"
-                          className="w-full min-h-[42px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular font-bold"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div>
-                        <span className="block text-[11px] font-bold text-slate-500 mb-1">
-                          Entry Type
-                        </span>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setDirection('given')}
-                            className={`min-h-[40px] rounded-xl text-xs font-extrabold border ${
-                              direction === 'given'
-                                ? 'bg-red-600 border-red-600 text-white'
-                                : 'border-[var(--surface-border)]'
-                            }`}
-                          >
-                            Udhaar (Given)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDirection('received')}
-                            className={`min-h-[40px] rounded-xl text-xs font-extrabold border ${
-                              direction === 'received'
-                                ? 'bg-emerald-600 border-emerald-600 text-white'
-                                : 'border-[var(--surface-border)]'
-                            }`}
-                          >
-                            Paid (Jama)
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-500 mb-1">
-                          Bill Date
-                        </label>
-                        <input
-                          type="date"
-                          value={billDate}
-                          onChange={(e) => setBillDate(e.target.value)}
-                          className="w-full min-h-[40px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xs font-tabular font-bold"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={scanning}
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="min-h-[44px] rounded-xl spatial-card text-xs font-bold text-[var(--ink)] active:scale-95 transition"
+                >
+                  Retake
+                </button>
+                <button
+                  type="button"
+                  disabled={scanning || !scanDataUrl}
+                  onClick={() => runAiScan(scanDataUrl)}
+                  className="min-h-[44px] rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center justify-center gap-1 active:scale-95 transition"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Re-Scan</span>
+                </button>
               </div>
             </div>
 
+            {scanning && (
+              <div className="space-y-3">
+                <div
+                  style={{ background: 'var(--munim-gradient)' }}
+                  className="rounded-2xl p-4 text-white flex items-center gap-3 shadow-lg"
+                >
+                  <Loader2 className="w-6 h-6 animate-spin shrink-0" />
+                  <div>
+                    <p className="text-sm font-extrabold">Reading Parchi with Ucred AI...</p>
+                    <p className="text-xs opacity-90">
+                      Extracting party name, line items, quantities, and total amount.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Spatial Skeleton Shimmer Preview */}
+                <div className="rounded-[22px] bg-[var(--app-bg)] p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="h-9 rounded-xl spatial-shimmer" />
+                    <div className="h-9 rounded-xl spatial-shimmer" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-4 w-3/4 rounded-full spatial-shimmer" />
+                    <div className="h-4 w-1/2 rounded-full spatial-shimmer" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {scanError && (
+              <div
+                role="alert"
+                className="rounded-2xl bg-[var(--credit-tint)] p-4 space-y-2"
+              >
+                <div className="flex items-start gap-2 text-xs font-bold text-[var(--credit-red)]">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{scanError}</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => scanDataUrl && runAiScan(scanDataUrl)}
+                    className="min-h-[40px] px-3 rounded-xl bg-[var(--credit-red)] text-white text-xs font-bold inline-flex items-center gap-1.5 active:scale-95 transition"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Retry AI Scan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScanError('');
+                      setHasScanResult(true);
+                      if (items.length === 0) {
+                        setItems([{ name: 'Parchi Item', qty: 1, rate: 0, gstRate: 0 }]);
+                      }
+                    }}
+                    className="min-h-[40px] px-3 rounded-xl spatial-card text-xs font-bold text-[var(--ink)] active:scale-95 transition"
+                  >
+                    Fill Manually
+                  </button>
+                </div>
+              </div>
+            )}
+
             {hasScanResult && !scanning && (
               <>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[var(--ink-muted)]">
+                    <span>
+                      AI Confidence:{' '}
+                      <strong className="text-[var(--ink)] capitalize">{confidence}</strong>
+                      {matchedAccount ? ` · Matched: ${matchedAccount.name}` : ' · New/Manual Party'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-[var(--ink-muted)] mb-1">
+                        Party / Customer Name
+                      </label>
+                      <input
+                        type="text"
+                        value={partyName}
+                        onChange={(e) => setPartyName(e.target.value)}
+                        placeholder="Ramesh Kirana"
+                        className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[var(--ink-muted)] mb-1">
+                        Mobile (Optional)
+                      </label>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        placeholder="9876543210"
+                        className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <span className="block text-[11px] font-bold text-[var(--ink-muted)] mb-1">
+                        Entry Type
+                      </span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setDirection('given')}
+                          className={`min-h-[44px] rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
+                            direction === 'given'
+                              ? 'bg-[var(--credit-red)] text-white shadow-xs'
+                              : 'bg-[var(--app-bg)] text-[var(--ink)]'
+                          }`}
+                        >
+                          Udhaar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDirection('received')}
+                          className={`min-h-[44px] rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
+                            direction === 'received'
+                              ? 'bg-[var(--debit-green)] text-white shadow-xs'
+                              : 'bg-[var(--app-bg)] text-[var(--ink)]'
+                          }`}
+                        >
+                          Paid
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[var(--ink-muted)] mb-1">
+                        Bill Date
+                      </label>
+                      <input
+                        type="date"
+                        value={billDate}
+                        onChange={(e) => setBillDate(e.target.value)}
+                        className="w-full min-h-[44px] rounded-xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-2.5 text-xs font-tabular font-bold text-[var(--ink)]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Editable Line Items */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase text-slate-500">
+                    <span className="text-xs font-bold uppercase text-[var(--ink-muted)]">
                       Extracted Line Items ({items.length})
                     </span>
                     <button
@@ -523,18 +555,18 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                       onClick={() =>
                         setItems((prev) => [...prev, { name: '', qty: 1, rate: 0, gstRate: 0 }])
                       }
-                      className="text-xs font-bold text-[var(--brand)] inline-flex items-center gap-1"
+                      className="text-xs font-extrabold text-[var(--brand-accent)] inline-flex items-center gap-1 active:scale-95 transition"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Item</span>
                     </button>
                   </div>
 
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  <div className="space-y-1.5 max-h-44 overflow-y-auto">
                     {items.map((it, idx) => (
                       <div
                         key={idx}
-                        className="grid grid-cols-12 gap-1.5 items-center rounded-xl bg-[var(--app-bg)] p-2"
+                        className="grid grid-cols-12 gap-1.5 items-center rounded-2xl bg-[var(--app-bg)] p-2"
                       >
                         <input
                           type="text"
@@ -545,7 +577,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                             setItems(next);
                           }}
                           placeholder="Item"
-                          className="col-span-5 min-h-[36px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-semibold"
+                          className="col-span-5 min-h-[40px] rounded-xl spatial-card px-2.5 text-xs font-semibold text-[var(--ink)] outline-none"
                         />
                         <input
                           type="number"
@@ -559,7 +591,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                             setManualTotal('');
                           }}
                           placeholder="Qty"
-                          className="col-span-2 min-h-[36px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-tabular"
+                          className="col-span-2 min-h-[40px] rounded-xl spatial-card px-2 text-xs font-tabular text-[var(--ink)] outline-none"
                         />
                         <input
                           type="number"
@@ -572,7 +604,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                             setManualTotal('');
                           }}
                           placeholder="Rate"
-                          className="col-span-3 min-h-[36px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-tabular"
+                          className="col-span-3 min-h-[40px] rounded-xl spatial-card px-2 text-xs font-tabular text-[var(--ink)] outline-none"
                         />
                         <button
                           type="button"
@@ -581,7 +613,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                             setManualTotal('');
                           }}
                           aria-label="Remove item"
-                          className="col-span-2 min-h-[36px] flex items-center justify-center text-slate-400 hover:text-red-600"
+                          className="col-span-2 min-h-[40px] flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--credit-red)] active:scale-95 transition"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -591,57 +623,55 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                 </div>
 
                 {/* Note & Total Override */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--ink-muted)] mb-1">
                       Note / Parchi Ref
                     </label>
                     <input
                       type="text"
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Atta, Sugar & Oil parchi"
-                      className="w-full min-h-[42px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xs font-semibold"
+                      placeholder="Atta, Sugar & Oil"
+                      className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-xs font-semibold text-[var(--ink)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-500 mb-1">
-                      Total Amount (₹) · Items Sum {formatINR(computedItemsTotal)}
+                    <label className="block text-[11px] font-bold text-[var(--ink-muted)] mb-1 font-tabular">
+                      Total (₹) · Sum {formatINR(computedItemsTotal)}
                     </label>
                     <input
                       type="number"
                       min="1"
                       value={manualTotal !== '' ? manualTotal : String(computedItemsTotal || '')}
                       onChange={(e) => setManualTotal(e.target.value)}
-                      className="w-full min-h-[42px] rounded-xl border-2 border-[var(--brand)] bg-transparent px-3 text-base font-extrabold font-tabular"
+                      className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] ring-2 ring-[var(--brand-accent)]/60 px-3 text-base font-extrabold font-tabular text-[var(--ink)] outline-none"
                     />
                   </div>
                 </div>
 
-                {postError && <p className="text-xs font-bold text-red-600">{postError}</p>}
+                {postError && <p className="text-xs font-bold text-[var(--credit-red)]">{postError}</p>}
 
                 {/* Dual Action Bar */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
                   <button
                     type="button"
                     disabled={posting}
                     onClick={handlePostKhata}
-                    className="min-h-[48px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                    className="min-h-[48px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-xs inline-flex items-center justify-center gap-1.5 shadow-md disabled:opacity-60 active:scale-95 transition"
                   >
-                    <Check className="w-4 h-4" />
-                    <span>
-                      {posting
-                        ? 'Posting...'
-                        : `Post ${formatINR(effectiveTotal)} to Khata`}
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span className="font-tabular">
+                      {posting ? 'Posting...' : `Post ${formatINR(effectiveTotal)}`}
                     </span>
                   </button>
                   <button
                     type="button"
                     disabled={posting}
                     onClick={handleOpenInBillBuilder}
-                    className="min-h-[48px] rounded-xl border border-[var(--surface-border)] hover:border-[var(--brand)] font-extrabold text-sm inline-flex items-center justify-center gap-2"
+                    className="min-h-[48px] rounded-2xl bg-[var(--app-bg)] font-extrabold text-xs text-[var(--ink)] inline-flex items-center justify-center gap-1.5 active:scale-95 transition"
                   >
-                    <FileText className="w-4 h-4 text-[var(--brand)]" />
+                    <FileText className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
                     <span>Create GST Bill</span>
                   </button>
                 </div>

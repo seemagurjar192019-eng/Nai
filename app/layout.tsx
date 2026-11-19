@@ -1,11 +1,22 @@
 import type { Metadata, Viewport } from 'next';
-import { JetBrains_Mono, Noto_Sans_Devanagari, Plus_Jakarta_Sans } from 'next/font/google';
+import {
+  JetBrains_Mono,
+  Noto_Sans_Devanagari,
+  Plus_Jakarta_Sans,
+} from 'next/font/google';
 import './globals.css';
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700', '800'],
   variable: '--font-sans',
+  display: 'swap',
+});
+
+const plusJakartaDisplay = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['700', '800'],
+  variable: '--font-display',
   display: 'swap',
 });
 
@@ -29,7 +40,7 @@ const APP_ORIGIN =
   'https://ais-dev-b5572c6vlenhbxhdhwmdvx-303612259339.asia-east1.run.app';
 
 export const viewport: Viewport = {
-  themeColor: '#161514',
+  themeColor: '#1E3A8A',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -103,10 +114,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${plusJakarta.variable} ${notoDevanagari.variable} ${jetbrainsMono.variable}`}
+      className={`${plusJakartaDisplay.variable} ${plusJakarta.variable} ${notoDevanagari.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="min-h-screen text-stone-900 dark:text-stone-100" suppressHydrationWarning>
+      <body className="min-h-screen bg-[var(--outer-frame)] text-[var(--ink)]" suppressHydrationWarning>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

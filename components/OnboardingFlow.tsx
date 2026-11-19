@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'motion/react';
@@ -8,18 +8,20 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
-  Heart,
+  Edit2,
+  KeyRound,
   Lock,
-  Pause,
-  Play,
+  Moon,
+  RefreshCw,
   ShieldCheck,
   Smartphone,
   Store,
+  Sun,
   UserCheck,
-  Volume2,
 } from 'lucide-react';
-import { LANGUAGE_OPTIONS, UCRED_LOGO_PATH, getUIStrings, speakHinglish } from '@/lib/i18n';
-import type { AccentTheme, LanguageCode } from '@/lib/types';
+import { indianMobileSchema, otpCodeSchema } from '@/lib/design-system';
+import { LANGUAGE_OPTIONS, UCRED_LOGO_PATH, getUIStrings } from '@/lib/i18n';
+import type { AppearanceMode, LanguageCode } from '@/lib/types';
 
 export type OnboardingStep =
   | 'splash'
@@ -32,228 +34,224 @@ export type OnboardingStep =
 interface OnboardingFlowProps {
   step: OnboardingStep;
   language: LanguageCode;
-  accentTheme: AccentTheme;
+  appearance: AppearanceMode;
   mobileNumber: string;
+  otpSentTo: string | null;
+  otpResendCooldown: number;
   authError: string;
   authBusy: boolean;
   onSelectLanguage: (lang: LanguageCode) => void;
+  onToggleAppearance: () => void;
   onMobileChange: (phone: string) => void;
-  onGoogleLogin: () => void;
+  onSendOtp: (phoneDigits: string) => Promise<void>;
+  onVerifyOtp: (otpCode: string) => Promise<void>;
+  onResetOtp: () => void;
   onWelcomeDone: () => void;
-  onCreateBusiness: (shopName: string) => void;
-  onSkipBusiness: () => void;
+  onCreateBusiness: (payload: {
+    name: string;
+    category: string;
+    upiId: string;
+  }) => void;
   onStepChange: (step: OnboardingStep) => void;
 }
+
+const SHOP_CATEGORIES = [
+  'Kirana / Grocery',
+  'Wholesale / Mandi',
+  'Medical / Pharmacy',
+  'Hardware & Electrical',
+  'Garments / Footwear',
+  'General Retail',
+];
 
 export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   step,
   language,
-  accentTheme,
+  appearance,
   mobileNumber,
+  otpSentTo,
+  otpResendCooldown,
   authError,
   authBusy,
   onSelectLanguage,
+  onToggleAppearance,
   onMobileChange,
-  onGoogleLogin,
+  onSendOtp,
+  onVerifyOtp,
+  onResetOtp,
   onWelcomeDone,
   onCreateBusiness,
-  onSkipBusiness,
   onStepChange,
 }) => {
   const t = getUIStrings(language);
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState(true);
+  const [otpInput, setOtpInput] = useState('');
   const [localError, setLocalError] = useState('');
   const [showLegalModal, setShowLegalModal] = useState<'terms' | 'privacy' | null>(null);
   const [shopNameInput, setShopNameInput] = useState('');
+  const [shopCategoryInput, setShopCategoryInput] = useState('Kirana / Grocery');
+  const [shopUpiInput, setShopUpiInput] = useState('');
   const [langMenuOpen, setLangMenuOpen] = useState(false);
 
-  // Welcome Audio Guide simulation synced with SpeechSynthesis
-  const [audioPlaying, setAudioPlaying] = useState(false);
-  const [audioSeconds, setAudioSeconds] = useState(0);
-  const audioTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (audioTimerRef.current) clearInterval(audioTimerRef.current);
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
-
-  const toggleWelcomeAudio = () => {
-    if (audioPlaying) {
-      if (audioTimerRef.current) clearInterval(audioTimerRef.current);
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-      setAudioPlaying(false);
-      return;
-    }
-
-    setAudioPlaying(true);
-    speakHinglish(
-      'Ucred mein aapka swagat hai. Agar aap ek dukandar hain aur aapka len-den udhaar mein hota hai, toh apni dukaan ka naam jod kar bol kar apna digital khata, AI parchi aur galla shuru karein.',
-      language
-    );
-    if (audioTimerRef.current) clearInterval(audioTimerRef.current);
-    audioTimerRef.current = setInterval(() => {
-      setAudioSeconds((prev) => {
-        if (prev >= 34) {
-          if (audioTimerRef.current) clearInterval(audioTimerRef.current);
-          setAudioPlaying(false);
-          return 0;
-        }
-        return prev + 1;
-      });
-    }, 1000);
-  };
-
-  const handleContinueClick = () => {
+  const handleSendOtpClick = async () => {
     setLocalError('');
     const digits = mobileNumber.replace(/\D/g, '');
-    if (digits.length !== 10) {
-      setLocalError('Please enter a valid 10-digit mobile number.');
+    const check = indianMobileSchema.safeParse(digits);
+    if (!check.success) {
+      setLocalError(check.error.issues[0]?.message || 'Enter a valid 10-digit Indian mobile number.');
       return;
     }
     if (!agreed) {
       setLocalError('Please agree to the Terms and Privacy Policy to continue.');
       return;
     }
-    onGoogleLogin();
+    setOtpInput('');
+    await onSendOtp(digits);
   };
 
-  // 1. SPLASH SCREEN (OkCredit video 00:02 - 00:05)
+  const handleVerifyOtpClick = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setLocalError('');
+    const cleanOtp = otpInput.replace(/\D/g, '').slice(0, 6);
+    const check = otpCodeSchema.safeParse(cleanOtp);
+    if (!check.success) {
+      setLocalError(check.error.issues[0]?.message || 'Enter the 6-digit SMS OTP.');
+      return;
+    }
+    await onVerifyOtp(cleanOtp);
+  };
+
+  // 1. SPLASH SCREEN — Clean Ucred Brand Reveal
   if (step === 'splash') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-between bg-[var(--app-bg)] px-6 py-12 text-center">
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <motion.div
-            initial={{ scale: 0.85, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.45 }}
-            className="w-24 h-24 rounded-3xl overflow-hidden bg-[#F6F2EC] border border-[var(--surface-border)] shadow-lg flex items-center justify-center p-2"
-          >
+      <div className="max-w-[430px] mx-auto min-h-dvh relative overflow-x-hidden shadow-2xl flex flex-col items-center justify-between spatial-shell-bg px-6 py-12 text-center">
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 stagger-fade-up">
+          <div className="w-24 h-24 rounded-[28px] overflow-hidden spatial-hero ring-1 ring-white/80 dark:ring-white/10 shrink-0">
             <Image
               src={UCRED_LOGO_PATH}
-              alt="Ucred logo"
-              width={88}
-              height={88}
+              alt="Ucred"
+              width={96}
+              height={96}
               priority
               referrerPolicy="no-referrer"
-              className="w-full h-full object-contain rounded-2xl"
+              className="w-full h-full object-cover"
             />
-          </motion.div>
-          <motion.div
-            initial={{ y: 10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.15, duration: 0.35 }}
-            className="space-y-1.5"
-          >
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-              {t.appName}
+          </div>
+          <div className="space-y-1.5">
+            <h1 className="font-display text-3xl font-extrabold tracking-tight text-[var(--ink)]">
+              Ucred
             </h1>
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-              Voice Khata, AI Parchi &amp; Live Galla · Built for Indian Shops
+            <p className="text-sm font-medium text-[var(--ink-muted)]">
+              Voice Khata, AI Parchi &amp; Live Galla OS
             </p>
-          </motion.div>
+          </div>
         </div>
 
-        <div className="w-full max-w-sm space-y-6">
-          <div className="grid grid-cols-3 gap-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+        <div className="w-full max-w-sm space-y-5">
+          <div className="grid grid-cols-3 gap-3 text-[11px] font-bold tracking-wider uppercase text-[var(--ink-muted)]">
             <div className="flex flex-col items-center gap-2">
-              <span className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900 text-[var(--brand)] flex items-center justify-center">
+              <span className="w-11 h-11 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--brand-accent)] flex items-center justify-center">
                 <ShieldCheck className="w-5 h-5" />
               </span>
-              <span>Secured</span>
+              <span>OTP Verified</span>
             </div>
             <div className="flex flex-col items-center gap-2">
-              <span className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900 text-[var(--brand)] flex items-center justify-center">
+              <span className="w-11 h-11 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--brand-accent)] flex items-center justify-center">
                 <Lock className="w-5 h-5" />
               </span>
-              <span>Safe & Trusted</span>
+              <span>Cloud Synced</span>
             </div>
             <div className="flex flex-col items-center gap-2">
-              <span className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-900 text-[var(--brand)] flex items-center justify-center">
+              <span className="w-11 h-11 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--brand-accent)] flex items-center justify-center">
                 <UserCheck className="w-5 h-5" />
               </span>
-              <span>Private</span>
+              <span>100% Private</span>
             </div>
           </div>
 
-          <p className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400">
-            <span>Made With</span>
-            <Heart className="w-4 h-4 text-red-500 fill-red-500" />
-            <span>In India</span>
+          <p className="text-xs font-semibold text-[var(--ink-muted)]">
+            Built for Indian Retail &amp; Wholesale Merchants
           </p>
         </div>
       </div>
     );
   }
 
-  // 2. LANGUAGE SELECTION GRID (OkCredit video 00:06 - 00:07)
+  // 2. LANGUAGE SELECTION
   if (step === 'language') {
     return (
-      <div className="min-h-screen flex flex-col bg-[var(--app-bg)] px-5 py-8">
-        <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col gap-6">
-          <div className="flex items-center justify-between">
+      <div className="max-w-[430px] mx-auto min-h-dvh relative overflow-x-hidden shadow-2xl flex flex-col spatial-shell-bg px-5 py-7">
+        <div className="w-full flex-1 flex flex-col gap-5">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl overflow-hidden bg-[#F6F2EC] border border-[var(--surface-border)] p-1 flex items-center justify-center">
+              <span className="w-10 h-10 rounded-2xl overflow-hidden spatial-card ring-1 ring-white/80 dark:ring-white/10 shrink-0">
                 <Image
                   src={UCRED_LOGO_PATH}
                   alt="Ucred"
-                  width={32}
-                  height={32}
+                  width={40}
+                  height={40}
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-cover"
                 />
               </span>
-              <span className="text-lg font-extrabold text-slate-900 dark:text-white">
+              <span className="font-display text-xl font-extrabold text-[var(--ink)]">
                 Ucred
               </span>
             </div>
-            <Link
-              href="/privacy"
-              className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-[var(--brand)] underline underline-offset-4"
-            >
-              Privacy
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onToggleAppearance}
+                aria-label="Toggle Light or Dark mode"
+                className="min-w-[44px] min-h-[44px] rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
+              >
+                {appearance === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+              <Link
+                href="/privacy"
+                className="min-h-[44px] inline-flex items-center text-xs font-semibold text-[var(--ink-muted)] hover:text-[var(--ink)] underline underline-offset-4 px-2"
+              >
+                Privacy
+              </Link>
+            </div>
           </div>
 
-          <h1 className="text-2xl font-extrabold text-center text-slate-900 dark:text-white">
-            {t.selectLanguage}
-          </h1>
+          <div className="text-center space-y-1">
+            <h1 className="font-display text-2xl font-extrabold text-[var(--ink)]">
+              {t.selectLanguage}
+            </h1>
+            <p className="text-sm text-[var(--ink-muted)]">
+              Voice entry and bills adapt cleanly to your shop language.
+            </p>
+          </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
-            {LANGUAGE_OPTIONS.map((opt) => {
+          <div className="grid grid-cols-2 gap-3">
+            {LANGUAGE_OPTIONS.map((opt, idx) => {
               const selected = language === opt.code;
               return (
                 <button
                   key={opt.code}
                   type="button"
                   onClick={() => onSelectLanguage(opt.code)}
-                  className={`relative text-left rounded-2xl p-4 min-h-[84px] flex flex-col justify-center transition border-2 ${
+                  style={{ animationDelay: `${Math.min(idx, 12) * 35}ms` }}
+                  className={`stagger-fade-up relative text-left rounded-[22px] p-4 min-h-[68px] flex flex-col justify-center active:scale-95 transition ${
+                    idx === 0 ? 'col-span-2' : ''
+                  } ${
                     selected
-                      ? 'bg-[var(--brand-tint)] border-[var(--brand)] shadow-sm'
-                      : 'bg-[var(--surface)] border-[var(--surface-border)] hover:border-slate-400 dark:hover:border-slate-600'
+                      ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)] shadow-md'
+                      : 'spatial-card ring-1 ring-white/80 dark:ring-white/10'
                   }`}
                 >
-                  <span
-                    className={`text-xl font-bold leading-snug ${
-                      selected
-                        ? 'text-[var(--brand)]'
-                        : 'text-slate-900 dark:text-slate-100'
-                    }`}
-                  >
+                  <span className="text-lg font-bold leading-snug text-[var(--ink)]">
                     {opt.nativeName}
                   </span>
                   {opt.englishName !== opt.nativeName && (
-                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400 mt-0.5">
+                    <span className="text-xs font-medium text-[var(--ink-muted)] mt-0.5">
                       {opt.englishName}
                     </span>
                   )}
                   {selected && (
-                    <span className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] flex items-center justify-center">
+                    <span className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] flex items-center justify-center shadow-xs">
                       <Check className="w-3.5 h-3.5 stroke-[3]" />
                     </span>
                   )}
@@ -262,11 +260,11 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             })}
           </div>
 
-          <div className="mt-auto pt-4">
+          <div className="mt-auto pt-4 pb-safe">
             <button
               type="button"
               onClick={() => onStepChange('login')}
-              className="w-full min-h-[54px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-base font-bold shadow-sm transition"
+              className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 text-[var(--brand-fg)] text-base font-bold shadow-lg transition"
             >
               Continue ({LANGUAGE_OPTIONS.find((o) => o.code === language)?.nativeName || 'English'})
             </button>
@@ -276,177 +274,267 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     );
   }
 
-  // 3. MOBILE NUMBER + FREE REAL GOOGLE AUTH SYNC (OkCredit video 00:08 - 00:16)
+  // 3. REAL MOBILE NUMBER + 6-DIGIT SMS OTP SIGN-IN
   if (step === 'login') {
     const currentLangObj =
       LANGUAGE_OPTIONS.find((l) => l.code === language) || LANGUAGE_OPTIONS[0];
 
     return (
-      <div className="min-h-screen flex flex-col bg-[var(--app-bg)] px-5 py-6">
-        <div className="w-full max-w-lg mx-auto flex-1 flex flex-col">
+      <div className="max-w-[430px] mx-auto min-h-dvh relative overflow-x-hidden shadow-2xl flex flex-col spatial-shell-bg px-5 py-6">
+        <div className="w-full flex-1 flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between gap-4 pb-8">
+          <div className="flex items-center justify-between gap-3 pb-6">
             <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl overflow-hidden bg-[#F6F2EC] border border-[var(--surface-border)] p-1 flex items-center justify-center">
+              <span className="w-10 h-10 rounded-2xl overflow-hidden spatial-card ring-1 ring-white/80 dark:ring-white/10 shrink-0">
                 <Image
                   src={UCRED_LOGO_PATH}
                   alt="Ucred"
-                  width={32}
-                  height={32}
+                  width={40}
+                  height={40}
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-cover"
                 />
               </span>
-              <span className="text-xl font-extrabold text-[var(--brand)]">
+              <span className="font-display text-xl font-extrabold text-[var(--ink)]">
                 Ucred
               </span>
             </div>
 
-            <div className="relative">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setLangMenuOpen((v) => !v)}
-                className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-semibold text-slate-800 dark:text-slate-100"
+                onClick={onToggleAppearance}
+                aria-label="Toggle Light or Dark mode"
+                className="min-w-[44px] min-h-[44px] rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
               >
-                <span>{currentLangObj.nativeName}</span>
-                <ChevronDown className="w-4 h-4 text-slate-500" />
+                {appearance === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
-              {langMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-lg p-1.5 z-30">
-                  {LANGUAGE_OPTIONS.slice(0, 6).map((opt) => (
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setLangMenuOpen((v) => !v)}
+                  className="inline-flex items-center gap-1.5 min-h-[44px] px-3.5 py-1.5 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-semibold text-[var(--ink)] active:scale-95 transition"
+                >
+                  <span>{currentLangObj.nativeName}</span>
+                  <ChevronDown className="w-4 h-4 text-[var(--ink-muted)]" />
+                </button>
+                {langMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-[22px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-1.5 z-30">
+                    {LANGUAGE_OPTIONS.slice(0, 6).map((opt) => (
+                      <button
+                        key={opt.code}
+                        type="button"
+                        onClick={() => {
+                          onSelectLanguage(opt.code);
+                          setLangMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium flex items-center justify-between ${
+                          language === opt.code
+                            ? 'bg-[var(--brand-tint)] text-[var(--ink)] font-bold'
+                            : 'text-[var(--ink)] hover:bg-[var(--surface-subtle)]'
+                        }`}
+                      >
+                        <span>{opt.nativeName}</span>
+                        {language === opt.code && (
+                          <Check className="w-4 h-4 text-[var(--brand-accent)]" />
+                        )}
+                      </button>
+                    ))}
                     <button
-                      key={opt.code}
                       type="button"
                       onClick={() => {
-                        onSelectLanguage(opt.code);
                         setLangMenuOpen(false);
+                        onStepChange('language');
                       }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-sm font-medium flex items-center justify-between ${
-                        language === opt.code
-                          ? 'bg-[var(--brand-tint)] text-[var(--brand)] font-bold'
-                          : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-                      }`}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-[var(--brand-accent)] hover:bg-[var(--surface-subtle)]"
                     >
-                      <span>{opt.nativeName}</span>
-                      {language === opt.code && <Check className="w-4 h-4" />}
+                      All 11 Languages...
                     </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLangMenuOpen(false);
-                      onStepChange('language');
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-[var(--brand)] hover:bg-slate-100 dark:hover:bg-slate-800"
-                  >
-                    More Languages...
-                  </button>
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Body */}
-          <div className="space-y-6 my-auto pb-8">
-            <div className="w-12 h-12 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
-              <Smartphone className="w-6 h-6" />
+          {/* Auth Card */}
+          <div className="rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-6 sm:p-7 space-y-6 my-auto stagger-fade-up">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+              {otpSentTo ? <KeyRound className="w-6 h-6" /> : <Smartphone className="w-6 h-6" />}
             </div>
 
-            <div className="space-y-1.5">
-              <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                {t.enterMobileTitle}
-              </h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Used on your shop receipts, business card & WhatsApp reminders. Synced free via Google Account.
-              </p>
-            </div>
+            {!otpSentTo ? (
+              <>
+                <div className="space-y-1.5">
+                  <h1 className="font-display text-2xl font-extrabold text-[var(--ink)]">
+                    {t.enterMobileTitle}
+                  </h1>
+                  <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
+                    Sign in directly with your 10-digit Indian mobile number &amp; SMS OTP. No email or Gmail popup required.
+                  </p>
+                </div>
 
-            <div className="space-y-2">
-              <label
-                htmlFor="ob-mobile"
-                className="block text-xs font-bold uppercase tracking-wider text-[var(--brand)]"
-              >
-                {t.mobileLabel}
-              </label>
-              <div className="flex items-center gap-2 rounded-2xl border-2 border-[var(--brand)] bg-white dark:bg-slate-900 px-3.5 min-h-[56px]">
-                <Smartphone className="w-5 h-5 text-[var(--brand)] shrink-0" />
-                <span className="font-tabular font-bold text-slate-500 dark:text-slate-400">
-                  +91
-                </span>
-                <input
-                  id="ob-mobile"
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={10}
-                  value={mobileNumber}
-                  onChange={(e) => onMobileChange(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="7000758749"
-                  className="w-full bg-transparent text-xl font-bold font-tabular text-slate-900 dark:text-white outline-none placeholder:text-slate-300"
-                />
-              </div>
-            </div>
+                <div className="space-y-2">
+                  <label
+                    htmlFor="ob-mobile"
+                    className="block text-xs font-bold uppercase tracking-wider text-[var(--brand-accent)]"
+                  >
+                    {t.mobileLabel}
+                  </label>
+                  <div className="flex items-center gap-2 rounded-2xl bg-[var(--surface-subtle)] ring-2 ring-[var(--brand)] px-3.5 min-h-[56px]">
+                    <Smartphone className="w-5 h-5 text-[var(--brand-accent)] shrink-0" />
+                    <span className="font-tabular font-bold text-[var(--ink-muted)]">
+                      +91
+                    </span>
+                    <input
+                      id="ob-mobile"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={mobileNumber}
+                      onChange={(e) => onMobileChange(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !authBusy) void handleSendOtpClick();
+                      }}
+                      placeholder="9876543210"
+                      className="w-full bg-transparent text-xl font-bold font-tabular text-[var(--ink)] outline-none placeholder:text-[var(--ink-muted)]/40"
+                    />
+                  </div>
+                </div>
 
-            <div className="flex items-start gap-3">
-              <input
-                id="ob-agree"
-                type="checkbox"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-                className="mt-1 h-5 w-5 rounded accent-[var(--brand)] shrink-0 cursor-pointer"
-              />
-              <label htmlFor="ob-agree" className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                {t.agreePrefix}{' '}
+                <div className="flex items-start gap-3">
+                  <input
+                    id="ob-agree"
+                    type="checkbox"
+                    checked={agreed}
+                    onChange={(e) => setAgreed(e.target.checked)}
+                    className="mt-1 h-5 w-5 rounded accent-[var(--brand)] shrink-0 cursor-pointer"
+                  />
+                  <label htmlFor="ob-agree" className="text-sm text-[var(--ink-muted)] leading-relaxed">
+                    {t.agreePrefix}{' '}
+                    <button
+                      type="button"
+                      onClick={() => setShowLegalModal('terms')}
+                      className="font-semibold text-[var(--ink)] underline underline-offset-2"
+                    >
+                      Terms
+                    </button>{' '}
+                    and{' '}
+                    <button
+                      type="button"
+                      onClick={() => setShowLegalModal('privacy')}
+                      className="font-semibold text-[var(--ink)] underline underline-offset-2"
+                    >
+                      Privacy Policy
+                    </button>
+                    .
+                  </label>
+                </div>
+
+                {(localError || authError) && (
+                  <div
+                    role="alert"
+                    className="rounded-2xl bg-[var(--credit-tint)] px-4 py-3 text-sm font-semibold text-[var(--credit-red)] leading-relaxed"
+                  >
+                    {localError || authError}
+                  </div>
+                )}
+
                 <button
                   type="button"
-                  onClick={() => setShowLegalModal('terms')}
-                  className="font-semibold text-[var(--brand)] underline underline-offset-2"
+                  disabled={authBusy}
+                  onClick={() => void handleSendOtpClick()}
+                  className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 disabled:opacity-60 text-[var(--brand-fg)] text-base font-bold shadow-lg transition flex items-center justify-center gap-2"
                 >
-                  Terms
-                </button>{' '}
-                and{' '}
-                <button
-                  type="button"
-                  onClick={() => setShowLegalModal('privacy')}
-                  className="font-semibold text-[var(--brand)] underline underline-offset-2"
-                >
-                  Privacy Policy
+                  {authBusy ? 'Sending OTP...' : t.sendOtp}
                 </button>
-                .
-              </label>
-            </div>
+              </>
+            ) : (
+              <form onSubmit={(e) => void handleVerifyOtpClick(e)} className="space-y-5">
+                <div className="space-y-1.5">
+                  <h1 className="font-display text-2xl font-extrabold text-[var(--ink)]">
+                    Enter 6-Digit SMS OTP
+                  </h1>
+                  <div className="flex items-center justify-between gap-2 text-sm text-[var(--ink-muted)]">
+                    <span>
+                      Sent to <strong className="font-tabular text-[var(--ink)]">{otpSentTo}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocalError('');
+                        setOtpInput('');
+                        onResetOtp();
+                      }}
+                      className="min-h-[36px] inline-flex items-center gap-1 text-xs font-bold text-[var(--brand-accent)] hover:underline"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Change</span>
+                    </button>
+                  </div>
+                </div>
 
-            {(localError || authError) && (
-              <div
-                role="alert"
-                className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-300"
-              >
-                {localError || authError}
-              </div>
+                <div className="space-y-2">
+                  <label
+                    htmlFor="ob-otp"
+                    className="block text-xs font-bold uppercase tracking-wider text-[var(--brand-accent)]"
+                  >
+                    Verification Code
+                  </label>
+                  <input
+                    id="ob-otp"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="••••••"
+                    className="w-full min-h-[58px] rounded-2xl bg-[var(--surface-subtle)] ring-2 ring-[var(--brand)] px-4 text-center text-2xl font-extrabold font-tabular tracking-[0.45em] text-[var(--ink)] outline-none placeholder:tracking-[0.3em] placeholder:text-[var(--ink-muted)]/40"
+                  />
+                </div>
+
+                {(localError || authError) && (
+                  <div
+                    role="alert"
+                    className="rounded-2xl bg-[var(--credit-tint)] px-4 py-3 text-sm font-semibold text-[var(--credit-red)] leading-relaxed"
+                  >
+                    {localError || authError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={authBusy}
+                  className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 disabled:opacity-60 text-[var(--brand-fg)] text-base font-bold shadow-lg transition"
+                >
+                  {authBusy ? 'Verifying OTP...' : 'Verify & Open Khata'}
+                </button>
+
+                <div className="flex items-center justify-between text-xs font-semibold text-[var(--ink-muted)]">
+                  <span>Didn&apos;t receive SMS?</span>
+                  <button
+                    type="button"
+                    disabled={otpResendCooldown > 0 || authBusy}
+                    onClick={() => void handleSendOtpClick()}
+                    className="min-h-[36px] inline-flex items-center gap-1.5 font-bold text-[var(--brand-accent)] disabled:opacity-50 hover:underline"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>
+                      {otpResendCooldown > 0 ? `Resend in ${otpResendCooldown}s` : 'Resend OTP'}
+                    </span>
+                  </button>
+                </div>
+              </form>
             )}
 
-            <button
-              type="button"
-              disabled={authBusy}
-              onClick={handleContinueClick}
-              className="w-full min-h-[56px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] text-base font-bold shadow-sm transition flex items-center justify-center gap-2"
-            >
-              {authBusy ? 'Verifying with Google...' : t.continueGoogle}
-            </button>
-
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2">
-              <span>
-                Theme:{' '}
-                {accentTheme === 'green'
-                  ? 'OkCredit Green'
-                  : accentTheme === 'crimson'
-                  ? 'Crimson'
-                  : 'Ucred Obsidian'}
-              </span>
+            <div className="flex items-center justify-between text-xs text-[var(--ink-muted)] pt-2">
+              <span>Ucred Royal Indigo · {appearance === 'dark' ? 'Dark' : 'Light'}</span>
               <div className="flex items-center gap-3">
-                <Link href="/terms" className="font-semibold text-[var(--brand)] hover:underline">
+                <Link href="/terms" className="font-semibold text-[var(--ink)] hover:underline">
                   Terms
                 </Link>
-                <Link href="/privacy" className="font-semibold text-[var(--brand)] hover:underline">
+                <Link href="/privacy" className="font-semibold text-[var(--ink)] hover:underline">
                   Privacy
                 </Link>
               </div>
@@ -455,20 +543,26 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         </div>
 
         {showLegalModal && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 shadow-xl space-y-4">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+          <div
+            onClick={() => setShowLegalModal(null)}
+            className="fixed inset-0 z-50 bg-slate-950/55 flex items-center justify-center p-4 backdrop-blur-xs"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-[28px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 sheet-slide-up"
+            >
+              <h2 className="font-display text-lg font-extrabold text-[var(--ink)]">
                 {showLegalModal === 'terms' ? 'Terms & Conditions' : 'Privacy Policy & Security'}
               </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
                 {showLegalModal === 'terms'
-                  ? 'Ucred stores your shop ledger, customer accounts, bills, Galla cashbook, and stock privately under your authenticated account. WhatsApp & SMS reminders are initiated directly from your device.'
-                  : 'Your khata records are encrypted in transit and scoped strictly to your signed-in account in Cloud Firestore, with local offline caching on your device. No third-party ad tracking is used.'}
+                  ? 'Ucred stores your shop ledger, customer accounts, bills, Galla cashbook, and stock privately under your verified phone account. WhatsApp & SMS reminders are initiated directly from your device.'
+                  : 'Your khata records are encrypted in transit and scoped strictly to your verified phone UID in Cloud Firestore, with local offline caching on your device. No third-party ad tracking is used.'}
               </p>
               <button
                 type="button"
                 onClick={() => setShowLegalModal(null)}
-                className="w-full min-h-[44px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold"
+                className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold shadow-md active:scale-95 transition"
               >
                 Close
               </button>
@@ -482,81 +576,58 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   // 4. VERIFICATION SUCCESSFUL
   if (step === 'verified') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--app-bg)] px-6 text-center gap-6">
+      <div className="max-w-[430px] mx-auto min-h-dvh relative overflow-x-hidden shadow-2xl flex flex-col items-center justify-center spatial-shell-bg px-6 text-center gap-6">
         <motion.div
           initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-          className="w-24 h-24 rounded-full border-4 border-[var(--brand)] bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center"
+          className="w-24 h-24 rounded-full bg-[var(--debit-tint)] text-[var(--debit-green)] shadow-lg ring-4 ring-[var(--debit-green)]/30 flex items-center justify-center"
         >
           <Check className="w-12 h-12 stroke-[3]" />
         </motion.div>
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+        <h1 className="font-display text-2xl font-extrabold text-[var(--ink)]">
           {t.verificationSuccess}
         </h1>
       </div>
     );
   }
 
-  // 5. WELCOME AUDIO INTRO
+  // 5. WELCOME TO UCRED (Clean Real Onboarding — Zero Competitor Audio Clone)
   if (step === 'welcome') {
-    const mmss = `00:${String(audioSeconds).padStart(2, '0')}`;
     return (
-      <div className="min-h-screen flex flex-col justify-between bg-[var(--app-bg)] px-6 py-10">
-        <div className="max-w-md w-full mx-auto flex-1 flex flex-col items-center justify-center text-center gap-6">
-          <div className="w-40 h-40 rounded-full bg-[var(--surface)] border border-[var(--surface-border)] flex flex-col items-center justify-center gap-2 shadow-sm">
-            <Store className="w-16 h-16 text-[var(--brand)]" />
-            <span className="text-xs font-bold uppercase tracking-widest text-[var(--brand)]">
-              Ucred Khata
+      <div className="max-w-[430px] mx-auto min-h-dvh relative overflow-x-hidden shadow-2xl flex flex-col justify-between spatial-shell-bg px-6 py-10">
+        <div className="w-full flex-1 flex flex-col items-center justify-center text-center gap-6 stagger-fade-up">
+          <div className="w-32 h-32 rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 flex flex-col items-center justify-center gap-2 p-4">
+            <span className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+              <Store className="w-8 h-8" />
+            </span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[var(--ink-muted)]">
+              Ucred OS
             </span>
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+            <h1 className="font-display text-2xl font-extrabold text-[var(--ink)]">
               {t.welcomeFamily}
             </h1>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+            <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
               {t.welcomeSub}
             </p>
           </div>
 
-          <div className="w-full rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={toggleWelcomeAudio}
-              aria-label={audioPlaying ? 'Pause audio intro' : 'Play audio intro'}
-              className="w-11 h-11 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] flex items-center justify-center shrink-0 hover:bg-[var(--brand-hover)] transition"
-            >
-              {audioPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-            </button>
-            <div className="flex-1 space-y-1">
-              <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div
-                  className="h-full bg-[var(--brand)] transition-all"
-                  style={{ width: `${Math.min(100, (audioSeconds / 34) * 100)}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[11px] font-tabular font-semibold text-slate-500">
-                <span className="inline-flex items-center gap-1">
-                  <Volume2 className="w-3.5 h-3.5" />
-                  Hinglish Guide
-                </span>
-                <span>{mmss} / 00:34</span>
-              </div>
-            </div>
+          <div className="w-full rounded-[24px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4.5 text-left space-y-2 text-xs text-[var(--ink-muted)]">
+            <p className="font-bold text-[var(--ink)]">Ready for live shop operations:</p>
+            <p>· Hybrid Hinglish &amp; Hindi voice entries + multi-item spoken bills</p>
+            <p>· AI Parchi scanner from handwritten paper slips</p>
+            <p>· Live Cash Drawer (Galla), UPI recovery &amp; Munim audit trail</p>
           </div>
         </div>
 
-        <div className="max-w-md w-full mx-auto">
+        <div className="w-full pt-4 pb-safe">
           <button
             type="button"
-            onClick={() => {
-              if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-              }
-              onWelcomeDone();
-            }}
-            className="w-full min-h-[54px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-base font-bold transition shadow-sm"
+            onClick={onWelcomeDone}
+            className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 text-[var(--brand-fg)] text-base font-bold transition shadow-lg"
           >
             {t.startBtn}
           </button>
@@ -565,66 +636,94 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     );
   }
 
-  // 6. SETUP BUSINESS NAME
+  // 6. SETUP REAL BUSINESS PROFILE
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--app-bg)] px-5 py-6">
-      <div className="max-w-md w-full mx-auto flex-1 flex flex-col">
-        <div className="flex items-center justify-between pb-10">
+    <div className="max-w-[430px] mx-auto min-h-dvh relative overflow-x-hidden shadow-2xl flex flex-col spatial-shell-bg px-5 py-6">
+      <div className="w-full flex-1 flex flex-col">
+        <div className="flex items-center justify-between pb-6">
           <button
             type="button"
             onClick={() => onStepChange('welcome')}
-            className="inline-flex items-center gap-2 min-h-[44px] text-sm font-bold text-slate-800 dark:text-slate-100"
+            className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-bold text-[var(--ink)] active:scale-95 transition"
           >
             <ArrowLeft className="w-5 h-5" />
             <span>{t.setupBusiness}</span>
           </button>
-
-          <button
-            type="button"
-            onClick={onSkipBusiness}
-            disabled={authBusy}
-            className="min-h-[40px] px-4 rounded-xl border border-[var(--surface-border)] bg-[var(--surface)] text-sm font-bold text-[var(--brand)] hover:bg-[var(--brand-tint)] transition"
-          >
-            {t.skip}
-          </button>
         </div>
 
-        <div className="space-y-6 my-auto pb-16">
-          <div className="w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
-            <Store className="w-7 h-7" />
+        <div className="rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-5 my-auto stagger-fade-up">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+            <Store className="w-6 h-6" />
           </div>
 
-          <div className="space-y-1.5">
-            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+          <div className="space-y-1">
+            <h1 className="font-display text-2xl font-extrabold text-[var(--ink)]">
               {t.businessPrompt}
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-[var(--ink-muted)]">
               {t.businessSub}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex-1 flex items-center gap-2 rounded-2xl border-2 border-[var(--brand)] bg-[var(--surface)] px-3.5 min-h-[56px]">
-              <Store className="w-5 h-5 text-[var(--brand)] shrink-0" />
+          <div className="space-y-3.5">
+            <div>
+              <label className="block text-xs font-bold text-[var(--brand-accent)] mb-1">
+                Shop / Business Name *
+              </label>
               <input
                 type="text"
                 value={shopNameInput}
                 onChange={(e) => setShopNameInput(e.target.value)}
-                placeholder="Sharma Kirana Store"
-                className="w-full bg-transparent text-base font-bold text-slate-900 dark:text-white outline-none placeholder:text-slate-400"
+                placeholder="e.g. Sharma Kirana & General Store"
+                className="w-full min-h-[50px] rounded-xl bg-[var(--surface-subtle)] ring-2 ring-[var(--brand)] px-3.5 text-base font-bold text-[var(--ink)] outline-none placeholder:text-[var(--ink-muted)]/50"
               />
             </div>
 
-            <button
-              type="button"
-              disabled={authBusy}
-              onClick={() => onCreateBusiness(shopNameInput.trim() || 'My Shop')}
-              aria-label="Save business name"
-              className="w-14 h-14 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-50 text-[var(--brand-fg)] flex items-center justify-center shrink-0 shadow-sm transition"
-            >
-              <Check className="w-6 h-6 stroke-[2.8]" />
-            </button>
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Business Category
+              </label>
+              <select
+                value={shopCategoryInput}
+                onChange={(e) => setShopCategoryInput(e.target.value)}
+                className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              >
+                {SHOP_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Shop UPI ID (Optional — for Vasooli QR)
+              </label>
+              <input
+                type="text"
+                value={shopUpiInput}
+                onChange={(e) => setShopUpiInput(e.target.value)}
+                placeholder="e.g. sharmakirana@okicici"
+                className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)] placeholder:text-[var(--ink-muted)]/50"
+              />
+            </div>
           </div>
+
+          <button
+            type="button"
+            disabled={authBusy || !shopNameInput.trim()}
+            onClick={() =>
+              onCreateBusiness({
+                name: shopNameInput.trim() || 'My Shop',
+                category: shopCategoryInput,
+                upiId: shopUpiInput.trim(),
+              })
+            }
+            className="w-full min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-50 text-[var(--brand-fg)] font-extrabold text-base shadow-lg active:scale-95 transition"
+          >
+            {authBusy ? 'Creating Shop...' : 'Open My Ucred Cockpit'}
+          </button>
         </div>
       </div>
     </div>

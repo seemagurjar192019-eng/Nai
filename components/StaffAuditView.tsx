@@ -178,25 +178,25 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
   };
 
   return (
-    <div className="space-y-5 pb-24">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
+    <div className="space-y-4 pb-32">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           {onBack && (
             <button
               type="button"
               onClick={onBack}
               aria-label="Back to Ledger"
-              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10"
+              className="min-w-[44px] min-h-[44px] rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center active:scale-95 transition shrink-0"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
             </button>
           )}
-          <div>
-            <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-              Staff Counter &amp; Audit Log
+          <div className="min-w-0">
+            <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
+              Staff &amp; Munim Logs
             </h2>
-            <p className="text-xs text-slate-500">
-              Multi-operator counter accountability · Every bill &amp; khata change stamped automatically
+            <p className="text-xs text-[var(--ink-muted)] leading-snug">
+              Multi-operator accountability stamped automatically
             </p>
           </div>
         </div>
@@ -204,47 +204,49 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
         <button
           type="button"
           onClick={openCreateStaff}
-          className="min-h-[42px] px-4 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5"
+          className="min-h-[44px] px-3.5 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 shadow-md active:scale-95 transition"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Staff / Munim</span>
+          <span>Add Staff</span>
         </button>
       </div>
 
       {/* Active Counter Operator Switcher */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-            <UserCheck className="w-4 h-4 text-[var(--brand)]" />
-            <span>Active Counter Operator</span>
+      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)] flex items-center gap-1.5">
+            <UserCheck className="w-4 h-4 text-[var(--brand-accent)]" />
+            <span>Active Operator</span>
           </p>
-          <span className="text-xs font-extrabold text-[var(--brand)]">
+          <span className="text-xs font-extrabold text-[var(--brand-accent)]">
             {activeOperator.name} ({activeOperator.role})
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        <div className="space-y-2">
           {/* Owner Default */}
           <button
             type="button"
             onClick={() => handleSelectOperator(null)}
-            className={`rounded-xl border p-3 flex items-center justify-between gap-2 text-left transition ${
+            className={`w-full rounded-[20px] p-3 flex items-center justify-between gap-2 text-left active:scale-[0.98] transition ${
               activeOperator.staffId === 'owner'
-                ? 'bg-[var(--brand-tint)] border-[var(--brand)]'
-                : 'border-[var(--surface-border)]'
+                ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)]'
+                : 'bg-[var(--surface-subtle)]'
             }`}
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <span className="w-9 h-9 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center shrink-0">
+              <span className="w-10 h-10 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center shadow-inner shrink-0">
                 O
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-extrabold truncate">Shop Owner</p>
-                <p className="text-[11px] font-medium text-slate-500">owner · Full access</p>
+                <p className="text-sm font-extrabold text-[var(--ink)]">Shop Owner</p>
+                <p className="text-[11px] font-medium text-[var(--ink-muted)]">
+                  owner · Full access
+                </p>
               </div>
             </div>
             {activeOperator.staffId === 'owner' && (
-              <Check className="w-4 h-4 text-[var(--brand)] shrink-0" />
+              <Check className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
             )}
           </button>
 
@@ -254,29 +256,29 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
             return (
               <div
                 key={stf.id}
-                className={`rounded-xl border p-3 flex items-center justify-between gap-2 ${
+                className={`rounded-[20px] p-3 flex items-center justify-between gap-2 transition ${
                   isSelected
-                    ? 'bg-[var(--brand-tint)] border-[var(--brand)]'
-                    : 'border-[var(--surface-border)]'
+                    ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)]'
+                    : 'bg-[var(--surface-subtle)]'
                 } ${!stf.active ? 'opacity-55' : ''}`}
               >
                 <button
                   type="button"
                   onClick={() => handleSelectOperator(stf)}
-                  className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+                  className="flex items-center gap-2.5 min-w-0 flex-1 text-left active:scale-95 transition"
                 >
                   <div
                     style={{ backgroundColor: getAvatarColor(stf.name) }}
-                    className="w-9 h-9 rounded-full text-white font-extrabold text-sm flex items-center justify-center shrink-0"
+                    className="w-10 h-10 rounded-2xl text-white font-extrabold text-sm flex items-center justify-center shadow-inner shrink-0"
                   >
                     {stf.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-extrabold truncate flex items-center gap-1">
-                      <span>{stf.name}</span>
-                      {stf.pinHash && <KeyRound className="w-3 h-3 text-slate-400 shrink-0" />}
+                    <p className="text-sm font-extrabold text-[var(--ink)] flex items-center gap-1">
+                      <span className="truncate">{stf.name}</span>
+                      {stf.pinHash && <KeyRound className="w-3 h-3 text-[var(--ink-muted)] shrink-0" />}
                     </p>
-                    <p className="text-[11px] font-medium text-slate-500 truncate">
+                    <p className="text-[11px] font-medium text-[var(--ink-muted)]">
                       {stf.role}
                       {!stf.active ? ' · Paused' : ''}
                     </p>
@@ -287,7 +289,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                   <button
                     type="button"
                     onClick={() => openEditStaff(stf)}
-                    className="px-2 py-1 rounded-lg text-[11px] font-bold text-slate-500 hover:text-[var(--brand)]"
+                    className="min-h-[40px] px-3 rounded-xl text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--brand-accent)] hover:bg-[var(--surface)] active:scale-95 transition"
                   >
                     Edit
                   </button>
@@ -303,8 +305,10 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                       }
                     }}
                     aria-label={`Remove ${stf.name}`}
-                    className={`px-1.5 py-1 rounded-lg text-[11px] font-bold ${
-                      armed ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-red-600'
+                    className={`min-w-[40px] min-h-[40px] px-2.5 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
+                      armed
+                        ? 'bg-[var(--credit-red)] text-white shadow-sm'
+                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]/60'
                     }`}
                   >
                     {armed ? 'Delete?' : <Trash2 className="w-3.5 h-3.5" />}
@@ -317,31 +321,31 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
       </section>
 
       {/* Immutable Audit Timeline */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4 space-y-3">
+      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h3 className="text-sm font-extrabold flex items-center gap-2">
-            <History className="w-4 h-4 text-[var(--brand)]" />
-            <span>Counter Activity Audit Trail ({filteredLogs.length})</span>
+          <h3 className="font-display text-sm font-extrabold flex items-center gap-2 text-[var(--ink)]">
+            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+              <History className="w-4 h-4" />
+            </span>
+            <span>Audit Trail ({filteredLogs.length})</span>
           </h3>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <select
-              aria-label="Filter logs by staff"
-              value={actorFilter}
-              onChange={(e) => setActorFilter(e.target.value)}
-              className="min-h-[34px] rounded-lg border border-[var(--surface-border)] bg-transparent px-2.5 text-xs font-bold"
-            >
-              <option value="all">All Operators</option>
-              {actorOptions.map((nameOpt) => (
-                <option key={nameOpt} value={nameOpt}>
-                  {nameOpt}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            aria-label="Filter logs by staff"
+            value={actorFilter}
+            onChange={(e) => setActorFilter(e.target.value)}
+            className="min-h-[38px] rounded-xl bg-[var(--surface-subtle)] px-3 text-xs font-bold text-[var(--ink)] outline-none"
+          >
+            <option value="all">All Operators</option>
+            {actorOptions.map((nameOpt) => (
+              <option key={nameOpt} value={nameOpt}>
+                {nameOpt}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
           {(
             [
               { id: 'all', label: 'All' },
@@ -356,10 +360,10 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
               key={f.id}
               type="button"
               onClick={() => setActionFilter(f.id)}
-              className={`min-h-[32px] px-3 rounded-lg text-xs font-bold border whitespace-nowrap ${
+              className={`min-h-[38px] px-3.5 rounded-xl text-xs font-extrabold whitespace-nowrap active:scale-95 transition ${
                 actionFilter === f.id
-                  ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                  : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-300'
+                  ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/40'
+                  : 'bg-[var(--surface-subtle)] text-[var(--ink-muted)]'
               }`}
             >
               {f.label}
@@ -368,34 +372,36 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
         </div>
 
         {filteredLogs.length === 0 ? (
-          <div className="py-10 text-center space-y-2">
-            <Users className="w-7 h-7 mx-auto text-slate-400" />
-            <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
+          <div className="py-8 text-center space-y-2">
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-[var(--surface-subtle)] text-[var(--ink-muted)] flex items-center justify-center">
+              <Users className="w-6 h-6" />
+            </div>
+            <p className="text-sm font-bold text-[var(--ink)]">
               No counter activity logs recorded yet.
             </p>
-            <p className="text-xs text-slate-500">
-              Add a khata entry, GST bill, stock change, or switch operator to create an audit trail.
+            <p className="text-xs text-[var(--ink-muted)]">
+              Add a khata entry, GST bill, stock change, or switch operator to create an audit
+              trail.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-[var(--surface-border)]">
-            {filteredLogs.map((log) => (
+          <div className="space-y-2">
+            {filteredLogs.map((log, idx) => (
               <div
                 key={log.id}
-                className="py-3 flex items-center justify-between gap-3 text-xs"
+                style={{ animationDelay: `${Math.min(idx, 12) * 30}ms` }}
+                className="stagger-fade-up rounded-2xl bg-[var(--surface-subtle)]/65 p-3 flex items-center justify-between gap-3 text-xs"
               >
                 <div className="min-w-0 space-y-0.5">
-                  <p className="font-bold text-slate-900 dark:text-white truncate">
-                    {log.summary}
-                  </p>
-                  <p className="text-[11px] text-slate-500 truncate">
+                  <p className="font-bold text-[var(--ink)] leading-snug">{log.summary}</p>
+                  <p className="text-[11px] text-[var(--ink-muted)] leading-snug">
                     {log.actorName} · {log.actorRole} · {log.actionType.toUpperCase()}
                     {log.targetName ? ` · ${log.targetName}` : ''}
                     {typeof log.createdAt === 'string' ? ` · ${formatDateTime(log.createdAt)}` : ''}
                   </p>
                 </div>
                 {typeof log.amount === 'number' && log.amount > 0 && (
-                  <span className="font-extrabold font-tabular text-sm text-[var(--brand)] shrink-0">
+                  <span className="font-extrabold font-tabular text-sm text-[var(--brand-accent)] shrink-0">
                     {formatINR(log.amount)}
                   </span>
                 )}
@@ -405,51 +411,60 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
         )}
       </section>
 
-      {/* Add / Edit Staff Modal */}
+      {/* Add / Edit Staff Bottom Sheet */}
       {showAddStaff && (
         <div
           role="dialog"
           aria-modal="true"
           onClick={() => !saving && setShowAddStaff(false)}
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-xs flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 pt-3 space-y-4 pb-safe max-h-[90dvh] overflow-y-auto"
           >
+            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--ink-muted)]/25" />
+
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold">
+              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
                 {editingStaff ? `Edit ${editingStaff.name}` : 'Add Staff / Munim'}
               </h3>
-              <button type="button" onClick={() => setShowAddStaff(false)}>
+              <button
+                type="button"
+                onClick={() => setShowAddStaff(false)}
+                aria-label="Close staff dialog"
+                className="min-w-[44px] min-h-[44px] rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Full Name</label>
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                  Full Name
+                </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ramu Munim"
-                  className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold"
+                  className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
 
               <div>
-                <span className="block text-xs font-bold text-slate-500 mb-1">Role</span>
+                <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1">Role</span>
                 <div className="grid grid-cols-3 gap-2">
                   {(['munim', 'cashier', 'owner'] as const).map((r) => (
                     <button
                       key={r}
                       type="button"
                       onClick={() => setRole(r)}
-                      className={`min-h-[40px] rounded-xl text-xs font-extrabold capitalize border ${
+                      className={`min-h-[44px] rounded-xl text-xs font-extrabold capitalize active:scale-95 transition ${
                         role === r
-                          ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                          : 'border-[var(--surface-border)]'
+                          ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]'
+                          : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
                       }`}
                     >
                       {r}
@@ -459,7 +474,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
                   Mobile Number (Optional)
                 </label>
                 <input
@@ -468,12 +483,12 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   placeholder="9876543210"
-                  className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular font-bold"
+                  className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
                   4-Digit Operator PIN (Optional)
                 </label>
                 <input
@@ -483,18 +498,18 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                   value={pin}
                   onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   placeholder={editingStaff?.pinHash ? 'Enter 4 digits to update PIN' : 'e.g. 4321'}
-                  className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular font-bold"
+                  className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
             </div>
 
-            {formError && <p className="text-xs font-bold text-red-600">{formError}</p>}
+            {formError && <p className="text-xs font-bold text-[var(--credit-red)]">{formError}</p>}
 
             <button
               type="button"
               disabled={saving}
               onClick={handleSaveStaff}
-              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm disabled:opacity-60"
+              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm shadow-md disabled:opacity-60 active:scale-95 transition"
             >
               {saving ? 'Saving...' : editingStaff ? 'Update Staff' : 'Save Staff Member'}
             </button>
@@ -502,24 +517,28 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
         </div>
       )}
 
-      {/* Operator PIN Switch Verification Modal */}
+      {/* Operator PIN Switch Verification Bottom Sheet */}
       {pendingSwitch && (
         <div
           role="dialog"
           aria-modal="true"
           onClick={() => setPendingSwitch(null)}
-          className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-xs flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-xs rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 text-center space-y-4 shadow-2xl"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 pt-3 text-center space-y-4 pb-safe"
           >
-            <div className="mx-auto w-12 h-12 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
+            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--ink-muted)]/25" />
+
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-base font-extrabold">Enter PIN for {pendingSwitch.name}</h3>
-              <p className="text-xs text-slate-500">4-digit counter verification</p>
+              <h3 className="font-display text-base font-extrabold text-[var(--ink)]">
+                Enter PIN for {pendingSwitch.name}
+              </h3>
+              <p className="text-xs text-[var(--ink-muted)]">4-digit counter verification</p>
             </div>
             <input
               type="password"
@@ -528,21 +547,23 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
               value={switchPinInput}
               onChange={(e) => setSwitchPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder="••••"
-              className="w-full min-h-[48px] rounded-xl border-2 border-[var(--brand)] bg-transparent text-center text-2xl font-extrabold font-tabular tracking-[0.4em]"
+              className="w-full min-h-[50px] rounded-2xl bg-[var(--surface-subtle)] ring-2 ring-[var(--brand-accent)] text-center text-2xl font-extrabold font-tabular tracking-[0.4em] text-[var(--ink)] outline-none"
             />
-            {switchPinError && <p className="text-xs font-bold text-red-600">{switchPinError}</p>}
-            <div className="grid grid-cols-2 gap-2">
+            {switchPinError && (
+              <p className="text-xs font-bold text-[var(--credit-red)]">{switchPinError}</p>
+            )}
+            <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={handleVerifySwitchPin}
-                className="min-h-[44px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold"
+                className="min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold shadow-md active:scale-95 transition"
               >
                 Switch Counter
               </button>
               <button
                 type="button"
                 onClick={() => setPendingSwitch(null)}
-                className="min-h-[44px] rounded-xl border border-[var(--surface-border)] text-xs font-bold"
+                className="min-h-[46px] rounded-xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)] active:scale-95 transition"
               >
                 Cancel
               </button>

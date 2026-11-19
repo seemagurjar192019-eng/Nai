@@ -11,8 +11,7 @@ export type LanguageCode =
   | 'kn'
   | 'bn';
 
-export type AccentTheme = 'obsidian' | 'green' | 'crimson';
-export type AppearanceMode = 'light' | 'dark' | 'system';
+export type AppearanceMode = 'light' | 'dark';
 
 export type AccountKind = 'customer' | 'supplier';
 export type TxDirection = 'given' | 'received';
@@ -52,7 +51,6 @@ export interface UserProfile {
   uid: string;
   mobileNumber: string;
   language: LanguageCode;
-  accentTheme: AccentTheme;
   appearance: AppearanceMode;
   activeBusinessId: string;
   appLockPin: string;

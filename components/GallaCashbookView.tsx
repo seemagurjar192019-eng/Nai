@@ -5,10 +5,13 @@ import {
   ArrowDownLeft,
   ArrowLeft,
   ArrowUpRight,
+  Eye,
+  EyeOff,
   Landmark,
   MinusCircle,
   PlusCircle,
   Trash2,
+  TrendingDown,
   TrendingUp,
   Wallet,
   X,
@@ -30,6 +33,8 @@ interface GallaCashbookViewProps {
   bills: BillDocument[];
   stockItems: StockItem[];
   activeOperatorName: string;
+  hideBalance?: boolean;
+  onToggleHideBalance?: () => void;
   onAddEntry: (payload: {
     entryType: CashbookEntryType;
     mode: CashbookMode;
@@ -51,6 +56,8 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
   bills,
   stockItems,
   activeOperatorName,
+  hideBalance = false,
+  onToggleHideBalance,
   onAddEntry,
   onDeleteEntry,
   onBack,
@@ -131,188 +138,241 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
     }
   };
 
+  const profitPositive = pulse.estimatedDailyProfit >= 0;
+
   return (
-    <div className="space-y-4 pb-24">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
+    <div className="space-y-4 pb-32">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           {onBack && (
             <button
               type="button"
               onClick={onBack}
               aria-label="Back to Ledger"
-              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10"
+              className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center active:scale-95 transition shrink-0"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
             </button>
           )}
-          <div>
-            <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
+          <div className="min-w-0">
+            <h2 className="font-display text-xl font-extrabold text-[var(--ink)] truncate">
               Live Galla &amp; Cashbook
             </h2>
-            <p className="text-xs text-slate-500">
-              Cash Drawer, UPI/Bank &amp; Daily Profit Pulse · Operator: {activeOperatorName}
+            <p className="text-xs font-medium text-[var(--ink-muted)] truncate">
+              Cash Drawer, UPI/Bank &amp; Profit Pulse · {activeOperatorName}
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
+        {onToggleHideBalance && (
           <button
             type="button"
-            onClick={() => openEntryModal('inflow')}
-            className="min-h-[42px] px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
+            onClick={onToggleHideBalance}
+            aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
+            className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition shrink-0"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Cash In</span>
+            {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
-          <button
-            type="button"
-            onClick={() => openEntryModal('outflow')}
-            className="min-h-[42px] px-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
-          >
-            <MinusCircle className="w-4 h-4" />
-            <span>Expense / Out</span>
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* Live Cash Drawer + UPI + Profit Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4 space-y-1 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
-            <span>Cash Drawer (Galla)</span>
-            <Wallet className="w-4 h-4 text-[var(--brand)]" />
+      {/* Top 50/50 Split Actions: + Cash In (Green) & - Expense / Out (Red) */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => openEntryModal('inflow')}
+          className="min-h-[48px] px-4 rounded-2xl bg-[var(--debit-green)] text-white text-sm font-extrabold inline-flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+        >
+          <PlusCircle className="w-4 h-4 shrink-0" />
+          <span>+ Cash In</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => openEntryModal('outflow')}
+          className="min-h-[48px] px-4 rounded-2xl bg-[var(--credit-red)] text-white text-sm font-extrabold inline-flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+        >
+          <MinusCircle className="w-4 h-4 shrink-0" />
+          <span>- Expense / Out</span>
+        </button>
+      </div>
+
+      {/* 2-Column Spatial Bento Grid: Cash Drawer (Galla) & UPI/Bank Balance */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-[24px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-extrabold text-[var(--ink-muted)] uppercase tracking-wider">
+              Cash Drawer
+            </span>
+            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-inner shrink-0">
+              <Wallet className="w-4 h-4" />
+            </span>
           </div>
           <p
-            className={`text-2xl font-extrabold font-tabular ${
-              pulse.cashDrawerBalance >= 0 ? 'text-emerald-600' : 'text-red-600'
+            className={`font-display text-xl font-extrabold font-tabular ${
+              pulse.cashDrawerBalance >= 0
+                ? 'text-[var(--debit-green)]'
+                : 'text-[var(--credit-red)]'
             }`}
           >
-            {formatINR(pulse.cashDrawerBalance)}
+            {hideBalance ? '₹••••' : formatINR(pulse.cashDrawerBalance)}
           </p>
-          <p className="text-[11px] font-medium text-slate-500">
-            Physical cash net balance across entries
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4 space-y-1 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
-            <span>UPI &amp; Bank Balance</span>
-            <Landmark className="w-4 h-4 text-[var(--brand)]" />
-          </div>
-          <p className="text-2xl font-extrabold font-tabular text-slate-900 dark:text-white">
-            {formatINR(pulse.upiBankBalance)}
-          </p>
-          <p className="text-[11px] font-medium text-slate-500 font-tabular">
-            Today In: {formatINR(pulse.todayInflow)} · Out: {formatINR(pulse.todayOutflow)}
+          <p className="text-[11px] font-medium text-[var(--ink-muted)] leading-snug">
+            Physical cash net balance
           </p>
         </div>
 
-        <div className="rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] p-4 space-y-1 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-bold uppercase opacity-80">
-            <span>Today&apos;s Profit Pulse</span>
-            <TrendingUp className="w-4 h-4" />
+        <div className="rounded-[24px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-extrabold text-[var(--ink-muted)] uppercase tracking-wider">
+              UPI &amp; Bank
+            </span>
+            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 text-white flex items-center justify-center shadow-inner shrink-0">
+              <Landmark className="w-4 h-4" />
+            </span>
           </div>
-          <p className="text-2xl font-extrabold font-tabular">
-            {pulse.estimatedDailyProfit >= 0 ? '+' : '-'}
-            {formatINR(Math.abs(pulse.estimatedDailyProfit))}
+          <p className="font-display text-xl font-extrabold font-tabular text-[var(--ink)]">
+            {hideBalance ? '₹••••' : formatINR(pulse.upiBankBalance)}
           </p>
-          <p className="text-[11px] opacity-85">{pulse.profitBasisNote}</p>
+          <p className="text-[11px] font-medium text-[var(--ink-muted)] font-tabular leading-snug">
+            In {hideBalance ? '₹••' : formatINR(pulse.todayInflow)} · Out{' '}
+            {hideBalance ? '₹••' : formatINR(pulse.todayOutflow)}
+          </p>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="inline-flex rounded-xl bg-black/5 dark:bg-white/10 p-1">
-          {(
-            [
-              { id: 'today', label: 'Today' },
-              { id: 'all', label: 'All Dates' },
-            ] as const
-          ).map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => setDateScope(d.id)}
-              className={`min-h-[34px] px-4 rounded-lg text-xs font-bold transition ${
-                dateScope === d.id
-                  ? 'bg-[var(--surface)] text-[var(--brand)] shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300'
+      {/* Dynamic Horizontal Today's Profit Pulse Card (Emerald if >=0, Red if <0) */}
+      <div
+        className={`rounded-[24px] p-4 flex items-center justify-between gap-3 shadow-[var(--spatial-shadow)] ${
+          profitPositive ? 'bg-[var(--debit-tint)]' : 'bg-[var(--credit-tint)]'
+        }`}
+      >
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-8 h-8 rounded-xl bg-gradient-to-br text-white flex items-center justify-center shadow-inner shrink-0 ${
+                profitPositive ? 'from-emerald-500 to-green-600' : 'from-red-500 to-rose-600'
               }`}
             >
-              {d.label}
-            </button>
-          ))}
+              {profitPositive ? (
+                <TrendingUp className="w-4 h-4" />
+              ) : (
+                <TrendingDown className="w-4 h-4" />
+              )}
+            </span>
+            <span
+              className={`text-xs font-extrabold uppercase tracking-wider ${
+                profitPositive ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
+              }`}
+            >
+              Today&apos;s Profit Pulse
+            </span>
+          </div>
+          <p className="text-xs font-medium text-[var(--ink-muted)] leading-snug">
+            {pulse.profitBasisNote}
+          </p>
         </div>
+        <p
+          className={`font-display text-2xl font-extrabold font-tabular shrink-0 ${
+            profitPositive ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
+          }`}
+        >
+          {hideBalance
+            ? '₹••••'
+            : `${profitPositive ? '+' : '-'}${formatINR(Math.abs(pulse.estimatedDailyProfit))}`}
+        </p>
+      </div>
 
-        <div className="inline-flex rounded-xl bg-black/5 dark:bg-white/10 p-1">
-          {(
-            [
-              { id: 'all', label: 'All Modes' },
-              { id: 'cash', label: 'Cash' },
-              { id: 'upi', label: 'UPI' },
-              { id: 'bank', label: 'Bank' },
-            ] as const
-          ).map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => setModeFilter(m.id)}
-              className={`min-h-[34px] px-3 rounded-lg text-xs font-bold transition ${
-                modeFilter === m.id
-                  ? 'bg-[var(--surface)] text-[var(--brand)] shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+      {/* Single Horizontal Scrollable Filter Bar (Dates + Payment Modes) */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+        {(
+          [
+            { id: 'today', label: 'Today' },
+            { id: 'all', label: 'All Dates' },
+          ] as const
+        ).map((d) => (
+          <button
+            key={d.id}
+            type="button"
+            onClick={() => setDateScope(d.id)}
+            className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 active:scale-95 transition ${
+              dateScope === d.id
+                ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-sm'
+                : 'spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--ink-muted)]'
+            }`}
+          >
+            {d.label}
+          </button>
+        ))}
+
+        <div className="h-5 w-px bg-[var(--surface-subtle)] shrink-0 mx-0.5" />
+
+        {(
+          [
+            { id: 'all', label: 'All Modes' },
+            { id: 'cash', label: 'Cash' },
+            { id: 'upi', label: 'UPI' },
+            { id: 'bank', label: 'Bank' },
+          ] as const
+        ).map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => setModeFilter(m.id)}
+            className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 active:scale-95 transition ${
+              modeFilter === m.id
+                ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-xs'
+                : 'spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--ink-muted)]'
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
 
       {listError && (
-        <div className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-3.5 py-2.5 text-xs font-bold text-red-700 dark:text-red-300 flex items-center justify-between">
+        <div className="rounded-2xl bg-[var(--credit-tint)] px-3.5 py-2.5 text-xs font-bold text-[var(--credit-red)] flex items-center justify-between">
           <span>{listError}</span>
-          <button type="button" onClick={() => setListError('')}>
+          <button type="button" onClick={() => setListError('')} aria-label="Dismiss error">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Cashbook Entries Table/List */}
+      {/* Cashbook Entries Cards */}
       {visibleEntries.length === 0 ? (
-        <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-10 text-center space-y-3">
-          <p className="text-base font-bold text-slate-700 dark:text-slate-200">
+        <div className="rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-8 text-center space-y-3">
+          <p className="font-display text-base font-bold text-[var(--ink)]">
             No Galla entries for this view yet.
           </p>
-          <p className="text-xs text-slate-500">
-            Record morning opening cash, walk-in cash sales, or daily shop expenses like tea, bijli, and tempo fare.
+          <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
+            Record morning opening cash, walk-in cash sales, or daily shop expenses like tea,
+            bijli, and tempo fare.
           </p>
           <div className="flex items-center justify-center gap-2.5 pt-1">
             <button
               type="button"
               onClick={() => openEntryModal('inflow')}
-              className="min-h-[42px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold"
+              className="min-h-[44px] px-4 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold shadow-sm active:scale-95 transition"
             >
               + Add Opening / Cash Sale
             </button>
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] divide-y divide-[var(--surface-border)] overflow-hidden">
-          {visibleEntries.map((entry) => {
+        <div className="space-y-2.5">
+          {visibleEntries.map((entry, idx) => {
             const isIn = entry.entryType === 'inflow';
             const armed = armedDeleteId === entry.id;
             return (
               <div
                 key={entry.id}
-                className="px-4 py-3.5 flex items-center justify-between gap-3"
+                style={{ animationDelay: `${Math.min(idx, 10) * 35}ms` }}
+                className="stagger-fade-up rounded-[22px] spatial-card ring-1 ring-white/80 dark:ring-white/10 px-3.5 py-3 flex items-center justify-between gap-3"
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <span
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      isIn
-                        ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600'
-                        : 'bg-red-50 dark:bg-red-950/50 text-red-600'
+                    className={`w-10 h-10 rounded-2xl bg-gradient-to-br text-white flex items-center justify-center shadow-inner shrink-0 ${
+                      isIn ? 'from-emerald-500 to-green-600' : 'from-red-500 to-rose-600'
                     }`}
                   >
                     {isIn ? (
@@ -321,11 +381,11 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                       <ArrowUpRight className="w-4 h-4" />
                     )}
                   </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-extrabold text-[var(--ink)] leading-snug truncate">
                       {entry.note || entry.category}
                     </p>
-                    <p className="text-[11px] font-medium text-slate-500 truncate">
+                    <p className="text-[11px] font-medium text-[var(--ink-muted)] leading-snug mt-0.5">
                       {entry.category} · {entry.mode.toUpperCase()}
                       {entry.actorName ? ` · ${entry.actorName}` : ''} ·{' '}
                       {formatDateTime(entry.entryDate)}
@@ -333,14 +393,15 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <span
                     className={`text-base font-extrabold font-tabular ${
-                      isIn ? 'text-emerald-600' : 'text-red-600'
+                      isIn ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
                     }`}
                   >
-                    {isIn ? '+' : '-'}
-                    {formatINR(entry.amount)}
+                    {hideBalance
+                      ? '₹••••'
+                      : `${isIn ? '+' : '-'}${formatINR(entry.amount)}`}
                   </span>
                   <button
                     type="button"
@@ -360,10 +421,10 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                       }
                     }}
                     aria-label="Delete cashbook entry"
-                    className={`px-2 py-1 rounded-lg text-xs font-bold transition ${
+                    className={`min-w-[40px] min-h-[40px] px-2 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
                       armed
-                        ? 'bg-red-600 text-white'
-                        : 'text-slate-400 hover:text-red-600'
+                        ? 'bg-[var(--credit-red)] text-white'
+                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
                     }`}
                   >
                     {armed ? 'Delete?' : <Trash2 className="w-4 h-4" />}
@@ -375,23 +436,29 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
         </div>
       )}
 
-      {/* Add Cashbook Entry Modal */}
+      {/* Add Cashbook Entry Bottom Sheet */}
       {modalType && (
         <div
           role="dialog"
           aria-modal="true"
           onClick={() => !saving && setModalType(null)}
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe max-h-[90dvh] overflow-y-auto"
           >
+            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold">
+              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
                 {modalType === 'inflow' ? 'Cash In / Galla Deposit' : 'Shop Expense / Payout'}
               </h3>
-              <button type="button" onClick={() => setModalType(null)} aria-label="Close">
+              <button
+                type="button"
+                onClick={() => setModalType(null)}
+                aria-label="Close"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -402,10 +469,10 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                   key={m}
                   type="button"
                   onClick={() => setMode(m)}
-                  className={`min-h-[40px] rounded-xl text-xs font-extrabold uppercase border ${
+                  className={`min-h-[44px] rounded-2xl text-xs font-extrabold uppercase active:scale-95 transition ${
                     mode === m
-                      ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                      : 'border-[var(--surface-border)]'
+                      ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/40'
+                      : 'bg-[var(--app-bg)] text-[var(--ink)]'
                   }`}
                 >
                   {m}
@@ -414,17 +481,19 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
             </div>
 
             <div>
-              <span className="block text-xs font-bold text-slate-500 mb-1.5">Category</span>
+              <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1.5">
+                Category
+              </span>
               <div className="flex flex-wrap gap-1.5">
                 {(modalType === 'inflow' ? INFLOW_CATEGORIES : OUTFLOW_CATEGORIES).map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setCategory(cat)}
-                    className={`min-h-[34px] px-3 rounded-lg text-xs font-bold border ${
+                    className={`min-h-[40px] px-3.5 rounded-2xl text-xs font-bold active:scale-95 transition ${
                       category === cat
-                        ? 'bg-[var(--brand)] text-[var(--brand-fg)] border-[var(--brand)]'
-                        : 'border-[var(--surface-border)]'
+                        ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
+                        : 'bg-[var(--app-bg)] text-[var(--ink)]'
                     }`}
                   >
                     {cat}
@@ -435,29 +504,33 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Amount (₹)</label>
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                  Amount (₹)
+                </label>
                 <input
                   type="number"
                   min="1"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="500"
-                  className="w-full min-h-[46px] rounded-xl border-2 border-[var(--brand)] bg-transparent px-3 text-lg font-extrabold font-tabular outline-none"
+                  className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-2 ring-[var(--brand-accent)]/60 px-3 text-lg font-extrabold font-tabular text-[var(--ink)] outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Date</label>
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                  Date
+                </label>
                 <input
                   type="date"
                   value={entryDate}
                   onChange={(e) => setEntryDate(e.target.value)}
-                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xs font-tabular font-bold"
+                  className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-xs font-tabular font-bold text-[var(--ink)]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
                 Note (Optional)
               </label>
               <input
@@ -465,19 +538,21 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder={
-                  modalType === 'inflow' ? 'Morning opening cash / counter sale' : 'Chai, transport, electricity...'
+                  modalType === 'inflow'
+                    ? 'Morning opening cash / counter sale'
+                    : 'Chai, transport, electricity...'
                 }
-                className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
               />
             </div>
 
-            {formError && <p className="text-xs font-bold text-red-600">{formError}</p>}
+            {formError && <p className="text-xs font-bold text-[var(--credit-red)]">{formError}</p>}
 
             <button
               type="button"
               disabled={saving}
               onClick={handleSave}
-              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm disabled:opacity-60"
+              className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm shadow-md disabled:opacity-60 active:scale-95 transition"
             >
               {saving ? 'Saving...' : 'Save to Galla'}
             </button>

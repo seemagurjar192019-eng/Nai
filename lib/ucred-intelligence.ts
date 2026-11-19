@@ -115,7 +115,7 @@ export function computeCustomerTrustScore(
 
   let band: TrustBand = 'reliable';
   if (score < 50) band = 'high-risk';
-  else if (score < 75) band = 'watch';
+  else if (score < 70) band = 'watch';
 
   // Build concise, practical shopkeeper recovery hint
   let recoveryTimingHint = 'No balance due';
@@ -277,5 +277,36 @@ export function computeDailyGallaPulse(params: {
     todayExpenses: Math.round(todayExpenses * 100) / 100,
     estimatedDailyProfit,
     profitBasisNote,
+  };
+}
+
+export interface NetCashflowSummary {
+  totalReceivable: number;
+  totalPayable: number;
+  netCashflow: number;
+  receivableSharePct: number;
+  payableSharePct: number;
+}
+
+export function computeNetCashflowSummary(accounts: LedgerAccount[]): NetCashflowSummary {
+  let receivable = 0;
+  let payable = 0;
+  for (const acc of accounts) {
+    if (acc.balance > 0) receivable += acc.balance;
+    else if (acc.balance < 0) payable += Math.abs(acc.balance);
+  }
+  const totalReceivable = Math.round(receivable * 100) / 100;
+  const totalPayable = Math.round(payable * 100) / 100;
+  const netCashflow = Math.round((totalReceivable - totalPayable) * 100) / 100;
+  const gross = totalReceivable + totalPayable;
+  const receivableSharePct = gross > 0 ? Math.round((totalReceivable / gross) * 100) : 50;
+  const payableSharePct = gross > 0 ? 100 - receivableSharePct : 50;
+
+  return {
+    totalReceivable,
+    totalPayable,
+    netCashflow,
+    receivableSharePct,
+    payableSharePct,
   };
 }

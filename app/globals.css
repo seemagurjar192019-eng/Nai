@@ -2,104 +2,288 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --brand: #161514;
-  --brand-hover: #2A2826;
-  --brand-fg: #FFFFFF;
-  --brand-tint: #EDE7DF;
-  --brand-soft: rgba(22, 21, 20, 0.14);
-  --app-bg: #F6F2EC;
+  /* Ucred v2.0 — Airy Slate Light Mode (60% Slate Canvas · 30% White Surface · 10% Royal Indigo & Hisaab Semantics) */
+  --app-bg: #F8FAFC;
+  --outer-frame: #E2E8F0;
   --surface: #FFFFFF;
-  --surface-border: #E5DEC9;
-  --credit-red: #C62828;
-  --credit-tint: #FEECEC;
-  --debit-green: #0F8A4B;
-  --debit-tint: #E8F5EE;
-}
-
-:root[data-accent="green"] {
-  --brand: #008037;
-  --brand-hover: #006B2E;
-  --brand-fg: #FFFFFF;
-  --brand-tint: #E8F5EE;
-  --brand-soft: rgba(0, 128, 55, 0.14);
-  --app-bg: #F6F8F7;
-  --surface: #FFFFFF;
+  --surface-subtle: #F1F5F9;
   --surface-border: #E2E8F0;
-}
+  --ink: #0F172A;
+  --ink-muted: #475569;
 
-:root[data-accent="crimson"] {
-  --brand: #9A1B1E;
-  --brand-hover: #7F1518;
+  --brand: #1E3A8A;
+  --brand-hover: #1E40AF;
   --brand-fg: #FFFFFF;
-  --brand-tint: #FCECEC;
-  --brand-soft: rgba(154, 27, 30, 0.14);
-  --app-bg: #F9F6F0;
-  --surface: #FFFFFF;
-  --surface-border: #EADFD7;
+
+  --brand-accent: #1E3A8A;
+  --brand-accent-fg: #FFFFFF;
+  --brand-tint: #EFF6FF;
+  --brand-soft: rgba(79, 70, 229, 0.2);
+
+  /* Strict Hisaab-Kitaab Semantics */
+  --credit-red: #DC2626;
+  --credit-tint: #FEE2E2;
+  --debit-green: #15803D;
+  --debit-tint: #DCFCE7;
+  --alert-amber: #D97706;
+  --alert-tint: #FEF3C7;
+
+  /* Exclusive AI Munim Gradient (Bolne Wala Munim Orb & Parchi Laser) */
+  --munim-gradient: linear-gradient(135deg, #4F46E5, #06B6D4);
+
+  /* Spatial Depth & Spring Motion Tokens (Tenmin-Inspired) */
+  --spatial-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.08);
+  --spatial-shadow-lg: 0 18px 44px -14px rgba(15, 23, 42, 0.14);
+  --spatial-dock-shadow: 0 14px 40px -8px rgba(15, 23, 42, 0.18);
+  --spatial-sheet-shadow: 0 -18px 50px -12px rgba(15, 23, 42, 0.22);
+  --spring-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --smooth-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .dark {
-  --brand: #F3EDE4;
-  --brand-hover: #E5DDD0;
-  --brand-fg: #161514;
-  --brand-tint: rgba(243, 237, 228, 0.12);
-  --brand-soft: rgba(243, 237, 228, 0.18);
-  --app-bg: #0E0E0D;
-  --surface: #181715;
-  --surface-border: #2A2824;
-  --credit-tint: rgba(198, 40, 40, 0.18);
-  --debit-tint: rgba(15, 138, 75, 0.18);
-}
+  /* Ucred v2.0 — Obsidian Dark Mode */
+  --app-bg: #09090B;
+  --outer-frame: #000000;
+  --surface: #18181B;
+  --surface-subtle: #27272A;
+  --surface-border: #27272A;
+  --ink: #FAFAFA;
+  --ink-muted: #94A3B8;
 
-.dark[data-accent="green"] {
-  --brand: #10B981;
-  --brand-hover: #059669;
-  --brand-fg: #042F1E;
-  --brand-tint: rgba(16, 185, 129, 0.16);
-  --brand-soft: rgba(16, 185, 129, 0.22);
-  --app-bg: #0D1210;
-  --surface: #131B17;
-  --surface-border: #1F2D27;
-}
-
-.dark[data-accent="crimson"] {
-  --brand: #E11D48;
-  --brand-hover: #BE123C;
+  --brand: #2563EB;
+  --brand-hover: #1D4ED8;
   --brand-fg: #FFFFFF;
-  --brand-tint: rgba(225, 29, 72, 0.20);
-  --brand-soft: rgba(225, 29, 72, 0.24);
-  --app-bg: #141010;
-  --surface: #1E1717;
-  --surface-border: #332425;
+
+  --brand-accent: #3B82F6;
+  --brand-accent-fg: #09090B;
+  --brand-tint: rgba(59, 130, 246, 0.16);
+  --brand-soft: rgba(59, 130, 246, 0.28);
+
+  --credit-red: #F87171;
+  --credit-tint: #450A0A;
+  --debit-green: #4ADE80;
+  --debit-tint: #052E16;
+  --alert-amber: #FBBF24;
+  --alert-tint: #451A03;
+
+  --munim-gradient: linear-gradient(135deg, #6366F1, #22D3EE);
+
+  --spatial-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.55);
+  --spatial-shadow-lg: 0 20px 48px -12px rgba(0, 0, 0, 0.72);
+  --spatial-dock-shadow: 0 16px 46px -8px rgba(0, 0, 0, 0.78);
+  --spatial-sheet-shadow: 0 -18px 52px -10px rgba(0, 0, 0, 0.75);
 }
 
 body {
-  background-color: var(--app-bg);
+  background-color: var(--outer-frame);
+  color: var(--ink);
   font-family: var(--font-sans), var(--font-devanagari), system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display), var(--font-devanagari), var(--font-sans), sans-serif;
+  letter-spacing: -0.02em;
 }
 
 .font-tabular {
   font-family: var(--font-mono), var(--font-sans), monospace;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
-@keyframes voicePulse {
+/* Spatial Surface Helpers (Zero Harsh Box Borders) */
+.spatial-shell-bg {
+  background-color: var(--app-bg);
+  background-image: radial-gradient(ellipse at top, rgba(79, 70, 229, 0.12), transparent 60%);
+}
+
+.dark .spatial-shell-bg {
+  background-image: radial-gradient(ellipse at top, rgba(59, 130, 246, 0.11), transparent 55%);
+}
+
+.spatial-card {
+  background-color: var(--surface);
+  box-shadow: var(--spatial-shadow);
+}
+
+.spatial-hero {
+  background-color: var(--surface);
+  box-shadow: var(--spatial-shadow-lg);
+}
+
+.spatial-sheet {
+  background-color: var(--surface);
+  box-shadow: var(--spatial-sheet-shadow);
+}
+
+.spatial-dock {
+  box-shadow: var(--spatial-dock-shadow);
+}
+
+/* Hide scrollbars cleanly on horizontal chip scrollers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Tenmin-Inspired Pure CSS Spring Keyframes */
+@keyframes floatOrb {
   0%, 100% {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16), 0 0 0 0 var(--brand-soft);
+    transform: translateY(0px) scale(1);
+    box-shadow: 0 12px 28px rgba(79, 70, 229, 0.34), 0 0 0 0 rgba(6, 182, 212, 0.28);
   }
   50% {
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2), 0 0 0 10px rgba(0, 0, 0, 0);
+    transform: translateY(-3.5px) scale(1.035);
+    box-shadow: 0 16px 34px rgba(79, 70, 229, 0.42), 0 0 0 9px rgba(6, 182, 212, 0);
   }
 }
 
-.voice-fab-pulse {
-  animation: voicePulse 2.4s ease-in-out infinite;
+@keyframes rippleWave {
+  0% {
+    transform: scale(0.88);
+    opacity: 0.72;
+  }
+  100% {
+    transform: scale(1.62);
+    opacity: 0;
+  }
+}
+
+@keyframes eqBar {
+  0%, 100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes springPop {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sheetSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes laserSweep {
+  0%, 100% {
+    top: 6%;
+  }
+  50% {
+    top: 89%;
+  }
+}
+
+@keyframes ringDraw {
+  0% {
+    stroke-dashoffset: 132;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes checkPop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.munim-orb-idle {
+  animation: floatOrb 3.2s ease-in-out infinite;
+}
+
+.munim-ripple-1 {
+  animation: rippleWave 1.5s var(--smooth-ease) infinite;
+}
+
+.munim-ripple-2 {
+  animation: rippleWave 1.5s var(--smooth-ease) 0.52s infinite;
+}
+
+.eq-bar {
+  transform-origin: center;
+  animation: eqBar 0.7s ease-in-out infinite;
+}
+
+.stagger-fade-up {
+  animation: springPop 0.32s var(--spring-ease) both;
+}
+
+.sheet-slide-up {
+  animation: sheetSlideUp 0.28s var(--spring-ease) both;
+}
+
+.parchi-laser {
+  animation: laserSweep 1.7s ease-in-out infinite;
+}
+
+.trust-ring-draw {
+  animation: ringDraw 0.6s var(--smooth-ease) both;
+}
+
+.spatial-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-subtle) 25%,
+    rgba(79, 70, 229, 0.12) 50%,
+    var(--surface-subtle) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.35s ease-in-out infinite;
+}
+
+.check-pop {
+  animation: checkPop 0.34s var(--spring-ease) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .voice-fab-pulse {
-    animation: none;
+  .munim-orb-idle,
+  .munim-ripple-1,
+  .munim-ripple-2,
+  .eq-bar,
+  .stagger-fade-up,
+  .sheet-slide-up,
+  .parchi-laser,
+  .trust-ring-draw,
+  .spatial-shimmer,
+  .check-pop {
+    animation: none !important;
   }
 }
 
@@ -113,6 +297,14 @@ body {
   }
   .no-print {
     display: none !important;
+  }
+  html,
+  body,
+  .native-app-shell {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
   }
   body {
     background: #ffffff !important;

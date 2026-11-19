@@ -45,6 +45,63 @@ interface CollectionViewProps {
   onOpenAccount: (account: LedgerAccount) => void;
 }
 
+const RING_RADIUS = 21;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+function TrustAvatarRing({
+  name,
+  score,
+  hasTrust,
+}: {
+  name: string;
+  score: number;
+  hasTrust: boolean;
+}) {
+  const clamped = Math.max(0, Math.min(100, hasTrust ? score : 100));
+  const offset = RING_CIRCUMFERENCE * (1 - clamped / 100);
+  const strokeColor = !hasTrust
+    ? 'var(--brand-accent)'
+    : clamped >= 70
+      ? 'var(--debit-green)'
+      : clamped >= 50
+        ? 'var(--alert-amber)'
+        : 'var(--credit-red)';
+
+  return (
+    <div className="relative w-12 h-12 shrink-0 flex items-center justify-center">
+      <svg viewBox="0 0 48 48" className="w-12 h-12 -rotate-90" aria-hidden="true">
+        <circle
+          cx="24"
+          cy="24"
+          r={RING_RADIUS}
+          strokeWidth="3"
+          fill="none"
+          className="stroke-[var(--surface-subtle)]"
+        />
+        <circle
+          cx="24"
+          cy="24"
+          r={RING_RADIUS}
+          strokeWidth="3"
+          fill="none"
+          stroke={strokeColor}
+          strokeLinecap="round"
+          strokeDasharray={RING_CIRCUMFERENCE}
+          strokeDashoffset={offset}
+          className="trust-ring-draw"
+          style={{ transition: 'stroke-dashoffset 0.55s cubic-bezier(0.16, 1, 0.3, 1)' }}
+        />
+      </svg>
+      <div
+        style={{ backgroundColor: getAvatarColor(name) }}
+        className="absolute w-10 h-10 rounded-full text-white font-extrabold text-base flex items-center justify-center shadow-sm"
+      >
+        {name.charAt(0).toUpperCase()}
+      </div>
+    </div>
+  );
+}
+
 export const CollectionView: React.FC<CollectionViewProps> = ({
   accounts,
   business,
@@ -59,7 +116,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
   const [filterChip, setFilterChip] = useState<CollectionFilterChip>('all');
   const [sortBy, setSortBy] = useState<SortByOption>('recovery-priority');
   const [showSort, setShowSort] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [showUpiSetup, setShowUpiSetup] = useState(false);
   const [upiInput, setUpiInput] = useState(business.upiId || '');
   const [upiBusy, setUpiBusy] = useState(false);
@@ -80,8 +137,13 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
     trustScoresByAccount
   );
 
-  const safeIndex = Math.min(activeIndex, Math.max(0, dueAccounts.length - 1));
-  const current = dueAccounts[safeIndex] || null;
+  const safeSelectedIndex =
+    selectedIndex === null
+      ? null
+      : dueAccounts.length === 0
+        ? null
+        : Math.min(selectedIndex, dueAccounts.length - 1);
+  const current = safeSelectedIndex !== null ? dueAccounts[safeSelectedIndex] || null : null;
   const currentTrust = current ? trustScoresByAccount[current.id] : undefined;
 
   const chips: Array<{ id: CollectionFilterChip; label: string }> = [
@@ -126,13 +188,19 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-24">
-      {/* Customer Receivables vs Supplier Payables Switch */}
-      <div className="inline-flex rounded-xl bg-black/5 dark:bg-white/10 p-1">
+    <div className="space-y-4 pb-32">
+      {/* Sliding Pill Customer Receivables vs Supplier Payables Switch */}
+      <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 shadow-inner">
+        <span
+          aria-hidden="true"
+          className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl bg-[var(--surface)] shadow-sm transition-transform duration-200 ease-out ${
+            partyKind === 'supplier' ? 'translate-x-full' : 'translate-x-0'
+          }`}
+        />
         {(
           [
-            { id: 'customer', label: 'Customers (To Collect)' },
-            { id: 'supplier', label: 'Suppliers (To Pay)' },
+            { id: 'customer', label: 'Customers (Collect)' },
+            { id: 'supplier', label: 'Suppliers (Pay)' },
           ] as const
         ).map((tab) => (
           <button
@@ -140,12 +208,12 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
             type="button"
             onClick={() => {
               setPartyKind(tab.id);
-              setActiveIndex(0);
+              setSelectedIndex(null);
             }}
-            className={`min-h-[38px] px-4 rounded-lg text-xs sm:text-sm font-bold transition ${
+            className={`relative z-10 min-h-[44px] px-3 rounded-xl text-xs font-extrabold transition-colors active:scale-95 ${
               partyKind === tab.id
-                ? 'bg-[var(--surface)] text-[var(--brand)] shadow-xs'
-                : 'text-slate-600 dark:text-slate-300'
+                ? 'text-[var(--brand)] dark:text-[var(--brand-accent)]'
+                : 'text-[var(--ink-muted)]'
             }`}
           >
             {tab.label}
@@ -162,12 +230,12 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
               type="button"
               onClick={() => {
                 setFilterChip(c.id);
-                setActiveIndex(0);
+                setSelectedIndex(null);
               }}
-              className={`min-h-[38px] px-4 rounded-xl text-sm font-bold whitespace-nowrap shrink-0 border transition ${
+              className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 active:scale-95 transition ${
                 filterChip === c.id
-                  ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                  : 'bg-[var(--surface)] border-[var(--surface-border)] text-slate-600 dark:text-slate-300'
+                  ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-xs'
+                  : 'spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--ink-muted)]'
               }`}
             >
               {c.label}
@@ -179,61 +247,177 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
           type="button"
           onClick={() => setShowSort(true)}
           aria-label="Sort collection accounts"
-          className="min-w-[40px] min-h-[40px] rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] flex items-center justify-center shrink-0"
+          className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center shrink-0 active:scale-95 transition"
         >
-          <SlidersHorizontal className="w-4 h-4" />
+          <SlidersHorizontal className="w-4 h-4 text-[var(--ink)]" />
         </button>
       </div>
 
       {actionError && !showUpiSetup && !dueEditAccount && (
         <div
           role="alert"
-          className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-3.5 py-2.5 text-xs font-bold text-red-700 dark:text-red-300 flex items-center justify-between gap-2"
+          className="rounded-2xl bg-[var(--credit-tint)] px-3.5 py-2.5 text-xs font-bold text-[var(--credit-red)] flex items-center justify-between gap-2"
         >
           <span className="inline-flex items-center gap-1.5">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{actionError}</span>
           </span>
-          <button type="button" onClick={() => setActionError('')}>
+          <button type="button" onClick={() => setActionError('')} aria-label="Dismiss error">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Collection Card Carousel */}
-      {!current ? (
-        <div className="rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-10 text-center space-y-3">
-          <p className="text-base font-bold text-slate-700 dark:text-slate-200">
+      {/* Compact Due Cards List (tap card for QR Bottom Sheet; 1-tap Remind on WhatsApp per row) */}
+      {dueAccounts.length === 0 ? (
+        <div className="rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-8 text-center space-y-3">
+          <p className="font-display text-base font-bold text-[var(--ink)]">
             No pending {partyKind === 'customer' ? 'customer dues' : 'supplier payables'} in this
             filter.
           </p>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
             {partyKind === 'customer'
-              ? 'Customers with pending credit balances appear here with instant UPI QR, Trust Score, and WhatsApp reminders.'
+              ? 'Customers with pending credit balances appear here with instant UPI QR, Trust Score, and 1-tap WhatsApp reminders.'
               : 'Suppliers you owe money to appear here so you can settle on time.'}
           </p>
         </div>
       ) : (
-        <div className="max-w-lg mx-auto space-y-4">
-          <div className="rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 shadow-sm space-y-5">
-            {/* Header */}
+        <div className="space-y-2.5">
+          {dueAccounts.map((acc, idx) => {
+            const trust = trustScoresByAccount[acc.id];
+            const msg = buildReminderMessage({
+              customerName: acc.name,
+              amount: acc.balance,
+              shopName: business.name,
+              upiId: business.upiId,
+              language,
+            });
+            const statusSummary =
+              trust && partyKind === 'customer'
+                ? `Trust ${trust.score}/100 · ${trust.recoveryTimingHint}`
+                : acc.promiseDate
+                  ? `Promise: ${acc.promiseDate}`
+                  : acc.dueDate
+                    ? `Due: ${acc.dueDate}`
+                    : acc.phone
+                      ? `+91 ${acc.phone}`
+                      : 'Tap for UPI QR & details';
+
+            return (
+              <div
+                key={acc.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedIndex(idx)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedIndex(idx);
+                  }
+                }}
+                style={{ animationDelay: `${Math.min(idx, 12) * 35}ms` }}
+                className="stagger-fade-up rounded-[22px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-3.5 flex items-center justify-between gap-2.5 active:scale-[0.985] transition cursor-pointer"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <TrustAvatarRing
+                    name={acc.name}
+                    score={trust?.score ?? 100}
+                    hasTrust={Boolean(trust && partyKind === 'customer')}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-extrabold text-[var(--ink)] leading-snug truncate">
+                      {acc.name}
+                    </p>
+                    <p
+                      className={`text-[11px] font-semibold leading-snug mt-0.5 truncate ${
+                        trust?.band === 'high-risk' && partyKind === 'customer'
+                          ? 'text-[var(--credit-red)]'
+                          : 'text-[var(--ink-muted)]'
+                      }`}
+                    >
+                      {statusSummary}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <p className="text-base font-extrabold font-tabular text-[var(--credit-red)]">
+                    {formatINR(Math.abs(acc.balance))}
+                  </p>
+                  {partyKind === 'customer' ? (
+                    <a
+                      href={buildWhatsAppUrl(acc.phone, msg)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="min-h-[44px] px-3 rounded-xl bg-[var(--debit-green)] text-white text-xs font-extrabold inline-flex items-center gap-1.5 whitespace-nowrap shadow-xs active:scale-95 transition"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Remind</span>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenAccount(acc);
+                      }}
+                      className="min-h-[44px] px-3 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center gap-1 whitespace-nowrap active:scale-95 transition"
+                    >
+                      <span>Open Ledger</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Bulk WhatsApp Reminder Action (customers) */}
+      {partyKind === 'customer' && dueAccounts.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowBulkModal(true)}
+          className="w-full min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition"
+        >
+          <Users className="w-5 h-5" />
+          <span>Bulk WhatsApp &amp; SMS Reminder ({dueAccounts.length})</span>
+        </button>
+      )}
+
+      {/* Payment Due Reminder UPI QR Bottom Sheet */}
+      {current && safeSelectedIndex !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setSelectedIndex(null)}
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 max-h-[90dvh] overflow-y-auto pb-safe"
+          >
+            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-start justify-between gap-3">
               <button
                 type="button"
-                onClick={() => onOpenAccount(current)}
-                className="flex items-center gap-3 text-left min-w-0"
+                onClick={() => {
+                  setSelectedIndex(null);
+                  onOpenAccount(current);
+                }}
+                className="flex items-center gap-3 text-left min-w-0 flex-1 active:scale-95 transition"
               >
-                <div
-                  style={{ backgroundColor: getAvatarColor(current.name) }}
-                  className="w-11 h-11 rounded-full text-white font-bold flex items-center justify-center shrink-0"
-                >
-                  {current.name.charAt(0).toUpperCase()}
-                </div>
+                <TrustAvatarRing
+                  name={current.name}
+                  score={currentTrust?.score ?? 100}
+                  hasTrust={Boolean(currentTrust && partyKind === 'customer')}
+                />
                 <div className="min-w-0">
-                  <p className="text-base font-extrabold text-slate-900 dark:text-white truncate">
+                  <p className="font-display text-base font-extrabold text-[var(--ink)]">
                     {current.name}
                   </p>
-                  <p className="text-xs font-medium text-slate-500 truncate">
+                  <p className="text-xs font-medium text-[var(--ink-muted)] leading-snug">
                     {current.phone
                       ? `+91 ${current.phone}`
                       : current.lastNote || (partyKind === 'customer' ? 'Customer' : 'Supplier')}
@@ -241,10 +425,10 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                   </p>
                   {currentTrust && partyKind === 'customer' && (
                     <p
-                      className={`text-[11px] font-bold truncate mt-0.5 ${
+                      className={`text-[11px] font-bold mt-0.5 leading-snug ${
                         currentTrust.band === 'high-risk'
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-slate-600 dark:text-slate-300'
+                          ? 'text-[var(--credit-red)]'
+                          : 'text-[var(--ink-muted)]'
                       }`}
                     >
                       Trust {currentTrust.score}/100 · {currentTrust.recoveryTimingHint}
@@ -252,51 +436,50 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                   )}
                 </div>
               </button>
-              <div className="text-right shrink-0">
-                <p
-                  className={`text-lg font-extrabold font-tabular ${
-                    partyKind === 'customer' ? 'text-red-600' : 'text-emerald-600'
-                  }`}
-                >
-                  {formatINR(Math.abs(current.balance))}
-                </p>
-                <p className="text-xs font-semibold text-slate-500">
-                  {partyKind === 'customer' ? t.due : t.youPay}
-                </p>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedIndex(null)}
+                aria-label="Close reminder"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {/* Center Reminder + Live UPI QR */}
-            <div className="relative rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-5 text-center space-y-3">
+            <div className="relative rounded-[24px] bg-[var(--app-bg)] p-5 text-center space-y-3">
               <button
                 type="button"
-                disabled={safeIndex === 0}
-                onClick={() => setActiveIndex((i) => Math.max(0, i - 1))}
+                disabled={safeSelectedIndex === 0}
+                onClick={() => setSelectedIndex((i) => Math.max(0, (i ?? 0) - 1))}
                 aria-label="Previous party"
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-[var(--surface)] border border-[var(--surface-border)] flex items-center justify-center disabled:opacity-30"
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full spatial-card flex items-center justify-center disabled:opacity-30 active:scale-95 transition"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 type="button"
-                disabled={safeIndex >= dueAccounts.length - 1}
-                onClick={() => setActiveIndex((i) => Math.min(dueAccounts.length - 1, i + 1))}
+                disabled={safeSelectedIndex >= dueAccounts.length - 1}
+                onClick={() =>
+                  setSelectedIndex((i) => Math.min(dueAccounts.length - 1, (i ?? 0) + 1))
+                }
                 aria-label="Next party"
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-[var(--surface)] border border-[var(--surface-border)] flex items-center justify-center disabled:opacity-30"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full spatial-card flex items-center justify-center disabled:opacity-30 active:scale-95 transition"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
 
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--ink-muted)]">
                 {partyKind === 'customer' ? 'Payment Due Reminder' : 'Supplier Payable'}
               </p>
-              <p className="text-3xl font-extrabold font-tabular text-slate-900 dark:text-white">
+              <p className="font-display text-3xl font-extrabold font-tabular text-[var(--credit-red)]">
                 {formatINR(Math.abs(current.balance))}
               </p>
 
               {partyKind === 'customer' && (
                 <>
-                  <div className="mx-auto w-fit p-3 bg-white rounded-2xl border border-slate-200 relative">
+                  <div className="mx-auto w-fit p-3.5 bg-white rounded-3xl shadow-md relative">
                     <QRCodeSVG
                       value={buildUpiUri(
                         business.upiId || 'setup-upi@okicici',
@@ -313,7 +496,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                           setActionError('');
                           setShowUpiSetup(true);
                         }}
-                        className="absolute inset-0 bg-white/85 backdrop-blur-[2px] rounded-2xl flex flex-col items-center justify-center gap-1.5"
+                        className="absolute inset-0 bg-white/85 backdrop-blur-[2px] rounded-3xl flex flex-col items-center justify-center gap-1.5 active:scale-95 transition"
                       >
                         <span className="px-3.5 py-2 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shadow">
                           <QrCode className="w-4 h-4" />
@@ -323,7 +506,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                     )}
                   </div>
 
-                  <p className="text-[11px] font-semibold text-slate-500">
+                  <p className="text-[11px] font-semibold text-[var(--ink-muted)]">
                     BHIM · PhonePe · Paytm · Google Pay
                     {business.upiId ? ` (${business.upiId})` : ''}
                   </p>
@@ -340,10 +523,10 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                   setDueEditAccount(current);
                   setDueInput(current.dueDate || todayStr);
                 }}
-                className="min-h-[46px] rounded-xl border border-[var(--surface-border)] text-sm font-bold flex items-center justify-center gap-2 hover:bg-black/5 dark:hover:bg-white/10"
+                className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] text-sm font-bold text-[var(--ink)] flex items-center justify-center gap-2 hover:bg-[var(--surface-subtle)] active:scale-95 transition"
               >
-                <Calendar className="w-4 h-4 text-[var(--brand)]" />
-                <span>{current.dueDate || 'Due Date'}</span>
+                <Calendar className="w-4 h-4 text-[var(--brand-accent)]" />
+                <span className="font-tabular">{current.dueDate || 'Due Date'}</span>
               </button>
 
               <a
@@ -351,12 +534,13 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                 onClick={(e) => {
                   if (!current.phone) {
                     e.preventDefault();
+                    setSelectedIndex(null);
                     onOpenAccount(current);
                   }
                 }}
-                className="min-h-[46px] rounded-xl border border-[var(--surface-border)] text-sm font-bold flex items-center justify-center gap-2 hover:bg-black/5 dark:hover:bg-white/10"
+                className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] text-sm font-bold text-[var(--ink)] flex items-center justify-center gap-2 hover:bg-[var(--surface-subtle)] active:scale-95 transition"
               >
-                <Phone className="w-4 h-4 text-[var(--brand)]" />
+                <Phone className="w-4 h-4 text-[var(--brand-accent)]" />
                 <span>{t.callNow}</span>
               </a>
             </div>
@@ -375,7 +559,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                 )}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm"
+                className="w-full min-h-[50px] rounded-2xl bg-[var(--debit-green)] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
               >
                 <MessageCircle className="w-5 h-5" />
                 <span>{t.sendWhatsapp}</span>
@@ -383,48 +567,40 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
             ) : (
               <button
                 type="button"
-                onClick={() => onOpenAccount(current)}
-                className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm"
+                onClick={() => {
+                  setSelectedIndex(null);
+                  onOpenAccount(current);
+                }}
+                className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
               >
                 <span>Open Supplier Ledger to Record Payment</span>
               </button>
             )}
+
+            <p className="text-center text-xs font-bold font-tabular text-[var(--ink-muted)]">
+              {safeSelectedIndex + 1} / {dueAccounts.length}
+            </p>
           </div>
-
-          <p className="text-center text-xs font-bold font-tabular text-slate-500">
-            {safeIndex + 1} / {dueAccounts.length}
-          </p>
         </div>
       )}
 
-      {/* Bulk WhatsApp Reminder Action (customers) */}
-      {partyKind === 'customer' && dueAccounts.length > 0 && (
-        <div className="max-w-lg mx-auto">
-          <button
-            type="button"
-            onClick={() => setShowBulkModal(true)}
-            className="w-full min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 shadow-md"
-          >
-            <Users className="w-5 h-5" />
-            <span>Bulk WhatsApp &amp; SMS Reminder ({dueAccounts.length})</span>
-          </button>
-        </div>
-      )}
-
-      {/* Setup UPI ID Modal */}
+      {/* Setup UPI ID Bottom Sheet */}
       {showUpiSetup && (
         <div
           role="dialog"
           aria-modal="true"
           onClick={() => setShowUpiSetup(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe"
           >
-            <h3 className="text-lg font-extrabold">Setup Shop UPI ID</h3>
-            <p className="text-xs text-slate-500">
+            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
+            <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
+              Setup Shop UPI ID
+            </h3>
+            <p className="text-xs text-[var(--ink-muted)]">
               Enter your VPA (e.g. sharma@okicici or 9876543210@ybl) to generate live QR codes for
               customers.
             </p>
@@ -436,22 +612,24 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                 setActionError('');
               }}
               placeholder="yourshop@upi"
-              className="w-full min-h-[48px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3.5 font-bold outline-none"
+              className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
-            {actionError && <p className="text-xs font-bold text-red-600">{actionError}</p>}
+            {actionError && (
+              <p className="text-xs font-bold text-[var(--credit-red)]">{actionError}</p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 disabled={upiBusy}
                 onClick={handleSaveUpi}
-                className="min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60"
+                className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60 active:scale-95 transition"
               >
                 {upiBusy ? 'Saving...' : 'Save UPI ID'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowUpiSetup(false)}
-                className="min-h-[46px] rounded-xl bg-black/5 dark:bg-white/10 font-bold"
+                className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] font-bold text-[var(--ink)] active:scale-95 transition"
               >
                 Cancel
               </button>
@@ -460,39 +638,44 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
         </div>
       )}
 
-      {/* Due Date Modal */}
+      {/* Due Date Bottom Sheet */}
       {dueEditAccount && (
         <div
           role="dialog"
           aria-modal="true"
           onClick={() => setDueEditAccount(null)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe"
           >
-            <h3 className="text-lg font-extrabold">Due Date — {dueEditAccount.name}</h3>
+            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
+            <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
+              Due Date — {dueEditAccount.name}
+            </h3>
             <input
               type="date"
               value={dueInput}
               onChange={(e) => setDueInput(e.target.value)}
-              className="w-full min-h-[48px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3.5 font-tabular"
+              className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 font-tabular text-[var(--ink)]"
             />
-            {actionError && <p className="text-xs font-bold text-red-600">{actionError}</p>}
+            {actionError && (
+              <p className="text-xs font-bold text-[var(--credit-red)]">{actionError}</p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 disabled={dueBusy}
                 onClick={handleSaveDue}
-                className="min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60"
+                className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60 active:scale-95 transition"
               >
                 {dueBusy ? 'Saving...' : 'Save'}
               </button>
               <button
                 type="button"
                 onClick={() => setDueEditAccount(null)}
-                className="min-h-[46px] rounded-xl bg-black/5 dark:bg-white/10 font-bold"
+                className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] font-bold text-[var(--ink)] active:scale-95 transition"
               >
                 Cancel
               </button>
@@ -501,21 +684,27 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
         </div>
       )}
 
-      {/* Sort By Modal */}
+      {/* Sort By Bottom Sheet */}
       {showSort && (
         <div
           role="dialog"
           aria-modal="true"
           onClick={() => setShowSort(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-2.5"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-2.5 pb-safe"
           >
+            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-center justify-between pb-1">
-              <h3 className="text-lg font-extrabold">Sort By</h3>
-              <button type="button" onClick={() => setShowSort(false)} aria-label="Close sort">
+              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">Sort By</h3>
+              <button
+                type="button"
+                onClick={() => setShowSort(false)}
+                aria-label="Close sort"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -535,10 +724,10 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                   setSortBy(opt.id);
                   setShowSort(false);
                 }}
-                className={`w-full min-h-[46px] px-4 rounded-xl flex items-center justify-between text-sm font-bold ${
+                className={`w-full min-h-[46px] px-4 rounded-2xl flex items-center justify-between text-sm font-bold active:scale-[0.98] transition ${
                   sortBy === opt.id
-                    ? 'bg-[var(--brand-tint)] text-[var(--brand)]'
-                    : 'hover:bg-black/5 dark:hover:bg-white/10'
+                    ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
+                    : 'bg-[var(--app-bg)]/70 hover:bg-[var(--surface-subtle)] text-[var(--ink)]'
                 }`}
               >
                 <span>{opt.label}</span>
@@ -549,33 +738,37 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
         </div>
       )}
 
-      {/* Bulk WhatsApp Queue Modal */}
+      {/* Bulk WhatsApp Queue Bottom Sheet */}
       {showBulkModal && (
         <div
           role="dialog"
           aria-modal="true"
           onClick={() => setShowBulkModal(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4 max-h-[85vh] overflow-y-auto"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 max-h-[85dvh] overflow-y-auto pb-safe"
           >
+            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold">1-Click Vasooli Queue</h3>
+              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
+                1-Click Vasooli Queue
+              </h3>
               <button
                 type="button"
                 onClick={() => setShowBulkModal(false)}
                 aria-label="Close queue"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[var(--ink-muted)]">
               Tap Send next to any customer to launch their pre-filled WhatsApp payment reminder
               with your UPI QR link.
             </p>
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {dueAccounts.map((acc) => {
                 const trust = trustScoresByAccount[acc.id];
                 const msg = buildReminderMessage({
@@ -588,11 +781,11 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                 return (
                   <div
                     key={acc.id}
-                    className="rounded-2xl border border-[var(--surface-border)] p-3 flex items-center justify-between gap-3"
+                    className="rounded-2xl bg-[var(--app-bg)] p-3 flex items-center justify-between gap-3"
                   >
                     <div className="min-w-0">
-                      <p className="font-bold text-sm truncate">{acc.name}</p>
-                      <p className="text-xs font-tabular font-bold text-red-600 truncate">
+                      <p className="font-bold text-sm text-[var(--ink)] truncate">{acc.name}</p>
+                      <p className="text-xs font-tabular font-bold text-[var(--credit-red)]">
                         {formatINR(acc.balance)} Due
                         {trust ? ` · Trust ${trust.score}/100` : ''}
                       </p>
@@ -601,7 +794,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                       href={buildWhatsAppUrl(acc.phone, msg)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="min-h-[40px] px-3.5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold inline-flex items-center gap-1.5 shrink-0"
+                      className="min-h-[44px] px-3.5 rounded-xl bg-[var(--debit-green)] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 active:scale-95 transition"
                     >
                       <MessageCircle className="w-4 h-4" />
                       <span>Send</span>

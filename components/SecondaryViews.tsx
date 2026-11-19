@@ -10,6 +10,7 @@ import {
   Building2,
   Camera,
   Check,
+  CloudUpload,
   CreditCard,
   Database,
   Download,
@@ -27,7 +28,6 @@ import {
   Receipt,
   Share2,
   ShieldCheck,
-  Sparkles,
   Star,
   Store,
   Sun,
@@ -49,7 +49,6 @@ import {
   verifyStoredPin,
 } from '@/lib/i18n';
 import type {
-  AccentTheme,
   AppNotificationItem,
   AppearanceMode,
   Business,
@@ -57,6 +56,8 @@ import type {
   LedgerAccount,
   LedgerTransaction,
 } from '@/lib/types';
+
+import { PWAInstallButton } from './PwaControls';
 
 export type SecondaryRoute =
   | 'settings'
@@ -67,228 +68,311 @@ export type SecondaryRoute =
   | 'galla'
   | 'staff-audit';
 
-interface MoreDrawerProps {
-  open: boolean;
-  onClose: () => void;
-  onNavigate: (
-    target: SecondaryRoute | 'bills' | 'stock' | 'collection' | 'scan-parchi'
-  ) => void;
+export type MoreTarget =
+  | SecondaryRoute
+  | 'bills'
+  | 'stock'
+  | 'collection'
+  | 'scan-parchi';
+
+interface MoreBentoViewProps {
+  business: Business;
+  appearance: AppearanceMode;
+  verifiedPhone: string;
+  activeOperatorName: string;
+  isGuestMode?: boolean;
+  onOpenCloudSync?: () => void;
+  onToggleAppearance: () => void;
+  onOpenBusinessSwitcher: () => void;
+  onNavigate: (target: MoreTarget) => void;
+  onExportCsv: () => void;
+  onExportJson: () => void;
 }
 
-export const MoreDrawerSheet: React.FC<MoreDrawerProps> = ({ open, onClose, onNavigate }) => {
-  if (!open) return null;
-
+export const MoreBentoView: React.FC<MoreBentoViewProps> = ({
+  business,
+  appearance,
+  verifiedPhone,
+  activeOperatorName,
+  isGuestMode = false,
+  onOpenCloudSync,
+  onToggleAppearance,
+  onOpenBusinessSwitcher,
+  onNavigate,
+  onExportCsv,
+  onExportJson,
+}) => {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="More options"
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-    >
-      <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-5 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">More</h2>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onNavigate('settings');
-              }}
-              className="min-h-[40px] px-3 rounded-xl bg-black/5 dark:bg-white/10 text-xs font-bold inline-flex items-center gap-1.5"
-            >
-              <Palette className="w-4 h-4 text-[var(--brand)]" />
-              <span>Settings</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close more menu"
-              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500 hover:bg-black/5 dark:hover:bg-white/10"
-            >
-              <X className="w-5 h-5" />
-            </button>
+    <div className="space-y-4 pb-32 stagger-fade-up">
+      {/* Hero Business & UPI Setup Card */}
+      <section className="rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-4.5 space-y-3.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                Active Shop
+              </p>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  isGuestMode
+                    ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
+                    : 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
+                }`}
+              >
+                {isGuestMode ? 'Guest Mode · Local' : 'Cloud Synced'}
+              </span>
+            </div>
+            <h2 className="font-display text-lg font-extrabold text-[var(--ink)] truncate">
+              {business.name}
+            </h2>
+            <p className="text-xs text-[var(--ink-muted)] font-tabular truncate">
+              {isGuestMode ? 'Saved on this device' : verifiedPhone} · Operator: {activeOperatorName}
+            </p>
           </div>
-        </div>
-
-        {/* Primary 3 Tiles */}
-        <div className="grid grid-cols-3 gap-3">
           <button
             type="button"
-            onClick={() => {
-              onClose();
-              onNavigate('account-summary');
-            }}
-            className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 flex flex-col items-center gap-2 text-center hover:border-[var(--brand)] transition"
+            onClick={onOpenBusinessSwitcher}
+            className="min-h-[44px] px-3.5 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 text-[var(--brand-fg)] text-xs font-extrabold whitespace-nowrap shrink-0 shadow-md transition"
           >
-            <span className="w-10 h-10 rounded-full bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
-              <User className="w-5 h-5" />
-            </span>
-            <span className="text-xs font-bold">Account</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onNavigate('business-profile');
-            }}
-            className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 flex flex-col items-center gap-2 text-center hover:border-[var(--brand)] transition"
-          >
-            <span className="w-10 h-10 rounded-full bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
-              <Store className="w-5 h-5" />
-            </span>
-            <span className="text-xs font-bold">Business Profile</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onNavigate('help-support');
-            }}
-            className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 flex flex-col items-center gap-2 text-center hover:border-[var(--brand)] transition"
-          >
-            <span className="w-10 h-10 rounded-full bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
-              <HelpCircle className="w-5 h-5" />
-            </span>
-            <span className="text-xs font-bold">Help &amp; Support</span>
+            Switch Shop
           </button>
         </div>
 
-        {/* Business Tools Grid */}
-        <div className="space-y-2.5">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Ucred Power Tools
-          </p>
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onNavigate('galla');
-              }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
-            >
-              <Wallet className="w-5 h-5 text-[var(--brand)] shrink-0" />
-              <span className="text-sm font-bold">Galla Cashbook</span>
-            </button>
+        {isGuestMode && onOpenCloudSync && (
+          <button
+            type="button"
+            onClick={onOpenCloudSync}
+            style={{ background: 'var(--munim-gradient)' }}
+            className="w-full min-h-[48px] px-4 rounded-2xl text-white flex items-center justify-between gap-3 shadow-md active:scale-95 transition"
+          >
+            <div className="flex items-center gap-2.5 min-w-0 text-left">
+              <CloudUpload className="w-4 h-4 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold truncate">Backup / Sync via Mobile OTP</p>
+                <p className="text-[10px] text-white/85 truncate">
+                  Optional — auto-merges local guest khata to cloud
+                </p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-white/20 text-[11px] font-extrabold shrink-0">
+              Sync Now
+            </span>
+          </button>
+        )}
 
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onNavigate('scan-parchi');
-              }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
-            >
-              <Camera className="w-5 h-5 text-[var(--brand)] shrink-0" />
-              <span className="text-sm font-bold">Scan Parchi (AI)</span>
-            </button>
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => onNavigate('settings')}
+            className="min-h-[58px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
+          >
+            <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+              <QrCode className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-[var(--ink)] truncate">UPI QR Setup</p>
+              <p className="text-[11px] text-[var(--ink-muted)] truncate">
+                {business.upiId || 'Add shop UPI ID'}
+              </p>
+            </div>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onNavigate('staff-audit');
-              }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
-            >
-              <UserCheck className="w-5 h-5 text-[var(--brand)] shrink-0" />
-              <span className="text-sm font-bold">Staff &amp; Audit Log</span>
-            </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('business-profile')}
+            className="min-h-[58px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
+          >
+            <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-violet-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+              <Store className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-[var(--ink)] truncate">Shop Profile</p>
+              <p className="text-[11px] text-[var(--ink-muted)] truncate">
+                {business.gstNumber || 'GSTIN & Card'}
+              </p>
+            </div>
+          </button>
+        </div>
+      </section>
 
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onNavigate('stock');
-              }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
-            >
-              <Package className="w-5 h-5 text-[var(--brand)] shrink-0" />
-              <span className="text-sm font-bold">Stock Inventory</span>
-            </button>
+      {/* Bento Group: Counter & Operations */}
+      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4 space-y-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+          Counter Tools &amp; Logs
+        </p>
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => onNavigate('staff-audit')}
+            className="min-h-[60px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
+          >
+            <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+              <UserCheck className="w-5 h-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-[var(--ink)]">Staff Munim Logs</p>
+              <p className="text-[11px] text-[var(--ink-muted)] truncate">Switch &amp; Audit</p>
+            </div>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onNavigate('bills');
-              }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
-            >
-              <Receipt className="w-5 h-5 text-[var(--brand)] shrink-0" />
-              <span className="text-sm font-bold">Bills &amp; Quotes</span>
-            </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('galla')}
+            className="min-h-[60px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
+          >
+            <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500/15 to-teal-500/20 shadow-inner text-[var(--debit-green)] flex items-center justify-center shrink-0">
+              <Wallet className="w-5 h-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-[var(--ink)]">Galla Cashbook</p>
+              <p className="text-[11px] text-[var(--ink-muted)] truncate">Cash &amp; Profit</p>
+            </div>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onNavigate('collection');
-              }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
-            >
-              <MessageCircle className="w-5 h-5 text-[var(--brand)] shrink-0" />
-              <span className="text-sm font-bold">1-Click Vasooli</span>
-            </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('stock')}
+            className="min-h-[60px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
+          >
+            <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500/15 to-orange-500/20 shadow-inner text-[var(--alert-amber)] flex items-center justify-center shrink-0">
+              <Package className="w-5 h-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-[var(--ink)]">Stock Inventory</p>
+              <p className="text-[11px] text-[var(--ink-muted)] truncate">Rates &amp; Alerts</p>
+            </div>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onNavigate('multi-device');
-              }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
+          <button
+            type="button"
+            onClick={() => onNavigate('scan-parchi')}
+            className="min-h-[60px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
+          >
+            <span
+              style={{ background: 'var(--munim-gradient)' }}
+              className="w-10 h-10 rounded-2xl text-white flex items-center justify-center shrink-0 shadow-inner ring-1 ring-white/30"
             >
-              <Laptop className="w-5 h-5 text-[var(--brand)] shrink-0" />
-              <span className="text-sm font-bold">Multi Device Sync</span>
-            </button>
+              <Camera className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-[var(--ink)]">AI Parchi Scan</p>
+              <p className="text-[11px] text-[var(--ink-muted)] truncate">Photo to Khata</p>
+            </div>
+          </button>
+        </div>
+      </section>
 
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onNavigate('settings');
-              }}
-              className="min-h-[54px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center gap-3 text-left hover:border-[var(--brand)] transition"
-            >
-              <Lock className="w-5 h-5 text-[var(--brand)] shrink-0" />
-              <span className="text-sm font-bold">App PIN &amp; Theme</span>
-            </button>
+      {/* Bento Group: Appearance, Backup & Cloud Sync */}
+      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4 space-y-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+          Appearance &amp; Cloud Backup
+        </p>
+
+        {/* Instant Light / Dark Mode Switch */}
+        <button
+          type="button"
+          onClick={onToggleAppearance}
+          className="w-full min-h-[58px] px-4 rounded-[20px] bg-[var(--surface-subtle)] flex items-center justify-between gap-3 active:scale-95 transition"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+              {appearance === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </span>
+            <div className="text-left min-w-0">
+              <p className="text-xs font-extrabold text-[var(--ink)]">
+                {appearance === 'dark' ? 'Obsidian Dark Mode' : 'Airy Slate Light Mode'}
+              </p>
+              <p className="text-[11px] text-[var(--ink-muted)]">
+                Tap to switch between Light and Dark theme
+              </p>
+            </div>
           </div>
+          <span className="px-3 py-1.5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-[11px] font-bold shadow-xs shrink-0">
+            {appearance === 'dark' ? 'Dark' : 'Light'}
+          </span>
+        </button>
 
+        {/* Cloud Backup & Exports */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={onExportJson}
+            className="min-h-[48px] px-3 rounded-xl bg-[var(--surface-subtle)] text-xs font-extrabold text-[var(--ink)] flex items-center justify-center gap-1.5 active:scale-95 transition"
+          >
+            <Download className="w-4 h-4 text-[var(--brand-accent)]" />
+            <span>JSON Backup</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onExportCsv}
+            className="min-h-[48px] px-3 rounded-xl bg-[var(--surface-subtle)] text-xs font-extrabold text-[var(--ink)] flex items-center justify-center gap-1.5 active:scale-95 transition"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-[var(--brand-accent)]" />
+            <span>Export CSV</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => onNavigate('account-summary')}
+            className="min-h-[46px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-[11px] font-bold text-[var(--ink)] flex items-center justify-center gap-1.5 active:scale-95 transition"
+          >
+            <User className="w-3.5 h-3.5 text-[var(--brand-accent)] shrink-0" />
+            <span className="truncate">Summary</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate('multi-device')}
+            className="min-h-[46px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-[11px] font-bold text-[var(--ink)] flex items-center justify-center gap-1.5 active:scale-95 transition"
+          >
+            <Laptop className="w-3.5 h-3.5 text-[var(--brand-accent)] shrink-0" />
+            <span className="truncate">Sync</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate('settings')}
+            className="min-h-[46px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-[11px] font-bold text-[var(--ink)] flex items-center justify-center gap-1.5 active:scale-95 transition"
+          >
+            <Lock className="w-3.5 h-3.5 text-[var(--brand-accent)] shrink-0" />
+            <span className="truncate">PIN &amp; All</span>
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 pt-1">
           <Link
             href="/privacy"
-            onClick={onClose}
-            className="w-full min-h-[48px] px-3.5 rounded-2xl border border-[var(--surface-border)] flex items-center justify-center gap-2 text-xs font-bold hover:border-[var(--brand)] transition"
+            className="min-h-[40px] text-xs font-bold text-[var(--brand-accent)] hover:underline inline-flex items-center gap-1.5"
           >
-            <ShieldCheck className="w-4 h-4 text-[var(--brand)] shrink-0" />
-            <span>Privacy Policy, Terms &amp; Account Deletion Info</span>
+            <ShieldCheck className="w-4 h-4" />
+            <span>Privacy, Terms &amp; Account Deletion</span>
           </Link>
+          <PWAInstallButton compact />
         </div>
-      </div>
+      </section>
     </div>
   );
 };
 
+
 interface SettingsViewProps {
   language: LanguageCode;
-  accentTheme: AccentTheme;
   appearance: AppearanceMode;
   mobileNumber: string;
+  verifiedPhone: string;
   business: Business;
   appLockPin: string;
-  userEmail: string;
+  isGuestMode?: boolean;
+  onOpenCloudSync?: () => void;
   onBack: () => void;
   onChangeLanguage: (lang: LanguageCode) => Promise<void>;
-  onChangeAccent: (accent: AccentTheme) => Promise<void>;
   onChangeAppearance: (mode: AppearanceMode) => Promise<void>;
   onSaveMobile: (phone: string) => Promise<void>;
   onSaveUpiId: (upiId: string) => Promise<void>;
   onSavePin: (pin: string) => Promise<void>;
-  onLoadDemo: () => Promise<void>;
   onExportCsv: () => void;
   onExportJson: () => void;
   onRestoreJson: (file: File) => Promise<void>;
@@ -299,20 +383,19 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   language,
-  accentTheme,
   appearance,
   mobileNumber,
+  verifiedPhone,
   business,
   appLockPin,
-  userEmail,
+  isGuestMode = false,
+  onOpenCloudSync,
   onBack,
   onChangeLanguage,
-  onChangeAccent,
   onChangeAppearance,
   onSaveMobile,
   onSaveUpiId,
   onSavePin,
-  onLoadDemo,
   onExportCsv,
   onExportJson,
   onRestoreJson,
@@ -350,18 +433,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5 pb-24">
+    <div className="space-y-4 pb-32 stagger-fade-up">
       <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 min-h-[44px] text-sm font-extrabold text-slate-800 dark:text-slate-100"
+          className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
         >
           <ArrowLeft className="w-5 h-5" />
           <span>Settings</span>
         </button>
         {statusMsg && (
-          <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-[var(--brand-tint)] text-[var(--brand)]">
+          <span className="text-xs font-bold px-3.5 py-2 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-xs">
             {statusMsg}
           </span>
         )}
@@ -370,92 +453,56 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-3.5 py-2.5 text-xs font-bold text-red-700 dark:text-red-300 flex items-center justify-between gap-2"
+          className="rounded-2xl bg-[var(--credit-tint)] px-4 py-3 text-xs font-bold text-[var(--credit-red)] flex items-center justify-between gap-2 shadow-xs"
         >
           <span>{errorMsg}</span>
-          <button type="button" onClick={() => setErrorMsg('')}>
+          <button
+            type="button"
+            onClick={() => setErrorMsg('')}
+            aria-label="Dismiss error"
+            className="min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Section 1: Brand Theme & Dark Mode */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <Palette className="w-5 h-5 text-[var(--brand)]" />
-          <h2 className="text-base font-extrabold">Theme &amp; Appearance</h2>
+      {/* Section 1: Ucred Royal Indigo & Obsidian Light/Dark Theme */}
+      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+              <Palette className="w-4 h-4" />
+            </span>
+            <h2 className="font-display text-base font-extrabold text-[var(--ink)]">
+              Ucred Display Theme
+            </h2>
+          </div>
+          <span className="text-[11px] font-bold text-[var(--ink-muted)]">
+            {appearance === 'dark' ? 'Obsidian Dark' : 'Airy Slate Light'}
+          </span>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-xs font-bold text-slate-500 uppercase">Brand Accent</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <button
-              type="button"
-              onClick={async () => {
-                await onChangeAccent('obsidian');
-                flash('Ucred Obsidian theme applied');
-              }}
-              className={`min-h-[50px] px-3.5 rounded-xl border-2 flex items-center justify-between text-xs sm:text-sm font-bold transition ${
-                accentTheme === 'obsidian'
-                  ? 'border-[var(--brand)] bg-[var(--brand-tint)] text-[var(--brand)]'
-                  : 'border-[var(--surface-border)]'
-              }`}
-            >
-              <span className="inline-flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full bg-[#161514] border border-[#E5DEC9]" />
-                <span>Ucred Obsidian</span>
-              </span>
-              {accentTheme === 'obsidian' && <Check className="w-4 h-4 shrink-0" />}
-            </button>
-
-            <button
-              type="button"
-              onClick={async () => {
-                await onChangeAccent('green');
-                flash('OkCredit Green theme applied');
-              }}
-              className={`min-h-[50px] px-3.5 rounded-xl border-2 flex items-center justify-between text-xs sm:text-sm font-bold transition ${
-                accentTheme === 'green'
-                  ? 'border-[#008037] bg-[#E8F5EE] text-[#008037]'
-                  : 'border-[var(--surface-border)]'
-              }`}
-            >
-              <span className="inline-flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full bg-[#008037]" />
-                <span>OkCredit Green</span>
-              </span>
-              {accentTheme === 'green' && <Check className="w-4 h-4 shrink-0" />}
-            </button>
-
-            <button
-              type="button"
-              onClick={async () => {
-                await onChangeAccent('crimson');
-                flash('Crimson theme applied');
-              }}
-              className={`min-h-[50px] px-3.5 rounded-xl border-2 flex items-center justify-between text-xs sm:text-sm font-bold transition ${
-                accentTheme === 'crimson'
-                  ? 'border-[#9A1B1E] bg-[#FCECEC] text-[#9A1B1E]'
-                  : 'border-[var(--surface-border)]'
-              }`}
-            >
-              <span className="inline-flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full bg-[#9A1B1E]" />
-                <span>Ucred Crimson</span>
-              </span>
-              {accentTheme === 'crimson' && <Check className="w-4 h-4 shrink-0" />}
-            </button>
+        <div className="rounded-2xl bg-[var(--surface-subtle)] p-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center -space-x-1.5 shrink-0">
+              <span className="w-5 h-5 rounded-full bg-[#1E3A8A] ring-2 ring-white dark:ring-zinc-900" />
+              <span className="w-5 h-5 rounded-full bg-[#2563EB] ring-2 ring-white dark:ring-zinc-900" />
+              <span className="w-5 h-5 rounded-full bg-[#F8FAFC] ring-2 ring-white dark:ring-zinc-900" />
+            </div>
+            <p className="text-xs font-semibold text-[var(--ink-muted)] truncate">
+              Royal Indigo Light &amp; Obsidian Dark system
+            </p>
           </div>
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-bold text-slate-500 uppercase">App Mode</p>
-          <div className="grid grid-cols-3 gap-2.5">
+          <p className="text-xs font-bold text-[var(--ink-muted)] uppercase">Display Mode</p>
+          <div className="grid grid-cols-2 gap-2.5">
             {(
               [
-                { id: 'light', label: 'Light', icon: Sun },
-                { id: 'dark', label: 'Dark', icon: Moon },
-                { id: 'system', label: 'System', icon: Laptop },
+                { id: 'light', label: 'Light Mode', icon: Sun },
+                { id: 'dark', label: 'Dark Mode', icon: Moon },
               ] as const
             ).map((m) => {
               const Icon = m.icon;
@@ -465,12 +512,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   type="button"
                   onClick={async () => {
                     await onChangeAppearance(m.id);
-                    flash(`${m.label} mode saved`);
+                    flash(`${m.label} active`);
                   }}
-                  className={`min-h-[44px] rounded-xl border text-sm font-bold flex items-center justify-center gap-1.5 ${
+                  className={`min-h-[48px] rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition ${
                     appearance === m.id
-                      ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                      : 'border-[var(--surface-border)]'
+                      ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)] text-[var(--brand-accent)] shadow-xs'
+                      : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -483,8 +530,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </section>
 
       {/* Section 2: Language */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-3">
-        <h2 className="text-base font-extrabold">App Language</h2>
+      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-3">
+        <h2 className="font-display text-base font-extrabold text-[var(--ink)]">App Language</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {LANGUAGE_OPTIONS.map((opt) => (
             <button
@@ -494,25 +541,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 await onChangeLanguage(opt.code);
                 flash(`Language set to ${opt.englishName}`);
               }}
-              className={`min-h-[44px] px-3 rounded-xl border text-left text-xs font-bold flex items-center justify-between ${
+              className={`min-h-[44px] px-3 rounded-xl text-left text-xs font-bold flex items-center justify-between active:scale-95 transition ${
                 language === opt.code
-                  ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                  : 'border-[var(--surface-border)]'
+                  ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)] text-[var(--brand-accent)]'
+                  : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
               }`}
             >
               <span>{opt.nativeName}</span>
-              {language === opt.code && <Check className="w-3.5 h-3.5" />}
+              {language === opt.code && <Check className="w-3.5 h-3.5 shrink-0" />}
             </button>
           ))}
         </div>
       </section>
 
       {/* Section 3: Shop Mobile, UPI QR & PIN Lock */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-4">
-        <h2 className="text-base font-extrabold">Account, UPI &amp; Security</h2>
+      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-4">
+        <h2 className="font-display text-base font-extrabold text-[var(--ink)]">
+          Account, UPI &amp; Security
+        </h2>
 
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-500">Shop Mobile Number</label>
+          <label className="block text-xs font-bold text-[var(--ink-muted)]">
+            Shop Mobile Number
+          </label>
           <div className="flex gap-2">
             <input
               type="tel"
@@ -520,7 +571,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               value={phoneInput}
               onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
               placeholder="9876543210"
-              className="flex-1 min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold font-tabular outline-none"
+              className="flex-1 min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
             <button
               type="button"
@@ -531,7 +582,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 }
                 void runSafely('mobile', () => onSaveMobile(phoneInput), 'Mobile number updated');
               }}
-              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold"
+              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold shadow-sm active:scale-95 transition"
             >
               Save
             </button>
@@ -539,7 +590,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-500">
+          <label className="block text-xs font-bold text-[var(--ink-muted)]">
             Shop UPI ID (for Live Collection QR Codes)
           </label>
           <div className="flex gap-2">
@@ -548,7 +599,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               value={upiInput}
               onChange={(e) => setUpiInput(e.target.value)}
               placeholder="sharma@okicici"
-              className="flex-1 min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold outline-none"
+              className="flex-1 min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
             <button
               type="button"
@@ -560,7 +611,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 }
                 void runSafely('upi', () => onSaveUpiId(clean), 'UPI ID saved');
               }}
-              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold inline-flex items-center gap-1"
+              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold inline-flex items-center gap-1 shadow-sm active:scale-95 transition"
             >
               <QrCode className="w-3.5 h-3.5" />
               <span>Save UPI</span>
@@ -570,7 +621,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <label className="block text-xs font-bold text-slate-500">
+            <label className="block text-xs font-bold text-[var(--ink-muted)]">
               4-Digit App Lock PIN ({appLockPin ? 'Currently Active' : 'Not Set'})
             </label>
             {appLockPin && (
@@ -586,7 +637,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     'App PIN disabled'
                   )
                 }
-                className="text-xs font-bold text-red-600 hover:underline"
+                className="text-xs font-bold text-[var(--credit-red)] hover:underline"
               >
                 Disable PIN
               </button>
@@ -600,7 +651,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder={appLockPin ? 'Enter new 4 digits' : 'e.g. 1234'}
-              className="flex-1 min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold font-tabular outline-none"
+              className="flex-1 min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
             <button
               type="button"
@@ -618,7 +669,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   '4-Digit PIN secured'
                 );
               }}
-              className="min-h-[44px] px-4 rounded-xl bg-slate-800 dark:bg-slate-700 text-white text-xs font-bold inline-flex items-center gap-1"
+              className="min-h-[44px] px-4 rounded-xl bg-slate-800 dark:bg-slate-700 text-white text-xs font-bold inline-flex items-center gap-1 shadow-sm active:scale-95 transition"
             >
               <KeyRound className="w-3.5 h-3.5" />
               <span>{appLockPin ? 'Update PIN' : 'Set PIN'}</span>
@@ -628,37 +679,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </section>
 
       {/* Section 4: Data Management */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <Database className="w-5 h-5 text-[var(--brand)]" />
-          <h2 className="text-base font-extrabold">Data &amp; Backup Management</h2>
+      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-3">
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+            <Database className="w-4 h-4" />
+          </span>
+          <h2 className="font-display text-base font-extrabold text-[var(--ink)]">
+            Data &amp; Backup Management
+          </h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            disabled={busyAction === 'demo'}
-            onClick={async () => {
-              setBusyAction('demo');
-              await onLoadDemo();
-              setBusyAction('');
-              flash('Demo customers, Galla & staff loaded');
-            }}
-            className="min-h-[46px] px-4 rounded-xl bg-[var(--brand-tint)] text-[var(--brand)] text-sm font-bold flex items-center justify-center gap-2"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>{busyAction === 'demo' ? 'Loading Demo...' : 'Load Demo Data'}</span>
-          </button>
-
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           <button
             type="button"
             onClick={() => {
               onExportCsv();
               flash('CSV exported');
             }}
-            className="min-h-[46px] px-4 rounded-xl border border-[var(--surface-border)] text-sm font-bold flex items-center justify-center gap-2"
+            className="min-h-[46px] px-4 rounded-xl bg-[var(--surface-subtle)] text-sm font-bold text-[var(--ink)] flex items-center justify-center gap-2 active:scale-95 transition"
           >
-            <FileSpreadsheet className="w-4 h-4 text-[var(--brand)]" />
+            <FileSpreadsheet className="w-4 h-4 text-[var(--brand-accent)]" />
             <span>Export Data (CSV)</span>
           </button>
 
@@ -668,18 +708,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onExportJson();
               flash('JSON backup downloaded');
             }}
-            className="min-h-[46px] px-4 rounded-xl border border-[var(--surface-border)] text-sm font-bold flex items-center justify-center gap-2"
+            className="min-h-[46px] px-4 rounded-xl bg-[var(--surface-subtle)] text-sm font-bold text-[var(--ink)] flex items-center justify-center gap-2 active:scale-95 transition"
           >
-            <Download className="w-4 h-4 text-[var(--brand)]" />
+            <Download className="w-4 h-4 text-[var(--brand-accent)]" />
             <span>Download JSON Backup</span>
           </button>
 
           <button
             type="button"
             onClick={() => restoreRef.current?.click()}
-            className="min-h-[46px] px-4 rounded-xl border border-[var(--surface-border)] text-sm font-bold flex items-center justify-center gap-2"
+            className="min-h-[46px] px-4 rounded-xl bg-[var(--surface-subtle)] text-sm font-bold text-[var(--ink)] flex items-center justify-center gap-2 active:scale-95 transition"
           >
-            <Upload className="w-4 h-4 text-[var(--brand)]" />
+            <Upload className="w-4 h-4 text-[var(--brand-accent)]" />
             <span>Restore JSON Backup</span>
           </button>
           <input
@@ -705,14 +745,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <button
               type="button"
               onClick={() => setConfirmClear(true)}
-              className="w-full min-h-[44px] rounded-xl border border-red-200 dark:border-red-900 text-red-600 text-sm font-bold flex items-center justify-center gap-2 hover:bg-red-50 dark:hover:bg-red-950/30"
+              className="w-full min-h-[46px] rounded-xl bg-[var(--credit-tint)] text-[var(--credit-red)] text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition"
             >
               <Trash2 className="w-4 h-4" />
               <span>Clear All Business Data</span>
             </button>
           ) : (
-            <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-3 space-y-2">
-              <p className="text-xs font-bold text-red-700 dark:text-red-300 text-center">
+            <div className="rounded-2xl bg-[var(--credit-tint)] p-3.5 space-y-2.5">
+              <p className="text-xs font-bold text-[var(--credit-red)] text-center">
                 Erase all customers, bills, Galla, staff, and stock for {business.name}?
               </p>
               <div className="grid grid-cols-2 gap-2">
@@ -723,14 +763,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     await runSafely('clear', onClearAll, 'All shop data cleared');
                     setConfirmClear(false);
                   }}
-                  className="min-h-[40px] rounded-lg bg-red-600 text-white text-xs font-bold"
+                  className="min-h-[44px] rounded-xl bg-[var(--credit-red)] text-white text-xs font-bold shadow-sm"
                 >
                   {busyAction === 'clear' ? 'Clearing...' : 'Yes, Clear All'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmClear(false)}
-                  className="min-h-[40px] rounded-lg bg-[var(--surface)] text-xs font-bold"
+                  className="min-h-[44px] rounded-xl bg-[var(--surface)] text-xs font-bold text-[var(--ink)]"
                 >
                   Cancel
                 </button>
@@ -740,15 +780,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </section>
 
-      {/* Section 5: About, Legal & Permanent Account Deletion */}
-      <section className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-4">
+      {/* Section 5: About, Cloud Backup / Legal & Account Controls */}
+      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-4">
         <div className="space-y-1">
-          <p className="text-sm font-extrabold">Ucred — Smart Voice Khata &amp; Galla OS</p>
-          <p className="text-xs text-slate-500">
-            Synced privately via Google ({userEmail || 'Authenticated'}). Your shop data stays 100%
-            private.
+          <p className="font-display text-sm font-extrabold text-[var(--ink)]">
+            Ucred — Merchant Credit &amp; Galla OS
           </p>
-          <div className="flex flex-wrap gap-3 pt-1 text-xs font-bold text-[var(--brand)]">
+          <p className="text-xs text-[var(--ink-muted)]">
+            {isGuestMode
+              ? 'Running in Instant Guest Mode (Local Device Storage). Sign in with +91 OTP anytime to sync across devices.'
+              : `Synced privately via Mobile OTP (${verifiedPhone || (mobileNumber ? `+91 ${mobileNumber}` : 'Authenticated')}). Your shop data stays 100% encrypted.`}
+          </p>
+          <div className="flex flex-wrap gap-3 pt-1 text-xs font-bold text-[var(--brand-accent)]">
             <Link href="/privacy" className="hover:underline">
               Privacy Policy
             </Link>
@@ -761,48 +804,64 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onLogout}
-          className="w-full min-h-[48px] rounded-2xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>Log Out</span>
-        </button>
-
-        {!confirmDeleteAcc ? (
-          <button
-            type="button"
-            onClick={() => setConfirmDeleteAcc(true)}
-            className="w-full min-h-[44px] rounded-xl border border-red-300 dark:border-red-900 text-red-600 dark:text-red-400 text-xs font-extrabold flex items-center justify-center gap-1.5 hover:bg-red-50 dark:hover:bg-red-950/30"
-          >
-            <AlertTriangle className="w-4 h-4" />
-            <span>Delete Account &amp; All Cloud Data</span>
-          </button>
+        {isGuestMode ? (
+          onOpenCloudSync && (
+            <button
+              type="button"
+              onClick={onOpenCloudSync}
+              style={{ background: 'var(--munim-gradient)' }}
+              className="w-full min-h-[48px] rounded-2xl text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+            >
+              <CloudUpload className="w-4 h-4" />
+              <span>Connect +91 Mobile OTP &amp; Cloud Backup</span>
+            </button>
+          )
         ) : (
-          <div className="rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 p-3.5 space-y-2.5">
-            <p className="text-xs font-bold text-red-700 dark:text-red-300 text-center leading-relaxed">
-              This permanently erases ALL businesses, customers, transactions, bills, Galla, staff,
-              stock, and removes your Ucred account. Export a JSON backup first!
-            </p>
-            <div className="grid grid-cols-2 gap-2">
+          <>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="w-full min-h-[48px] rounded-2xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Log Out (Switch to Guest Mode)</span>
+            </button>
+
+            {!confirmDeleteAcc ? (
               <button
                 type="button"
-                disabled={busyAction === 'delete-account'}
-                onClick={() => runSafely('delete-account', onDeleteAccount)}
-                className="min-h-[42px] rounded-xl bg-red-600 text-white text-xs font-extrabold disabled:opacity-60"
+                onClick={() => setConfirmDeleteAcc(true)}
+                className="w-full min-h-[46px] rounded-xl bg-[var(--credit-tint)] text-[var(--credit-red)] text-xs font-extrabold flex items-center justify-center gap-1.5 active:scale-95 transition"
               >
-                {busyAction === 'delete-account' ? 'Deleting Account...' : 'Delete Permanently'}
+                <AlertTriangle className="w-4 h-4" />
+                <span>Delete Account &amp; All Cloud Data</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteAcc(false)}
-                className="min-h-[42px] rounded-xl bg-[var(--surface)] text-xs font-bold"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+            ) : (
+              <div className="rounded-2xl bg-[var(--credit-tint)] p-3.5 space-y-2.5">
+                <p className="text-xs font-bold text-[var(--credit-red)] text-center leading-relaxed">
+                  This permanently erases ALL businesses, customers, transactions, bills, Galla, staff,
+                  stock, and removes your Ucred account. Export a JSON backup first!
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={busyAction === 'delete-account'}
+                    onClick={() => runSafely('delete-account', onDeleteAccount)}
+                    className="min-h-[44px] rounded-xl bg-[var(--credit-red)] text-white text-xs font-extrabold shadow-sm disabled:opacity-60"
+                  >
+                    {busyAction === 'delete-account' ? 'Deleting Account...' : 'Delete Permanently'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteAcc(false)}
+                    className="min-h-[44px] rounded-xl bg-[var(--surface)] text-xs font-bold text-[var(--ink)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>
@@ -877,12 +936,12 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5 pb-24">
-      <div className="flex items-center justify-between">
+    <div className="max-w-2xl mx-auto space-y-5 pb-32 stagger-fade-up">
+      <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 min-h-[44px] text-sm font-extrabold"
+          className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
         >
           <ArrowLeft className="w-5 h-5" />
           <span>Business Profile</span>
@@ -891,159 +950,165 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
         <button
           type="button"
           onClick={() => setShowCardModal(true)}
-          className="min-h-[40px] px-3.5 rounded-xl bg-[var(--brand-tint)] text-[var(--brand)] text-xs font-extrabold inline-flex items-center gap-1.5"
+          className="min-h-[44px] px-3.5 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center gap-1.5 shadow-xs active:scale-95 transition"
         >
           <CreditCard className="w-4 h-4" />
-          <span>Share Business Card</span>
+          <span>Share Card</span>
         </button>
       </div>
 
       {/* Business Card Preview */}
-      <div className="rounded-3xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-hover)] text-[var(--brand-fg)] p-6 shadow-md space-y-3">
+      <div className="rounded-[28px] bg-gradient-to-br from-[var(--brand)] to-[var(--brand-hover)] text-[var(--brand-fg)] p-6 shadow-lg space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-current/15 flex items-center justify-center font-extrabold text-xl">
+            <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center font-extrabold text-xl shadow-inner">
               {(name || 'U').charAt(0).toUpperCase()}
             </div>
             <div>
-              <h2 className="text-xl font-extrabold">{name || 'My Shop'}</h2>
+              <h2 className="font-display text-xl font-extrabold">{name || 'My Shop'}</h2>
               <p className="text-xs opacity-85">
                 {category || 'General Store'} · {businessType || 'Retail'}
               </p>
             </div>
           </div>
-          <Building2 className="w-7 h-7 opacity-70" />
+          <Building2 className="w-7 h-7 opacity-75" />
         </div>
-        <div className="text-xs space-y-1 opacity-90 pt-2 border-t border-current/20">
-          {phone && <p>Mobile: +91 {phone}</p>}
-          {gstNumber && <p>GSTIN: {gstNumber}</p>}
+        <div className="text-xs space-y-1 opacity-90 pt-2">
+          {phone && <p className="font-tabular">Mobile: +91 {phone}</p>}
+          {gstNumber && <p className="font-tabular">GSTIN: {gstNumber}</p>}
           {address && <p>{address}</p>}
         </div>
       </div>
 
       {/* Profile Form */}
-      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-3.5">
+      <div className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-3.5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
+            <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
               Business / Shop Name
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold"
+              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">Mobile Number</label>
+            <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+              Mobile Number
+            </label>
             <input
               type="tel"
               maxLength={10}
               value={phone}
               onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular font-bold"
+              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">GST Number</label>
+            <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+              GST Number
+            </label>
             <input
               type="text"
               value={gstNumber}
               onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
               placeholder="22AAAAA0000A1Z5"
-              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular uppercase"
+              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-tabular uppercase text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">UPI ID</label>
+            <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">UPI ID</label>
             <input
               type="text"
               value={upiId}
               onChange={(e) => setUpiId(e.target.value)}
               placeholder="shopname@okicici"
-              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold"
+              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">Business Type</label>
+            <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+              Business Type
+            </label>
             <input
               type="text"
               value={businessType}
               onChange={(e) => setBusinessType(e.target.value)}
               placeholder="Retailer / Wholesaler"
-              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
+              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">Category</label>
+            <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">Category</label>
             <input
               type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Kirana / Medical / Hardware"
-              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
+              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">Shop Address</label>
+          <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">Shop Address</label>
           <input
             type="text"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             placeholder="Main Market Road, Near Bus Stand"
-            className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
+            className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">Email</label>
+            <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
+              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">About Shop</label>
+            <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">About Shop</label>
             <input
               type="text"
               value={about}
               onChange={(e) => setAbout(e.target.value)}
               placeholder="Fresh groceries & daily essentials"
-              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
+              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
           </div>
         </div>
 
-        {formError && <p className="text-xs font-bold text-red-600">{formError}</p>}
+        {formError && <p className="text-xs font-bold text-[var(--credit-red)]">{formError}</p>}
 
         <button
           type="button"
           disabled={saving}
           onClick={handleSave}
-          className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm disabled:opacity-60"
+          className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm shadow-md disabled:opacity-60 active:scale-95 transition"
         >
           {saving ? 'Saving Profile...' : savedToast ? 'Saved ✓' : 'Save Business Profile'}
         </button>
 
         {canDeleteBusiness && onDeleteBusiness && (
-          <div className="pt-2 border-t border-[var(--surface-border)]">
+          <div className="pt-2">
             {!confirmDeleteBiz ? (
               <button
                 type="button"
                 onClick={() => setConfirmDeleteBiz(true)}
-                className="w-full min-h-[42px] rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                className="w-full min-h-[44px] rounded-xl bg-[var(--credit-tint)] text-xs font-bold text-[var(--credit-red)] active:scale-95 transition"
               >
                 Delete This Business ({business.name})
               </button>
             ) : (
-              <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-3 space-y-2">
-                <p className="text-xs font-bold text-red-700 dark:text-red-300 text-center">
+              <div className="rounded-2xl bg-[var(--credit-tint)] p-3.5 space-y-2.5">
+                <p className="text-xs font-bold text-[var(--credit-red)] text-center">
                   Delete {business.name} and all its customers, bills &amp; stock?
                 </p>
                 <div className="grid grid-cols-2 gap-2">
@@ -1061,14 +1126,14 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
                         setDeletingBiz(false);
                       }
                     }}
-                    className="min-h-[40px] rounded-lg bg-red-600 text-white text-xs font-bold"
+                    className="min-h-[44px] rounded-xl bg-[var(--credit-red)] text-white text-xs font-bold shadow-sm"
                   >
                     {deletingBiz ? 'Deleting...' : 'Yes, Delete'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmDeleteBiz(false)}
-                    className="min-h-[40px] rounded-lg bg-[var(--surface)] text-xs font-bold"
+                    className="min-h-[44px] rounded-xl bg-[var(--surface)] text-xs font-bold text-[var(--ink)]"
                   >
                     Cancel
                   </button>
@@ -1080,22 +1145,37 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
       </div>
 
       {showCardModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 text-center space-y-4">
+        <div
+          onClick={() => setShowCardModal(false)}
+          className="fixed inset-0 z-50 bg-slate-950/60 flex items-end justify-center backdrop-blur-xs"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 pt-3 pb-8 text-center space-y-4 sheet-slide-up"
+          >
+            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--ink-muted)]/25" />
+
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold">Digital Visiting Card</h3>
-              <button type="button" onClick={() => setShowCardModal(false)}>
+              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
+                Digital Visiting Card
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCardModal(false)}
+                aria-label="Close card"
+                className="min-w-[44px] min-h-[44px] rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] p-5 space-y-2 text-left">
-              <p className="text-xl font-extrabold">{name || 'My Shop'}</p>
+            <div className="rounded-[24px] bg-gradient-to-br from-[var(--brand)] to-[var(--brand-hover)] text-[var(--brand-fg)] p-5 space-y-2 text-left shadow-md">
+              <p className="font-display text-xl font-extrabold">{name || 'My Shop'}</p>
               <p className="text-xs opacity-90">{about || category}</p>
               {phone && <p className="text-xs font-tabular">Tel: +91 {phone}</p>}
               {address && <p className="text-xs">{address}</p>}
             </div>
             {upiId && (
-              <div className="mx-auto w-fit p-3 bg-white rounded-2xl border border-slate-200">
+              <div className="mx-auto w-fit p-3.5 bg-white rounded-2xl shadow-md">
                 <QRCodeSVG value={buildUpiUri(upiId, name)} size={140} />
               </div>
             )}
@@ -1107,7 +1187,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               )}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold flex items-center justify-center gap-2"
+              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 text-[var(--brand-fg)] font-bold flex items-center justify-center gap-2 shadow-md transition"
             >
               <Share2 className="w-4 h-4" />
               <span>Share on WhatsApp</span>
@@ -1143,42 +1223,54 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
   const suppDue = suppliers.reduce((s, a) => s + Math.abs(a.balance), 0);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4 pb-24">
+    <div className="max-w-2xl mx-auto space-y-4 pb-32 stagger-fade-up">
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center gap-2 min-h-[44px] text-sm font-extrabold"
+        className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
       >
         <ArrowLeft className="w-5 h-5" />
         <span>Account Summary &amp; Backup</span>
       </button>
 
-      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-3">
+      <div className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-extrabold">Customer Khata</h2>
-          <span className="text-xs font-bold text-slate-500">{customers.length} customers</span>
+          <h2 className="font-display text-base font-extrabold text-[var(--ink)]">
+            Customer Khata
+          </h2>
+          <span className="text-xs font-bold text-[var(--ink-muted)]">
+            {customers.length} customers
+          </span>
         </div>
         <div className="grid grid-cols-2 gap-3 font-tabular">
-          <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-3">
-            <p className="text-xs font-bold text-red-700 dark:text-red-300">You Get</p>
-            <p className="text-xl font-extrabold text-red-600">{formatINR(custDue)}</p>
+          <div className="rounded-2xl bg-[var(--debit-tint)] p-4">
+            <p className="text-xs font-bold text-[var(--debit-green)]">You Get</p>
+            <p className="text-xl font-extrabold text-[var(--debit-green)] mt-0.5">
+              {formatINR(custDue)}
+            </p>
           </div>
-          <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 p-3">
-            <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Advance</p>
-            <p className="text-xl font-extrabold text-emerald-600">{formatINR(custAdv)}</p>
+          <div className="rounded-2xl bg-[var(--brand-tint)] p-4">
+            <p className="text-xs font-bold text-[var(--brand-accent)]">Advance</p>
+            <p className="text-xl font-extrabold text-[var(--brand-accent)] mt-0.5">
+              {formatINR(custAdv)}
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-3">
+      <div className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-extrabold">Supplier Khata</h2>
-          <span className="text-xs font-bold text-slate-500">{suppliers.length} suppliers</span>
+          <h2 className="font-display text-base font-extrabold text-[var(--ink)]">
+            Supplier Khata
+          </h2>
+          <span className="text-xs font-bold text-[var(--ink-muted)]">
+            {suppliers.length} suppliers
+          </span>
         </div>
-        <p className="text-2xl font-extrabold font-tabular text-[var(--brand)]">
+        <p className="text-2xl font-extrabold font-tabular text-[var(--credit-red)]">
           {formatINR(suppDue)}
         </p>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-[var(--ink-muted)]">
           Total recorded ledger entries across this business: {transactions.length}
         </p>
       </div>
@@ -1187,7 +1279,7 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
         <button
           type="button"
           onClick={onExportJson}
-          className="min-h-[50px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2"
+          className="min-h-[50px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
         >
           <Download className="w-4 h-4" />
           <span>Download JSON Backup</span>
@@ -1195,9 +1287,9 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
         <button
           type="button"
           onClick={onExportCsv}
-          className="min-h-[50px] rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] font-extrabold text-sm flex items-center justify-center gap-2"
+          className="min-h-[50px] rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 font-extrabold text-sm text-[var(--ink)] flex items-center justify-center gap-2 active:scale-95 transition"
         >
-          <FileSpreadsheet className="w-4 h-4 text-[var(--brand)]" />
+          <FileSpreadsheet className="w-4 h-4 text-[var(--brand-accent)]" />
           <span>Export CSV Statement</span>
         </button>
       </div>
@@ -1206,51 +1298,78 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
 };
 
 export const MultiDeviceView: React.FC<{
-  userEmail: string;
+  verifiedPhone: string;
   mobileNumber: string;
+  isGuestMode?: boolean;
+  onOpenCloudSync?: () => void;
   onBack: () => void;
-}> = ({ userEmail, mobileNumber, onBack }) => (
-  <div className="max-w-xl mx-auto space-y-5 pb-24">
+}> = ({ verifiedPhone, mobileNumber, isGuestMode = false, onOpenCloudSync, onBack }) => (
+  <div className="max-w-xl mx-auto space-y-5 pb-32 stagger-fade-up">
     <button
       type="button"
       onClick={onBack}
-      className="inline-flex items-center gap-2 min-h-[44px] text-sm font-extrabold"
+      className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
     >
       <ArrowLeft className="w-5 h-5" />
       <span>Multi-Device Cloud Sync</span>
     </button>
 
-    <div className="rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4">
-      <div className="w-12 h-12 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
+    <div className="rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4">
+      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
         <Laptop className="w-6 h-6" />
       </div>
-      <h2 className="text-xl font-extrabold">Your Khata is Live Across Mobile &amp; Desktop</h2>
-      <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-        Every customer entry, voice transaction, parchi scan, Galla cash entry, GST bill, and stock
-        change syncs automatically to Cloud Firestore with offline IndexedDB persistence.
+      <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
+        {isGuestMode
+          ? 'Local Guest Storage Active'
+          : 'Your Khata is Live Across Mobile & Desktop'}
+      </h2>
+      <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
+        {isGuestMode
+          ? 'All your ledger entries, Galla cashbook, bills, and stock are saved offline on this device. Connect your +91 mobile via OTP whenever you want automatic cloud backup across devices.'
+          : 'Every customer entry, voice transaction, parchi scan, Galla cash entry, GST bill, and stock change syncs automatically to Cloud Firestore with offline IndexedDB persistence.'}
       </p>
 
-      <div className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 space-y-2 text-sm">
+      <div className="rounded-2xl bg-[var(--surface-subtle)] p-4 space-y-2 text-sm">
         <div className="flex justify-between">
-          <span className="text-slate-500">Cloud Account</span>
-          <span className="font-bold">{userEmail || 'Signed In'}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-slate-500">Shop Mobile</span>
-          <span className="font-bold font-tabular">
-            {mobileNumber ? `+91 ${mobileNumber}` : 'Not set'}
+          <span className="text-[var(--ink-muted)]">Mode</span>
+          <span className="font-bold text-[var(--ink)]">
+            {isGuestMode ? 'Guest Mode (Local)' : verifiedPhone || 'Signed In'}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-500">Sync Status</span>
-          <span className="font-bold text-emerald-600">Real-Time Encrypted</span>
+          <span className="text-[var(--ink-muted)]">Shop Mobile</span>
+          <span className="font-bold font-tabular text-[var(--ink)]">
+            {mobileNumber ? `+91 ${mobileNumber}` : isGuestMode ? 'Not connected' : verifiedPhone || 'Not set'}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[var(--ink-muted)]">Sync Status</span>
+          <span
+            className={`font-bold ${
+              isGuestMode ? 'text-[var(--brand-accent)]' : 'text-[var(--debit-green)]'
+            }`}
+          >
+            {isGuestMode ? 'Saved Locally on Device' : 'Real-Time Encrypted'}
+          </span>
         </div>
       </div>
 
-      <p className="text-xs text-slate-500">
-        Sign in with this same Google Account on your counter tablet, second phone, or shop laptop
-        to access live updates together.
-      </p>
+      {isGuestMode && onOpenCloudSync ? (
+        <button
+          type="button"
+          onClick={onOpenCloudSync}
+          style={{ background: 'var(--munim-gradient)' }}
+          className="w-full min-h-[48px] rounded-2xl text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+        >
+          <CloudUpload className="w-4 h-4" />
+          <span>Backup &amp; Sync via Mobile OTP</span>
+        </button>
+      ) : (
+        <p className="text-xs text-[var(--ink-muted)]">
+          Verify with this same +91 mobile number via SMS OTP on your counter tablet, second phone,
+          or shop laptop to access live updates together.
+        </p>
+      )}
     </div>
   </div>
 );
@@ -1282,18 +1401,26 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end">
-      <div className="w-full max-w-md bg-[var(--surface)] border-l border-[var(--surface-border)] h-full p-5 flex flex-col gap-4 overflow-y-auto shadow-2xl">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-xs flex justify-center"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[430px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 h-full p-5 flex flex-col gap-4 overflow-y-auto sheet-slide-up"
+      >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-[var(--brand)]" />
-            <h2 className="text-lg font-extrabold">Notifications</h2>
+          <div className="flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+              <Bell className="w-4 h-4" />
+            </span>
+            <h2 className="font-display text-lg font-extrabold text-[var(--ink)]">Notifications</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close notifications"
-            className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500"
+            className="min-w-[44px] min-h-[44px] rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -1311,10 +1438,10 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`min-h-[38px] rounded-xl text-xs font-bold border ${
+              className={`min-h-[44px] rounded-xl text-xs font-bold active:scale-95 transition ${
                 tab === t.id
-                  ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                  : 'border-[var(--surface-border)]'
+                  ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)] text-[var(--brand-accent)]'
+                  : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
               }`}
             >
               {t.label}
@@ -1322,36 +1449,37 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
           ))}
         </div>
 
-        <div className="space-y-3 flex-1">
+        <div className="space-y-3 flex-1 pb-safe">
           {visible.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-12">
+            <p className="text-sm text-[var(--ink-muted)] text-center py-12">
               No notifications in this tab.
             </p>
           ) : (
-            visible.map((item) => (
+            visible.map((item, idx) => (
               <div
                 key={item.id}
-                className={`rounded-2xl border p-4 space-y-2.5 ${
+                style={{ animationDelay: `${Math.min(idx, 10) * 35}ms` }}
+                className={`stagger-fade-up rounded-[22px] p-4 space-y-2.5 ${
                   item.read
-                    ? 'bg-[var(--app-bg)] border-[var(--surface-border)]'
-                    : 'bg-[var(--surface)] border-[var(--brand)]/50'
+                    ? 'bg-[var(--surface-subtle)]'
+                    : 'spatial-card ring-2 ring-[var(--brand-accent)]/35'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h3 className="text-sm font-extrabold">{item.title}</h3>
-                    <span className="text-[11px] text-slate-400">{item.timeLabel}</span>
+                    <h3 className="text-sm font-extrabold text-[var(--ink)]">{item.title}</h3>
+                    <span className="text-[11px] text-[var(--ink-muted)]">{item.timeLabel}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => onToggleFav(item.id)}
                     aria-label="Star notification"
-                    className="p-1.5 rounded-lg text-amber-500"
+                    className="min-w-[40px] min-h-[40px] rounded-xl flex items-center justify-center text-amber-500 active:scale-95 transition"
                   >
                     <Star className={`w-4 h-4 ${item.fav ? 'fill-amber-400' : ''}`} />
                   </button>
                 </div>
-                <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1 list-disc list-inside">
+                <ul className="text-xs text-[var(--ink-muted)] space-y-1 list-disc list-inside">
                   {item.bullets.map((b, i) => (
                     <li key={i}>{b}</li>
                   ))}
@@ -1364,7 +1492,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                       onTriggerAction(item.targetAction);
                       onClose();
                     }}
-                    className="min-h-[36px] px-3.5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold"
+                    className="min-h-[40px] px-3.5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold shadow-sm active:scale-95 transition"
                   >
                     {item.actionLabel}
                   </button>
@@ -1372,7 +1500,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                     <button
                       type="button"
                       onClick={() => onToggleRead(item.id)}
-                      className="text-xs font-semibold text-slate-500 hover:underline"
+                      className="min-h-[40px] px-2 text-xs font-semibold text-[var(--ink-muted)] hover:underline"
                     >
                       Mark Read
                     </button>
@@ -1388,23 +1516,25 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
 };
 
 export const HelpSupportView: React.FC<{ onBack: () => void }> = ({ onBack }) => (
-  <div className="max-w-2xl mx-auto space-y-4 pb-24">
+  <div className="max-w-2xl mx-auto space-y-4 pb-32 stagger-fade-up">
     <button
       type="button"
       onClick={onBack}
-      className="inline-flex items-center gap-2 min-h-[44px] text-sm font-extrabold"
+      className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
     >
       <ArrowLeft className="w-5 h-5" />
       <span>Help &amp; Support</span>
     </button>
 
     <div className="space-y-3">
-      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-2">
-        <div className="flex items-center gap-2 text-[var(--brand)] font-extrabold text-sm">
-          <BookOpen className="w-4 h-4" />
+      <div className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-2.5">
+        <div className="flex items-center gap-2.5 text-[var(--brand-accent)] font-extrabold text-sm">
+          <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner flex items-center justify-center">
+            <BookOpen className="w-4 h-4" />
+          </span>
           <span>Hybrid Voice Entry &amp; Counter Queue Examples</span>
         </div>
-        <ul className="text-sm text-slate-600 dark:text-slate-300 space-y-1.5 list-disc list-inside">
+        <ul className="text-sm text-[var(--ink-muted)] space-y-1.5 list-disc list-inside">
           <li>&quot;Ramesh do hazaar udhaar&quot; → Instant offline ₹2,000 Given (Udhaar)</li>
           <li>&quot;Mohan se paanch sau mila&quot; → Instant ₹500 Received (Jama)</li>
           <li>
@@ -1414,15 +1544,17 @@ export const HelpSupportView: React.FC<{ onBack: () => void }> = ({ onBack }) =>
         </ul>
       </div>
 
-      <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-5 space-y-2">
-        <div className="flex items-center gap-2 text-[var(--brand)] font-extrabold text-sm">
-          <ShieldCheck className="w-4 h-4" />
+      <div className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-2.5">
+        <div className="flex items-center gap-2.5 text-[var(--brand-accent)] font-extrabold text-sm">
+          <span className="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-500/15 to-teal-500/20 shadow-inner text-[var(--debit-green)] flex items-center justify-center">
+            <ShieldCheck className="w-4 h-4" />
+          </span>
           <span>Ucred Powerhouse Suite — Free &amp; Private</span>
         </div>
-        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+        <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
           Ucred combines AI Parchi Photo Scanning, Live Galla Cashbook &amp; Daily Profit Pulse,
           Customer Trust Scores, Staff Munim Counter Logs, Multi-Business Khata, GST Bills, and
-          1-Click WhatsApp UPI Vasooli inside your private Google Cloud account.
+          1-Click WhatsApp UPI Vasooli inside your private OTP-verified cloud account.
         </p>
       </div>
     </div>
@@ -1474,31 +1606,33 @@ export const PinLockOverlay: React.FC<{
   };
 
   return (
-    <div className="min-h-screen bg-[var(--app-bg)] flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-xs rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 text-center space-y-5 shadow-xl">
-        <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
+    <div className="max-w-[430px] mx-auto min-h-dvh shadow-2xl spatial-shell-bg flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-xs rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-6 text-center space-y-5 sheet-slide-up">
+        <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
           <Lock className="w-7 h-7" />
         </div>
         <div>
-          <h1 className="text-xl font-extrabold">Enter 4-Digit App PIN</h1>
-          <p className="text-xs text-slate-500 mt-1">Ucred Security Lock</p>
+          <h1 className="font-display text-xl font-extrabold text-[var(--ink)]">
+            Enter 4-Digit App PIN
+          </h1>
+          <p className="text-xs text-[var(--ink-muted)] mt-1">Ucred Security Lock</p>
         </div>
 
         <div className="flex justify-center gap-3">
           {[0, 1, 2, 3].map((idx) => (
             <span
               key={idx}
-              className={`w-4 h-4 rounded-full border-2 ${
+              className={`w-4 h-4 rounded-full transition-all ${
                 entered.length > idx
-                  ? 'bg-[var(--brand)] border-[var(--brand)]'
-                  : 'border-slate-300 dark:border-slate-600'
+                  ? 'bg-[var(--brand-accent)] scale-110 shadow-xs'
+                  : 'bg-[var(--surface-subtle)]'
               }`}
             />
           ))}
         </div>
 
         {(error || cooldownSec > 0) && (
-          <p className="text-xs font-bold text-red-600">
+          <p className="text-xs font-bold text-[var(--credit-red)]">
             {cooldownSec > 0 ? `Try again in ${cooldownSec}s` : error}
           </p>
         )}
@@ -1515,7 +1649,7 @@ export const PinLockOverlay: React.FC<{
                 onClick={() =>
                   key === '⌫' ? setEntered((p) => p.slice(0, -1)) : void handleDigit(key)
                 }
-                className="min-h-[52px] rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] text-lg font-extrabold font-tabular hover:bg-[var(--brand-tint)] disabled:opacity-40 transition"
+                className="min-h-[52px] rounded-2xl bg-[var(--surface-subtle)] text-lg font-extrabold font-tabular text-[var(--ink)] hover:bg-[var(--brand-tint)] disabled:opacity-40 active:scale-95 transition"
               >
                 {key}
               </button>
@@ -1532,14 +1666,14 @@ export const PinLockOverlay: React.FC<{
             try {
               await onForgotPin();
             } catch (err) {
-              setError(err instanceof Error ? err.message : 'Google re-verification failed.');
+              setError(err instanceof Error ? err.message : 'Mobile OTP re-verification failed.');
             } finally {
               setResetBusy(false);
             }
           }}
-          className="text-xs font-bold text-[var(--brand)] hover:underline disabled:opacity-50"
+          className="min-h-[44px] px-2 text-xs font-bold text-[var(--brand-accent)] hover:underline disabled:opacity-50"
         >
-          {resetBusy ? 'Verifying Google account...' : 'Forgot PIN? Reset via Google Sign-In'}
+          {resetBusy ? 'Sending OTP verification...' : 'Forgot PIN? Verify Mobile via OTP'}
         </button>
       </div>
     </div>

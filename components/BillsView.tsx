@@ -5,11 +5,13 @@ import {
   FileCheck,
   FileText,
   MessageCircle,
+  Mic,
   Package,
   Plus,
   Printer,
   Receipt,
   Search,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -49,6 +51,7 @@ interface BillsViewProps {
   prefillCustomer?: { name: string; phone: string } | null;
   externalDraft?: BillExternalDraft | null;
   onClearPrefill?: () => void;
+  onOpenVoiceBill?: () => void;
   onSaveBill: (payload: {
     docType: BillDocType;
     billNumber: string;
@@ -87,6 +90,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
   prefillCustomer,
   externalDraft,
   onClearPrefill,
+  onOpenVoiceBill,
   onSaveBill,
   onConvertQuote,
   onDeleteBill,
@@ -303,12 +307,12 @@ export const BillsView: React.FC<BillsViewProps> = ({
 
     if (isThermal) {
       return (
-        <div className="space-y-4 pb-24 max-w-md mx-auto">
+        <div className="space-y-4 pb-32">
           <div className="no-print flex items-center justify-between gap-2 flex-wrap">
             <button
               type="button"
               onClick={() => setPreviewBill(null)}
-              className="min-h-[42px] px-4 rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] text-sm font-bold"
+              className="min-h-[44px] px-4 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-bold text-[var(--ink)] active:scale-95 transition"
             >
               ← Back
             </button>
@@ -318,17 +322,17 @@ export const BillsView: React.FC<BillsViewProps> = ({
                   type="button"
                   disabled={convertingId === previewBill.id}
                   onClick={() => handleConvert(previewBill)}
-                  className="min-h-[42px] px-3 rounded-xl bg-amber-500 text-slate-950 text-xs font-extrabold inline-flex items-center gap-1.5"
+                  className="min-h-[44px] px-3.5 rounded-xl bg-[var(--alert-amber)] text-slate-950 text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm active:scale-95 transition"
                 >
                   <FileCheck className="w-4 h-4" />
-                  <span>{convertingId === previewBill.id ? 'Converting...' : 'Convert to Bill'}</span>
+                  <span>{convertingId === previewBill.id ? 'Converting...' : 'Convert'}</span>
                 </button>
               )}
               <a
                 href={waUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="min-h-[42px] px-3 rounded-xl bg-emerald-600 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
+                className="min-h-[44px] px-3.5 rounded-xl bg-[var(--debit-green)] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm active:scale-95 transition"
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>Share</span>
@@ -336,7 +340,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               <button
                 type="button"
                 onClick={handlePrintBill}
-                className="min-h-[42px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-2"
+                className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-2 shadow-md active:scale-95 transition"
               >
                 <Printer className="w-4 h-4" />
                 <span>Print 58mm</span>
@@ -375,7 +379,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               {previewBill.items.map((it, idx) => (
                 <div key={idx} className="space-y-0.5">
                   <p className="font-semibold truncate">{it.name}</p>
-                  <div className="flex justify-between text-[11px]">
+                  <div className="flex justify-between text-[11px] font-tabular">
                     <span>
                       {it.qty} × ₹{it.rate} {it.gstRate > 0 ? `(+${it.gstRate}%)` : ''}
                     </span>
@@ -387,7 +391,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               ))}
             </div>
 
-            <div className="space-y-1 text-[11px]">
+            <div className="space-y-1 text-[11px] font-tabular">
               <div className="flex justify-between">
                 <span>SUBTOTAL</span>
                 <span>{formatINR(previewBill.subtotal)}</span>
@@ -427,14 +431,14 @@ export const BillsView: React.FC<BillsViewProps> = ({
     }
 
     return (
-      <div className="space-y-4 pb-24 max-w-2xl mx-auto">
+      <div className="space-y-4 pb-32">
         <div className="no-print flex items-center justify-between gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => setPreviewBill(null)}
-            className="min-h-[42px] px-4 rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] text-sm font-bold"
+            className="min-h-[44px] px-4 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-bold text-[var(--ink)] active:scale-95 transition"
           >
-            ← Back to Bills
+            ← Back
           </button>
           <div className="flex items-center gap-2 flex-wrap">
             {previewBill.docType === 'quote' && (
@@ -442,7 +446,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                 type="button"
                 disabled={convertingId === previewBill.id}
                 onClick={() => handleConvert(previewBill)}
-                className="min-h-[42px] px-3.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-extrabold inline-flex items-center gap-1.5"
+                className="min-h-[44px] px-3.5 rounded-xl bg-[var(--alert-amber)] text-slate-950 text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm active:scale-95 transition"
               >
                 <FileCheck className="w-4 h-4" />
                 <span>
@@ -454,15 +458,15 @@ export const BillsView: React.FC<BillsViewProps> = ({
               href={waUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="min-h-[42px] px-3.5 rounded-xl bg-emerald-600 text-white text-xs font-extrabold inline-flex items-center gap-1.5"
+              className="min-h-[44px] px-3.5 rounded-xl bg-[var(--debit-green)] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shadow-sm active:scale-95 transition"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>WhatsApp Share</span>
+              <span>WhatsApp</span>
             </a>
             <button
               type="button"
               onClick={handlePrintBill}
-              className="min-h-[42px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-2"
+              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-2 shadow-md active:scale-95 transition"
             >
               <Printer className="w-4 h-4" />
               <span>Print / PDF</span>
@@ -480,7 +484,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               <p className="text-xs font-bold uppercase tracking-wider opacity-80">
                 {previewBill.docType === 'bill' ? 'Tax / Retail Bill' : 'Price Quote'}
               </p>
-              <h2 className="text-xl font-extrabold">{business.name}</h2>
+              <h2 className="font-display text-xl font-extrabold">{business.name}</h2>
               {business.gstNumber && (
                 <p className="text-xs opacity-90">GSTIN: {business.gstNumber}</p>
               )}
@@ -494,7 +498,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                   className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
                     previewBill.paymentStatus === 'paid'
                       ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-900'
+                      : 'bg-red-100 text-red-800'
                   }`}
                 >
                   {previewBill.paymentStatus === 'paid' ? 'Paid' : 'Udhaar / Unpaid'}
@@ -503,13 +507,13 @@ export const BillsView: React.FC<BillsViewProps> = ({
             </div>
           </div>
 
-          <div className="p-5 space-y-4">
+          <div className="p-4 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
                 <p className="text-[11px] font-bold uppercase text-slate-500">Bill To</p>
                 <p className="text-base font-extrabold">{previewBill.customerName}</p>
                 {previewBill.customerPhone && (
-                  <p className="text-xs text-slate-500">+91 {previewBill.customerPhone}</p>
+                  <p className="text-xs font-tabular text-slate-500">+91 {previewBill.customerPhone}</p>
                 )}
               </div>
               {business.upiId && (
@@ -519,9 +523,9 @@ export const BillsView: React.FC<BillsViewProps> = ({
               )}
             </div>
 
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-xs text-left">
               <thead>
-                <tr className="border-b border-slate-200 text-xs text-slate-500 uppercase">
+                <tr className="border-b border-slate-200 text-[10px] text-slate-500 uppercase">
                   <th className="py-2">Item</th>
                   <th className="py-2 text-right">Qty</th>
                   <th className="py-2 text-right">Rate</th>
@@ -545,7 +549,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             </table>
 
             <div className="border-t border-slate-200 pt-3 flex justify-end">
-              <div className="w-60 space-y-1 text-sm font-tabular">
+              <div className="w-56 space-y-1 text-xs font-tabular">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Subtotal</span>
                   <span>{formatINR(previewBill.subtotal)}</span>
@@ -560,7 +564,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                     <span>-{formatINR(Number(previewBill.discountAmount))}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-lg font-extrabold border-t border-slate-200 pt-1">
+                <div className="flex justify-between text-base font-extrabold border-t border-slate-200 pt-1">
                   <span>Grand Total</span>
                   <span className="text-[var(--brand)]">
                     {formatINR(previewBill.totalAmount)}
@@ -585,9 +589,48 @@ export const BillsView: React.FC<BillsViewProps> = ({
   }
 
   return (
-    <div className="space-y-4 pb-24">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="inline-flex rounded-xl bg-black/5 dark:bg-white/10 p-1">
+    <div className="space-y-4 pb-32">
+      {/* AI Voice Bill Hero Card */}
+      <div className="rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-4.5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            style={{ background: 'var(--munim-gradient)' }}
+            className="w-12 h-12 rounded-2xl text-white flex items-center justify-center shrink-0 shadow-inner ring-1 ring-white/30"
+          >
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-display text-base font-extrabold text-[var(--ink)] leading-tight">
+              AI Voice Bill Builder
+            </h2>
+            <p className="text-xs text-[var(--ink-muted)] leading-snug mt-0.5">
+              Speak items like &quot;Verma ka 2 atta 480 aur 1 oil 175 bill&quot;
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (onOpenVoiceBill) onOpenVoiceBill();
+            else setCreating(true);
+          }}
+          style={{ background: 'var(--munim-gradient)' }}
+          className="min-h-[44px] px-3.5 rounded-xl text-white text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 shadow-md active:scale-95 transition"
+        >
+          <Mic className="w-4 h-4 shrink-0" />
+          <span>Speak Bill</span>
+        </button>
+      </div>
+
+      {/* Sliding Pill Bills/Quotes Tabs + Create CTA */}
+      <div className="flex items-center justify-between gap-2.5">
+        <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 shadow-inner flex-1 max-w-[205px]">
+          <span
+            aria-hidden="true"
+            className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl spatial-card transition-transform duration-200 ease-out ${
+              docTypeFilter === 'quote' ? 'translate-x-full' : 'translate-x-0'
+            }`}
+          />
           {(['bill', 'quote'] as const).map((tab) => (
             <button
               key={tab}
@@ -596,10 +639,8 @@ export const BillsView: React.FC<BillsViewProps> = ({
                 setDocTypeFilter(tab);
                 setArmedDeleteId(null);
               }}
-              className={`min-h-[38px] px-5 rounded-lg text-sm font-bold capitalize transition ${
-                docTypeFilter === tab
-                  ? 'bg-[var(--surface)] text-[var(--brand)] shadow-xs'
-                  : 'text-slate-600 dark:text-slate-300'
+              className={`relative z-10 min-h-[38px] px-3 rounded-xl text-xs font-extrabold capitalize transition-colors active:scale-95 ${
+                docTypeFilter === tab ? 'text-[var(--brand-accent)]' : 'text-[var(--ink-muted)]'
               }`}
             >
               {tab === 'bill' ? 'Bills' : 'Quotes'}
@@ -613,70 +654,82 @@ export const BillsView: React.FC<BillsViewProps> = ({
             setError('');
             setCreating(true);
           }}
-          className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5"
+          className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 shadow-md active:scale-95 transition"
         >
           <Plus className="w-4 h-4" />
-          <span>Create {docTypeFilter === 'bill' ? 'Bill' : 'Quote'}</span>
+          <span>New {docTypeFilter === 'bill' ? 'Bill' : 'Quote'}</span>
         </button>
       </div>
 
       {/* Search Bills / Quotes */}
       {typeBills.length > 0 && (
         <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="w-4 h-4 text-[var(--ink-muted)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={`Search ${docTypeFilter === 'bill' ? 'bills' : 'quotes'} by number, customer, or mobile...`}
-            className="w-full min-h-[42px] rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] pl-10 pr-3 text-sm outline-none focus:border-[var(--brand)]"
+            className="w-full min-h-[46px] rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 pl-10 pr-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)] transition"
           />
         </div>
       )}
 
       {deductNotice && (
-        <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-3.5 py-2.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 flex items-center justify-between gap-2">
+        <div className="rounded-2xl bg-[var(--debit-tint)] px-4 py-3 text-xs font-bold text-[var(--debit-green)] flex items-center justify-between gap-2 shadow-xs">
           <span>{deductNotice}</span>
-          <button type="button" onClick={() => setDeductNotice('')} aria-label="Dismiss notice">
+          <button
+            type="button"
+            onClick={() => setDeductNotice('')}
+            aria-label="Dismiss notice"
+            className="min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {listError && (
-        <div className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 px-3.5 py-2.5 text-xs font-bold text-red-700 dark:text-red-300 flex items-center justify-between gap-2">
+        <div className="rounded-2xl bg-[var(--credit-tint)] px-4 py-3 text-xs font-bold text-[var(--credit-red)] flex items-center justify-between gap-2 shadow-xs">
           <span>{listError}</span>
-          <button type="button" onClick={() => setListError('')} aria-label="Dismiss error">
+          <button
+            type="button"
+            onClick={() => setListError('')}
+            aria-label="Dismiss error"
+            className="min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Sales & GST Summary */}
+      {/* Sales & GST Summary Bento */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4">
-          <p className="text-xs font-bold text-slate-500 uppercase">
+        <div className="rounded-[24px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4">
+          <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase tracking-wider">
             Total {docTypeFilter === 'bill' ? 'Sales' : 'Quotes'}
           </p>
-          <p className="text-2xl font-extrabold font-tabular text-slate-900 dark:text-white mt-1">
+          <p className="font-display text-xl font-extrabold font-tabular text-[var(--ink)] mt-1">
             {formatINR(totalSales)}
           </p>
         </div>
-        <div className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4">
-          <p className="text-xs font-bold text-slate-500 uppercase">Total GST</p>
-          <p className="text-2xl font-extrabold font-tabular text-[var(--brand)] mt-1">
+        <div className="rounded-[24px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4">
+          <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase tracking-wider">
+            Total GST
+          </p>
+          <p className="font-display text-xl font-extrabold font-tabular text-[var(--brand-accent)] mt-1">
             {formatINR(totalGst)}
           </p>
         </div>
       </div>
 
-      {/* Bill List */}
+      {/* Itemized GST / Kacha Bill Cards */}
       {filteredBills.length === 0 ? (
-        <div className="rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-10 text-center space-y-3">
-          <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
+        <div className="rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-8 text-center space-y-3">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
             <Receipt className="w-7 h-7" />
           </div>
-          <p className="text-base font-bold text-slate-700 dark:text-slate-200">
+          <p className="font-display text-base font-bold text-[var(--ink)]">
             {searchQuery.trim()
               ? `No ${docTypeFilter}s matched "${searchQuery.trim()}".`
               : `Create your first kaccha, pakka, GST, or 58mm thermal ${docTypeFilter}`}
@@ -684,42 +737,59 @@ export const BillsView: React.FC<BillsViewProps> = ({
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="min-h-[46px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5"
+            className="min-h-[46px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5 shadow-md active:scale-95 transition"
           >
             <Plus className="w-4 h-4" />
             <span>Create {docTypeFilter === 'bill' ? 'Bill' : 'Quote'}</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {filteredBills.map((b) => {
+        <div className="space-y-2.5">
+          {filteredBills.map((b, idx) => {
             const armed = armedDeleteId === b.id;
+            const isUnpaid = b.docType === 'bill' && b.paymentStatus === 'unpaid';
             return (
               <div
                 key={b.id}
-                className="rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] p-4 flex items-center justify-between gap-3"
+                style={{ animationDelay: `${Math.min(idx, 12) * 35}ms` }}
+                className="stagger-fade-up rounded-[22px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-3.5 flex items-center justify-between gap-2.5"
               >
                 <button
                   type="button"
                   onClick={() => setPreviewBill(b)}
-                  className="text-left min-w-0 flex-1"
+                  className="text-left min-w-0 flex-1 flex items-center gap-3 active:scale-[0.98] transition"
                 >
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-[var(--brand)] shrink-0" />
-                    <p className="font-extrabold text-sm truncate">
+                  <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-extrabold text-sm text-[var(--ink)] leading-snug truncate">
                       {b.billNumber} · {b.customerName}
                     </p>
+                    <p className="text-[11px] font-medium text-[var(--ink-muted)] mt-0.5 leading-snug truncate">
+                      {b.items.length} item(s) · {formatDateTime(b.billDate)}
+                      {b.createdByName ? ` · ${b.createdByName}` : ''}
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5 truncate">
-                    {b.items.length} item(s) · {formatDateTime(b.billDate)}
-                    {b.docType === 'bill' && b.paymentStatus === 'unpaid' ? ' · Udhaar' : ''}
-                    {b.createdByName ? ` · ${b.createdByName}` : ''}
-                  </p>
                 </button>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="font-extrabold font-tabular text-base text-[var(--brand)]">
-                    {formatINR(b.totalAmount)}
-                  </span>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <div className="text-right pr-1">
+                    <span className="block font-extrabold font-tabular text-sm text-[var(--ink)]">
+                      {formatINR(b.totalAmount)}
+                    </span>
+                    {b.docType === 'bill' && (
+                      <span
+                        className={`inline-block px-1.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
+                          isUnpaid
+                            ? 'bg-[var(--credit-tint)] text-[var(--credit-red)]'
+                            : 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
+                        }`}
+                      >
+                        {isUnpaid ? 'Udhaar' : 'Paid'}
+                      </span>
+                    )}
+                  </div>
                   {b.docType === 'quote' && (
                     <button
                       type="button"
@@ -727,7 +797,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       onClick={() => handleConvert(b)}
                       title="Convert Quote to Bill"
                       aria-label="Convert Quote to Bill"
-                      className="p-2 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                      className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-[var(--alert-amber)] hover:bg-[var(--alert-tint)] active:scale-95 transition"
                     >
                       <FileCheck className="w-4 h-4" />
                     </button>
@@ -741,9 +811,11 @@ export const BillsView: React.FC<BillsViewProps> = ({
                         setArmedDeleteId(b.id);
                       }
                     }}
-                    aria-label="Delete bill"
-                    className={`px-2 py-1.5 rounded-lg text-xs font-bold transition ${
-                      armed ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-red-600'
+                    aria-label={`Delete ${b.billNumber}`}
+                    className={`min-w-[44px] min-h-[44px] px-2 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
+                      armed
+                        ? 'bg-[var(--credit-red)] text-white shadow-sm'
+                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]/50'
                     }`}
                   >
                     {armed ? 'Confirm?' : <Trash2 className="w-4 h-4" />}
@@ -755,7 +827,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
         </div>
       )}
 
-      {/* Create Bill Builder Modal */}
+      {/* Create Bill Builder Bottom Sheet */}
       {creating && (
         <div
           onClick={() => {
@@ -764,14 +836,16 @@ export const BillsView: React.FC<BillsViewProps> = ({
               if (onClearPrefill) onClearPrefill();
             }
           }}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-slate-950/55 flex items-end justify-center backdrop-blur-xs"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4 max-h-[92vh] overflow-y-auto"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-5 pt-3 space-y-4 max-h-[92dvh] overflow-y-auto pb-safe"
           >
+            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--ink-muted)]/25" />
+
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold">
+              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
                 New {docTypeFilter === 'bill' ? 'Bill' : 'Quote'}
               </h3>
               <button
@@ -781,14 +855,15 @@ export const BillsView: React.FC<BillsViewProps> = ({
                   if (onClearPrefill) onClearPrefill();
                 }}
                 aria-label="Close bill builder"
+                className="min-w-[44px] min-h-[44px] rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
                   Customer Name
                 </label>
                 <input
@@ -796,11 +871,11 @@ export const BillsView: React.FC<BillsViewProps> = ({
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Ramesh"
-                  className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold"
+                  className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
                   Mobile Number
                 </label>
                 <input
@@ -809,30 +884,30 @@ export const BillsView: React.FC<BillsViewProps> = ({
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   placeholder="9876543210"
-                  className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular"
+                  className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-xs font-bold text-slate-500 uppercase">
-                  Items {docTypeFilter === 'bill' ? '· Auto-deducts linked Stock' : ''}
+                <span className="text-xs font-bold text-[var(--ink-muted)] uppercase">
+                  Items {docTypeFilter === 'bill' ? '· Auto-deducts Stock' : ''}
                 </span>
                 <button
                   type="button"
                   onClick={() =>
                     setItems((prev) => [...prev, { name: '', qty: 1, rate: 0, gstRate: 0 }])
                   }
-                  className="text-xs font-bold text-[var(--brand)]"
+                  className="min-h-[36px] px-2.5 rounded-lg text-xs font-extrabold text-[var(--brand-accent)] bg-[var(--brand-tint)] active:scale-95 transition"
                 >
                   + Add Item
                 </button>
               </div>
 
               {stockItems.length > 0 && (
-                <div className="flex items-center gap-2 rounded-xl bg-[var(--app-bg)] border border-[var(--surface-border)] px-3 py-2">
-                  <Package className="w-4 h-4 text-[var(--brand)] shrink-0" />
+                <div className="flex items-center gap-2 rounded-xl bg-[var(--surface-subtle)] px-3 py-2.5">
+                  <Package className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
                   <select
                     aria-label="Pick item from stock"
                     defaultValue=""
@@ -852,10 +927,10 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       }
                       e.target.value = '';
                     }}
-                    className="flex-1 bg-transparent text-xs font-bold outline-none"
+                    className="flex-1 bg-transparent text-xs font-bold text-[var(--ink)] outline-none"
                   >
                     <option value="">
-                      + Add directly from Stock Inventory ({stockItems.length} items)...
+                      + Add from Stock Inventory ({stockItems.length} items)...
                     </option>
                     {stockItems.map((stk) => (
                       <option key={stk.id} value={stk.id}>
@@ -869,7 +944,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               {items.map((it, idx) => (
                 <div
                   key={idx}
-                  className="grid grid-cols-12 gap-2 items-center rounded-xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-2"
+                  className="grid grid-cols-12 gap-1.5 items-center rounded-2xl bg-[var(--surface-subtle)] p-2"
                 >
                   <input
                     type="text"
@@ -880,7 +955,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       setItems(next);
                     }}
                     placeholder="Item name"
-                    className="col-span-5 min-h-[38px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-semibold"
+                    className="col-span-5 min-h-[40px] rounded-xl bg-[var(--surface)] px-2.5 text-xs font-semibold text-[var(--ink)] outline-none shadow-xs"
                   />
                   <input
                     type="number"
@@ -892,7 +967,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       setItems(next);
                     }}
                     placeholder="Qty"
-                    className="col-span-2 min-h-[38px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-tabular"
+                    className="col-span-2 min-h-[40px] rounded-xl bg-[var(--surface)] px-2 text-xs font-tabular text-[var(--ink)] outline-none shadow-xs"
                   />
                   <input
                     type="number"
@@ -904,7 +979,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       setItems(next);
                     }}
                     placeholder="₹ Rate"
-                    className="col-span-3 min-h-[38px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-tabular"
+                    className="col-span-3 min-h-[40px] rounded-xl bg-[var(--surface)] px-2 text-xs font-tabular text-[var(--ink)] outline-none shadow-xs"
                   />
                   <input
                     type="number"
@@ -916,16 +991,16 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       setItems(next);
                     }}
                     placeholder="GST%"
-                    className="col-span-2 min-h-[38px] rounded-lg bg-[var(--surface)] border border-[var(--surface-border)] px-2 text-xs font-tabular"
+                    className="col-span-2 min-h-[40px] rounded-xl bg-[var(--surface)] px-2 text-xs font-tabular text-[var(--ink)] outline-none shadow-xs"
                   />
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
-                  Discount (₹ Optional)
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                  Discount (₹)
                 </label>
                 <input
                   type="number"
@@ -933,35 +1008,37 @@ export const BillsView: React.FC<BillsViewProps> = ({
                   value={discountAmount}
                   onChange={(e) => setDiscountAmount(e.target.value)}
                   placeholder="0"
-                  className="w-full min-h-[42px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-tabular font-bold"
+                  className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
 
               {docTypeFilter === 'bill' && (
                 <div>
-                  <span className="block text-xs font-bold text-slate-500 mb-1">Payment Mode</span>
-                  <div className="grid grid-cols-2 gap-2">
+                  <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                    Payment Mode
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
                     <button
                       type="button"
                       onClick={() => setPaymentStatus('paid')}
-                      className={`min-h-[42px] rounded-xl text-xs font-bold border ${
+                      className={`min-h-[44px] rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
                         paymentStatus === 'paid'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-700 dark:text-emerald-300'
-                          : 'border-[var(--surface-border)]'
+                          ? 'bg-[var(--debit-tint)] text-[var(--debit-green)] ring-2 ring-[var(--debit-green)]'
+                          : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
                       }`}
                     >
-                      Paid Cash/UPI
+                      Paid
                     </button>
                     <button
                       type="button"
                       onClick={() => setPaymentStatus('unpaid')}
-                      className={`min-h-[42px] rounded-xl text-xs font-bold border ${
+                      className={`min-h-[44px] rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
                         paymentStatus === 'unpaid'
-                          ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 text-amber-800 dark:text-amber-300'
-                          : 'border-[var(--surface-border)]'
+                          ? 'bg-[var(--credit-tint)] text-[var(--credit-red)] ring-2 ring-[var(--credit-red)]'
+                          : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
                       }`}
                     >
-                      Post Udhaar
+                      Udhaar
                     </button>
                   </div>
                 </div>
@@ -969,8 +1046,8 @@ export const BillsView: React.FC<BillsViewProps> = ({
             </div>
 
             {docTypeFilter === 'bill' && paymentStatus === 'paid' && (
-              <div className="flex items-center justify-between gap-2 rounded-xl bg-[var(--app-bg)] border border-[var(--surface-border)] px-3 py-2">
-                <span className="text-[11px] font-bold text-slate-500">
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-[var(--surface-subtle)] px-3 py-2">
+                <span className="text-[11px] font-bold text-[var(--ink-muted)]">
                   Sync Paid Bill to Galla
                 </span>
                 <div className="flex items-center gap-1">
@@ -985,10 +1062,10 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       key={opt.label}
                       type="button"
                       onClick={() => setSyncGallaMode(opt.id)}
-                      className={`min-h-[30px] px-2.5 rounded-lg text-[11px] font-extrabold border ${
+                      className={`min-h-[36px] px-2.5 rounded-lg text-[11px] font-extrabold active:scale-95 transition ${
                         syncGallaMode === opt.id
-                          ? 'bg-[var(--brand)] border-[var(--brand)] text-[var(--brand-fg)]'
-                          : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-300'
+                          ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
+                          : 'bg-[var(--surface)] text-[var(--ink-muted)]'
                       }`}
                     >
                       {opt.label}
@@ -999,10 +1076,10 @@ export const BillsView: React.FC<BillsViewProps> = ({
             )}
 
             <div>
-              <span className="block text-xs font-bold text-slate-500 mb-1.5">
+              <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1.5">
                 Select Bill Template
               </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {(
                   [
                     { id: 'gst-color', label: 'Coloured GST' },
@@ -1015,10 +1092,10 @@ export const BillsView: React.FC<BillsViewProps> = ({
                     key={tpl.id}
                     type="button"
                     onClick={() => setTemplateId(tpl.id)}
-                    className={`min-h-[40px] rounded-xl text-xs font-bold border ${
+                    className={`min-h-[44px] rounded-xl text-xs font-bold active:scale-95 transition ${
                       templateId === tpl.id
-                        ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                        : 'border-[var(--surface-border)]'
+                        ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]'
+                        : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
                     }`}
                   >
                     {tpl.label}
@@ -1028,19 +1105,19 @@ export const BillsView: React.FC<BillsViewProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Notes</label>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">Notes</label>
               <input
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full min-h-[42px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xs"
+                className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-xs text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
               />
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-[var(--surface-border)]">
+            <div className="flex items-center justify-between pt-2">
               <div>
-                <p className="text-xs text-slate-500">Grand Total (incl. GST)</p>
-                <p className="text-xl font-extrabold font-tabular text-[var(--brand)]">
+                <p className="text-xs text-[var(--ink-muted)]">Grand Total (incl. GST)</p>
+                <p className="font-display text-xl font-extrabold font-tabular text-[var(--brand-accent)]">
                   {formatINR(grandTotal)}
                 </p>
               </div>
@@ -1048,12 +1125,12 @@ export const BillsView: React.FC<BillsViewProps> = ({
                 type="button"
                 disabled={saving}
                 onClick={handleCreate}
-                className="min-h-[48px] px-6 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm disabled:opacity-60"
+                className="min-h-[48px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm shadow-md disabled:opacity-60 active:scale-95 transition"
               >
                 {saving ? 'Saving...' : 'Save & Preview'}
               </button>
             </div>
-            {error && <p className="text-xs font-bold text-red-600">{error}</p>}
+            {error && <p className="text-xs font-bold text-[var(--credit-red)]">{error}</p>}
           </div>
         </div>
       )}

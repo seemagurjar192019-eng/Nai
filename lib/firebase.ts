@@ -1,7 +1,7 @@
 'use client';
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
+import { getAuth, type Auth } from 'firebase/auth';
 import {
   doc,
   getDocFromServer,
@@ -22,8 +22,6 @@ if (getApps().length === 0) {
 
 export const firebaseApp: FirebaseApp = appInstance;
 export const auth: Auth = getAuth(firebaseApp);
-export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 let dbInstance: Firestore;
 try {

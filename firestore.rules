@@ -25,7 +25,7 @@ service cloud.firestore {
     }
 
     function isVerified() {
-      return isSignedIn() && request.auth.token.email_verified == true;
+      return isSignedIn() && (request.auth.token.phone_number != null || request.auth.token.email_verified == true);
     }
 
     function isOwner(uid) {
@@ -36,12 +36,8 @@ service cloud.firestore {
       return lang in ['en', 'hi', 'hinglish', 'mr', 'gu', 'ta', 'te', 'pa', 'ml', 'kn', 'bn'];
     }
 
-    function isValidAccent(theme) {
-      return theme in ['obsidian', 'green', 'crimson'];
-    }
-
     function isValidAppearance(mode) {
-      return mode in ['light', 'dark', 'system'];
+      return mode in ['light', 'dark'];
     }
 
     function isValidStaffRole(role) {
@@ -50,12 +46,11 @@ service cloud.firestore {
 
     // Entity Validation Blueprints
     function isValidUserProfile(data, uid) {
-      return data.keys().hasAll(['uid', 'mobileNumber', 'language', 'accentTheme', 'appearance', 'activeBusinessId', 'onboardingDone', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['uid', 'mobileNumber', 'language', 'accentTheme', 'appearance', 'activeBusinessId', 'appLockPin', 'onboardingDone', 'createdAt', 'updatedAt'])
+      return data.keys().hasAll(['uid', 'mobileNumber', 'language', 'appearance', 'activeBusinessId', 'onboardingDone', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'mobileNumber', 'language', 'appearance', 'activeBusinessId', 'appLockPin', 'onboardingDone', 'createdAt', 'updatedAt'])
         && data.uid is string && data.uid == uid && data.uid.size() >= 1 && data.uid.size() <= 128
         && data.mobileNumber is string && data.mobileNumber.size() <= 20
         && data.language is string && isValidLanguage(data.language)
-        && data.accentTheme is string && isValidAccent(data.accentTheme)
         && data.appearance is string && isValidAppearance(data.appearance)
         && data.activeBusinessId is string && data.activeBusinessId.size() <= 128
         && (!('appLockPin' in data) || (data.appLockPin is string && data.appLockPin.size() <= 128))
@@ -224,10 +219,10 @@ service cloud.firestore {
       allow update: if isValidId(uid)
         && isOwner(uid)
         && isValidUserProfile(incoming(), uid)
-        && incoming().uid == existing().uid
-        && incoming().createdAt == existing().createdAt
+        && (!('uid' in existing()) || incoming().uid == existing().uid)
+        && ((!('createdAt' in existing()) && incoming().createdAt == request.time) || (existing().createdAt is timestamp && incoming().createdAt == existing().createdAt))
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly(['mobileNumber', 'language', 'accentTheme', 'appearance', 'activeBusinessId', 'appLockPin', 'onboardingDone', 'updatedAt']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['uid', 'mobileNumber', 'language', 'appearance', 'activeBusinessId', 'appLockPin', 'onboardingDone', 'createdAt', 'updatedAt', 'accentTheme', 'email', 'displayName', 'photoURL', 'name']);
       allow delete: if isValidId(uid) && isOwner(uid);
     }
 

@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   AlertTriangle,
   ArrowRight,
   Check,
   Edit3,
   FileText,
-  Loader2,
   MessageCircle,
   Mic,
-  MicOff,
+  Pause,
+  Play,
   Repeat,
   Sparkles,
   Undo2,
@@ -109,6 +109,59 @@ interface BatchItemState extends ParsedHinglishEntry {
   direction: TxDirection;
 }
 
+const SPRING_FAST = { type: 'spring' as const, stiffness: 420, damping: 28 };
+const SPRING_SHEET = { type: 'spring' as const, stiffness: 360, damping: 32 };
+
+// Deterministic 22-bar vertical waveform profile (zero Math.random during render)
+const WAVEFORM_HEIGHTS = [
+  10, 16, 24, 14, 28, 34, 20, 38, 26, 42, 30, 44, 28, 36, 22, 34, 18, 28, 24, 16, 20, 12,
+] as const;
+
+function Waveform22Bars({
+  active,
+  aiParsing,
+}: {
+  active: boolean;
+  aiParsing: boolean;
+}) {
+  return (
+    <div
+      aria-label={active ? 'Live audio waveform' : 'Paused waveform'}
+      className="flex items-center justify-center gap-[3px] h-11 px-2 flex-1"
+    >
+      {WAVEFORM_HEIGHTS.map((peak, i) => (
+        <motion.span
+          key={i}
+          animate={
+            active || aiParsing
+              ? {
+                  height: [6, peak, Math.max(8, Math.round(peak * 0.45)), peak * 0.85, 6],
+                  opacity: [0.65, 1, 0.75, 0.95, 0.65],
+                }
+              : {
+                  height: 6,
+                  opacity: 0.35,
+                }
+          }
+          transition={
+            active || aiParsing
+              ? {
+                  duration: aiParsing ? 0.65 : 0.95 + (i % 4) * 0.14,
+                  repeat: Infinity,
+                  repeatType: 'mirror',
+                  ease: 'easeInOut',
+                  delay: (i % 7) * 0.07,
+                }
+              : { duration: 0.25 }
+          }
+          style={{ background: 'var(--munim-gradient)' }}
+          className="w-[3px] rounded-full block"
+        />
+      ))}
+    </div>
+  );
+}
+
 export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   open,
   language,
@@ -137,14 +190,14 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   const [aiParsing, setAiParsing] = useState(false);
   const [parseSource, setParseSource] = useState<'local' | 'ai'>('local');
 
-  // Single Confirm fields
+  // Single Inline-Editable Confirm fields
   const [name, setName] = useState('');
   const [amount, setAmount] = useState(0);
   const [direction, setDirection] = useState<TxDirection>('given');
   const [note, setNote] = useState('');
   const [rawPhrase, setRawPhrase] = useState('');
   const [micDenied, setMicDenied] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [activeField, setActiveField] = useState<'name' | 'amount' | 'type' | 'note' | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [undoingId, setUndoingId] = useState<string | null>(null);
@@ -181,6 +234,17 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       }
     }
   };
+
+  // Live instant offline preview of whatever speech or typed text is streaming
+  const liveStreamPreview = useMemo(() => {
+    const activePhrase = (transcript || manualText).trim();
+    if (!activePhrase) return null;
+    const cmd = parseVoiceCommand(activePhrase);
+    if (cmd.intent === 'entries' && cmd.entries.length > 0) {
+      return cmd.entries;
+    }
+    return null;
+  }, [transcript, manualText]);
 
   const matchedAccount = useMemo(() => {
     const clean = (stage === 'balance' ? queriedName : name).trim().toLowerCase();
@@ -298,7 +362,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         setDirection(resolvedDir);
         setNote(first.note || '');
         setRawPhrase(phrase);
-        setEditing(first.amount <= 0 || !first.name);
+        setActiveField(first.amount <= 0 ? 'amount' : !first.name ? 'name' : null);
         setStage('confirm');
         const words = first.amount > 0 ? amountToHinglishWords(first.amount) : 'shunya';
         speakHinglish(
@@ -308,15 +372,15 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         return;
       }
 
-      setVoiceError('AI could not extract an amount from that speech. Please check and edit manually.');
+      setVoiceError('AI could not extract an amount from that speech. Tap any field below to edit.');
       setStage('confirm');
-      setEditing(true);
+      setActiveField('amount');
     } catch (err) {
       setVoiceError(
-        err instanceof Error ? err.message : 'Smart AI parse failed. Edit manually below.'
+        err instanceof Error ? err.message : 'Smart AI parse failed. Tap any field below to edit.'
       );
       setStage('confirm');
-      setEditing(true);
+      setActiveField('amount');
     } finally {
       setAiParsing(false);
     }
@@ -361,8 +425,8 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
           found.balance > 0
             ? 'udhaar baaki hai'
             : found.balance < 0
-            ? 'advance jama hai'
-            : 'hisaab barabar hai';
+              ? 'advance jama hai'
+              : 'hisaab barabar hai';
         speakHinglish(`${found.name} ka ${words} rupaye ${statusSpoken}.`, language);
       } else {
         speakHinglish(`${targetName || 'Customer'} ka khata nahi mila.`, language);
@@ -387,7 +451,6 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
 
     const parsed = cmd.entries[0] || { name: '', amount: 0, type: 'credit' as const, raw: phrase };
 
-    // Hybrid AI fallback if local offline parser couldn't find clear amount or name
     if ((parsed.amount <= 0 || !parsed.name) && phrase.trim().length > 3) {
       setName(parsed.name || prefillCustomerName || '');
       setAmount(parsed.amount);
@@ -403,7 +466,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
     setDirection(resolvedDir);
     setNote(parsed.note || '');
     setRawPhrase(phrase);
-    setEditing(parsed.amount <= 0 || !parsed.name);
+    setActiveField(parsed.amount <= 0 ? 'amount' : !parsed.name ? 'name' : null);
     setConfirmError('');
     setStage('confirm');
 
@@ -428,8 +491,8 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
 
     if (!SR) {
       setListening(false);
-      setStatusText('Voice recognition unavailable on this browser.');
-      setVoiceError('Type any Hinglish entry, spoken bill, or "Aaj ka hisaab" below.');
+      setStatusText('Voice recognition paused · type or tap a sample');
+      setVoiceError('Live mic unavailable on this browser. Type Hinglish or tap a sample below.');
       setTimeout(() => manualInputRef.current?.focus(), 60);
       return;
     }
@@ -481,7 +544,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
           appliedThisListenRef.current = true;
           applyTranscriptToConfirm(text);
         } else if (!text) {
-          setStatusText('Tap mic to retry or type below');
+          setStatusText('Paused · tap Play to speak or type below');
         }
       };
 
@@ -506,6 +569,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       setSessionQueue([]);
       setManualText('');
       setNote('');
+      setActiveField(null);
       setMicDenied(false);
       setVoiceError('');
       setConfirmError('');
@@ -524,16 +588,16 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialCounterMode]);
 
-  if (!open) return null;
-
   const handleSave = async (keepGoing: boolean) => {
     setConfirmError('');
     if (!name.trim()) {
       setConfirmError('Customer name is required.');
+      setActiveField('name');
       return;
     }
     if (!amount || amount <= 0) {
       setConfirmError('Amount must be greater than zero.');
+      setActiveField('amount');
       return;
     }
     const sig = `${name.trim().toLowerCase()}|${direction}|${amount}|${rawPhrase.trim()}`;
@@ -576,6 +640,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         setManualText('');
         setNote('');
         setTranscript('');
+        setActiveField(null);
         setStage('listen');
         speakHinglish('Save ho gaya. Agla boliye.', language);
         setTimeout(() => startMic(), 350);
@@ -585,7 +650,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       setStage('saved');
       setTimeout(() => {
         onClose();
-      }, 850);
+      }, 950);
     } catch (err) {
       setSaving(false);
       setConfirmError(err instanceof Error ? err.message : 'Failed to save entry.');
@@ -634,196 +699,198 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       setStage('saved');
       setTimeout(() => {
         onClose();
-      }, 850);
+      }, 950);
     } catch (err) {
       setSaving(false);
       setConfirmError(err instanceof Error ? err.message : 'Failed to save batch entries.');
     }
   };
 
+  const handleBottomSaveAction = () => {
+    const activePhrase = (transcript || manualText).trim();
+    if (activePhrase) {
+      applyTranscriptToConfirm(activePhrase);
+      return;
+    }
+    if (sessionQueue.length > 0) {
+      onClose();
+      return;
+    }
+    manualInputRef.current?.focus();
+  };
+
   const readbackType = direction === 'given' ? 'Udhaar' : 'Mila';
   const readbackText = `${name || 'Customer'}, ${Math.round(amount)} rupaye, ${readbackType}. Sahi hai?`;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Voice Khata and Counter Entry"
-      className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-    >
-      <motion.div
-        initial={{ y: 28, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto"
-      >
-        {stage === 'listen' && (
-          <>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                  {continuousMode ? 'Hands-Free Counter Mode' : 'Bolne Wala Munim'}
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Instant offline Hinglish + Hybrid AI for bills &amp; complex speech
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close voice entry"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-500 hover:bg-black/5 dark:hover:bg-white/10"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Hands-Free Counter Queue Toggle */}
-            <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] px-3.5 py-2">
-              <button
-                type="button"
-                onClick={() => setContinuousMode((v) => !v)}
-                className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 min-h-[36px]"
-              >
-                <Repeat className={`w-4 h-4 ${continuousMode ? 'text-[var(--brand)]' : 'text-slate-400'}`} />
-                <span>Hands-Free Counter Queue: {continuousMode ? 'ON' : 'OFF'}</span>
-              </button>
-              {sessionQueue.length > 0 && (
-                <span className="text-xs font-extrabold font-tabular text-[var(--brand)]">
-                  {sessionQueue.length} saved · {formatINR(queueTotal)}
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-col items-center justify-center py-2 gap-3">
-              <button
-                type="button"
-                disabled={aiParsing}
-                onClick={() => (listening ? stopMic() : startMic())}
-                aria-label={listening ? 'Stop listening' : 'Start listening'}
-                className={`w-24 h-24 rounded-full flex items-center justify-center shadow-lg transition ${
-                  listening
-                    ? 'bg-red-600 text-white voice-fab-pulse scale-105'
-                    : 'bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)]'
-                }`}
-              >
-                {aiParsing ? (
-                  <Loader2 className="w-9 h-9 animate-spin" />
-                ) : listening ? (
-                  <Mic className="w-10 h-10" />
-                ) : (
-                  <MicOff className="w-9 h-9" />
-                )}
-              </button>
-              <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                {aiParsing ? 'Smart AI parsing your speech...' : statusText}
-              </span>
-            </div>
-
-            <div className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 min-h-[72px] flex items-center justify-center text-center">
-              <p className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                {transcript || 'Speak entry, multi-item bill, balance check, or "Aaj ka hisaab"...'}
-              </p>
-            </div>
-
-            {voiceError && (
-              <div className="text-xs font-semibold text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-3.5 py-2.5 space-y-1.5">
-                <p>{voiceError}</p>
-                {micDenied && (
-                  <div className="flex items-center justify-between gap-2 flex-wrap text-[11px] font-medium">
-                    <span>
-                      Tap Lock / Site Settings in browser bar → Permissions → Allow Microphone.
-                    </span>
-                    <button
-                      type="button"
-                      onClick={startMic}
-                      className="px-2.5 py-1 rounded-lg bg-amber-600 text-white font-bold"
-                    >
-                      Retry Mic
-                    </button>
-                  </div>
-                )}
-              </div>
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="voice-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Voice Khata and Counter Entry"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => {
+            if (!saving) onClose();
+          }}
+          className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end justify-center"
+        >
+          <motion.div
+            key="voice-modal-sheet"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={SPRING_SHEET}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-4 max-h-[92dvh] overflow-y-auto no-scrollbar pb-safe overflow-hidden"
+          >
+            {/* Superlist-Inspired Soft Radial Indigo-Cyan Bottom Ambient Glow */}
+            {stage === 'listen' && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-[radial-gradient(ellipse_at_bottom,_rgba(79,70,229,0.22),_rgba(6,182,212,0.14),_transparent_72%)]"
+              />
             )}
 
-            <div className="space-y-2">
-              <label
-                htmlFor="voice-manual-input"
-                className="block text-xs font-bold uppercase tracking-wider text-slate-500"
-              >
-                Quick Commands or Type Manually
-              </label>
-              <div className="flex gap-2">
-                <input
-                  ref={manualInputRef}
-                  id="voice-manual-input"
-                  type="text"
-                  value={manualText}
-                  onChange={(e) => setManualText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && manualText.trim()) {
-                      applyTranscriptToConfirm(manualText.trim());
-                    }
-                  }}
-                  placeholder={
-                    prefillCustomerName
-                      ? `${prefillCustomerName} paanch sau udhaar`
-                      : 'Ramesh 500 udhaar aur Suresh 300 mila'
-                  }
-                  className="flex-1 min-h-[48px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3.5 text-sm sm:text-base font-medium text-slate-900 dark:text-white outline-none focus:border-[var(--brand)]"
-                />
-                <button
-                  type="button"
-                  disabled={aiParsing}
-                  onClick={() => {
-                    if (manualText.trim()) applyTranscriptToConfirm(manualText.trim());
-                  }}
-                  className="min-h-[48px] px-5 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-bold whitespace-nowrap"
-                >
-                  Next
-                </button>
-              </div>
+            <div className="w-10 h-1.5 rounded-full bg-[var(--surface-subtle)] mx-auto" />
 
-              <div className="flex items-center gap-2 overflow-x-auto pt-1 no-scrollbar">
-                {[
-                  'Ramesh 500 udhaar',
-                  'Ramesh ka hisaab batao',
-                  'Aaj ka hisaab',
-                  'Verma ka 2 atta 480 aur 1 oil 175 bill banao',
-                ].map((sample) => (
-                  <button
-                    key={sample}
-                    type="button"
-                    onClick={() => applyTranscriptToConfirm(sample)}
-                    className="min-h-[34px] px-3 rounded-lg border border-[var(--surface-border)] text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-[var(--brand)] hover:text-[var(--brand)] whitespace-nowrap shrink-0"
-                  >
-                    {sample}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Live Rush-Hour Session Queue with 1-Tap Undo */}
-            {sessionQueue.length > 0 && (
-              <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--app-bg)] p-3 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-500">
-                  <span>Session Queue ({sessionQueue.length})</span>
-                  <span className="font-tabular text-slate-900 dark:text-white">
-                    Total {formatINR(queueTotal)}
-                  </span>
-                </div>
-                <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                  {sessionQueue.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between gap-2 text-xs bg-[var(--surface)] rounded-xl px-3 py-2 border border-[var(--surface-border)]"
+            {stage === 'listen' && (
+              <div className="relative z-10 flex flex-col gap-3.5">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      style={{ background: 'var(--munim-gradient)' }}
+                      className="w-10 h-10 rounded-2xl text-white flex items-center justify-center shadow-md shrink-0"
                     >
-                      <span className="font-bold truncate">
+                      <Mic className="w-5 h-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <h2 className="font-display text-lg font-extrabold text-[var(--ink)] truncate">
+                        {continuousMode ? 'Hands-Free Counter Mode' : 'Bolne Wala Munim'}
+                      </h2>
+                      <p className="text-[11px] font-semibold text-[var(--ink-muted)] truncate">
+                        {aiParsing ? 'Smart AI parsing your speech...' : statusText}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label="Close voice entry"
+                    className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition shrink-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Hands-Free Counter Mode Toggle Pill */}
+                <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--app-bg)] px-3.5 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setContinuousMode((v) => !v)}
+                    className="flex items-center gap-2 text-xs font-bold text-[var(--ink)] min-h-[38px] active:scale-95 transition"
+                  >
+                    <Repeat
+                      className={`w-4 h-4 ${
+                        continuousMode ? 'text-[var(--brand-accent)]' : 'text-[var(--ink-muted)]'
+                      }`}
+                    />
+                    <span>Hands-Free Counter Queue: {continuousMode ? 'ON' : 'OFF'}</span>
+                  </button>
+                  {sessionQueue.length > 0 && (
+                    <span className="text-xs font-extrabold font-tabular text-[var(--brand-accent)]">
+                      {sessionQueue.length} saved · {formatINR(queueTotal)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Top-Stacking Live Streaming Cards (Superlist Capture Feel) */}
+                <div className="space-y-2 max-h-56 overflow-y-auto no-scrollbar">
+                  {aiParsing && (
+                    <div className="rounded-[22px] bg-[var(--surface)] shadow-md ring-1 ring-black/5 dark:ring-white/10 p-4 space-y-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="h-3.5 w-28 rounded-full spatial-shimmer" />
+                        <div className="h-5 w-20 rounded-full spatial-shimmer" />
+                      </div>
+                      <div className="h-3 w-48 rounded-full spatial-shimmer" />
+                    </div>
+                  )}
+
+                  {/* Live streaming parsed preview card while user speaks or types */}
+                  {liveStreamPreview ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={SPRING_FAST}
+                      className="space-y-2"
+                    >
+                      {liveStreamPreview.map((entry, idx) => (
+                        <div
+                          key={`${entry.name}_${idx}`}
+                          className="rounded-[22px] bg-[var(--surface)] shadow-md ring-1 ring-[var(--brand-accent)]/25 p-3.5 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
+                              <Sparkles className="w-3 h-3" />
+                              <span>Live Draft</span>
+                            </span>
+                            <p className="text-sm font-extrabold text-[var(--ink)] truncate">
+                              {entry.name || prefillCustomerName || 'Customer'}
+                            </p>
+                            {entry.note && (
+                              <p className="text-[11px] text-[var(--ink-muted)] truncate">
+                                {entry.note}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p
+                              className={`font-display text-lg font-extrabold font-tabular ${
+                                entry.type === 'debit'
+                                  ? 'text-[var(--debit-green)]'
+                                  : 'text-[var(--credit-red)]'
+                              }`}
+                            >
+                              {entry.amount > 0 ? formatINR(entry.amount) : '₹...'}
+                            </p>
+                            <p className="text-[10px] font-bold uppercase text-[var(--ink-muted)]">
+                              {entry.type === 'debit' ? 'Received (Mila)' : 'Given (Udhaar)'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </motion.div>
+                  ) : (
+                    <div className="rounded-[22px] bg-[var(--app-bg)] p-4 min-h-[68px] flex items-center justify-center text-center">
+                      <p className="text-sm font-bold text-[var(--ink)] leading-relaxed">
+                        {transcript ||
+                          'Speak entry, multi-item bill, balance check, or "Aaj ka hisaab"...'}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Saved Session Queue Cards */}
+                  {sessionQueue.map((item) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, y: -10, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={SPRING_FAST}
+                      className="flex items-center justify-between gap-2 text-xs bg-[var(--surface)] shadow-md ring-1 ring-black/5 dark:ring-white/10 rounded-[20px] px-3.5 py-2.5"
+                    >
+                      <span className="font-extrabold text-[var(--ink)] truncate">
                         {item.customerName} · {item.direction === 'given' ? 'Udhaar' : 'Mila'}
                       </span>
                       <div className="flex items-center gap-2 shrink-0">
                         <span
                           className={`font-extrabold font-tabular ${
-                            item.direction === 'given' ? 'text-red-600' : 'text-emerald-600'
+                            item.direction === 'given'
+                              ? 'text-[var(--credit-red)]'
+                              : 'text-[var(--debit-green)]'
                           }`}
                         >
                           {formatINR(item.amount)}
@@ -843,500 +910,655 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                               }
                             }}
                             aria-label={`Undo ${item.customerName}`}
-                            className="text-[11px] font-bold text-amber-600 hover:underline inline-flex items-center gap-0.5"
+                            className="text-[11px] font-bold text-[var(--alert-amber)] hover:underline inline-flex items-center gap-0.5 active:scale-95 transition"
                           >
                             <Undo2 className="w-3 h-3" />
                             <span>{undoingId === item.id ? '...' : 'Undo'}</span>
                           </button>
                         )}
                       </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {voiceError && (
+                  <div className="text-xs font-semibold text-[var(--alert-amber)] bg-[var(--alert-tint)] rounded-2xl px-3.5 py-2.5 space-y-1.5">
+                    <p>{voiceError}</p>
+                    {micDenied && (
+                      <div className="flex items-center justify-between gap-2 flex-wrap text-[11px] font-medium">
+                        <span>
+                          Tap Lock / Site Settings in browser bar → Permissions → Allow Microphone.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={startMic}
+                          className="min-h-[34px] px-3 py-1 rounded-xl bg-[var(--alert-amber)] text-white font-bold active:scale-95 transition"
+                        >
+                          Retry Mic
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Manual Typing + Sample Quick-Tap Strip */}
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      ref={manualInputRef}
+                      id="voice-manual-input"
+                      type="text"
+                      value={manualText}
+                      onChange={(e) => setManualText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && manualText.trim()) {
+                          applyTranscriptToConfirm(manualText.trim());
+                        }
+                      }}
+                      placeholder={
+                        prefillCustomerName
+                          ? `${prefillCustomerName} paanch sau udhaar`
+                          : 'Ramesh 500 udhaar aur Suresh 300 mila'
+                      }
+                      className="flex-1 min-h-[46px] rounded-2xl bg-[var(--surface)] shadow-xs ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm font-medium text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                    />
+                    <button
+                      type="button"
+                      disabled={aiParsing || !manualText.trim()}
+                      onClick={() => {
+                        if (manualText.trim()) applyTranscriptToConfirm(manualText.trim());
+                      }}
+                      className="min-h-[46px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-50 text-[var(--brand-fg)] font-extrabold text-sm whitespace-nowrap shadow-sm active:scale-95 transition"
+                    >
+                      Next
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                    {[
+                      'Ramesh 500 udhaar',
+                      'Ramesh ka hisaab batao',
+                      'Aaj ka hisaab',
+                      'Verma ka 2 atta 480 aur 1 oil 175 bill banao',
+                    ].map((sample) => (
+                      <button
+                        key={sample}
+                        type="button"
+                        onClick={() => applyTranscriptToConfirm(sample)}
+                        className="min-h-[36px] px-3 rounded-xl bg-[var(--surface)]/90 shadow-xs text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--brand-accent)] whitespace-nowrap shrink-0 active:scale-95 transition"
+                      >
+                        {sample}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Clean 3-Button Superlist Bottom Bar: Pause/Resume (||) | 22-Bar Waveform | Save (✓) */}
+                <div className="mt-1 rounded-full bg-[var(--surface)]/95 backdrop-blur-xl shadow-lg ring-1 ring-black/5 dark:ring-white/10 p-2 flex items-center justify-between gap-2">
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    transition={SPRING_FAST}
+                    type="button"
+                    disabled={aiParsing}
+                    onClick={() => (listening ? stopMic() : startMic())}
+                    aria-label={listening ? 'Pause voice capture' : 'Resume voice capture'}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition ${
+                      listening
+                        ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
+                        : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
+                    }`}
+                  >
+                    {listening ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+                  </motion.button>
+
+                  <Waveform22Bars active={listening} aiParsing={aiParsing} />
+
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    transition={SPRING_FAST}
+                    type="button"
+                    disabled={aiParsing}
+                    onClick={handleBottomSaveAction}
+                    aria-label="Parse and save voice entry"
+                    style={{ background: 'var(--munim-gradient)' }}
+                    className="w-12 h-12 rounded-full text-white flex items-center justify-center shadow-md shrink-0 disabled:opacity-60"
+                  >
+                    <Check className="w-5 h-5 stroke-[2.75]" />
+                  </motion.button>
+                </div>
+              </div>
+            )}
+
+            {stage === 'confirm' && (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
+                      Confirm Voice Entry
+                    </h2>
+                    <p className="text-[11px] font-medium text-[var(--ink-muted)]">
+                      {parseSource === 'ai' ? 'Hybrid Gemini AI' : 'Instant Offline Parser'} · Tap any
+                      row to edit
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {rawPhrase && parseSource !== 'ai' && (
+                      <button
+                        type="button"
+                        disabled={aiParsing}
+                        onClick={() => applyAiFallback(rawPhrase)}
+                        className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold active:scale-95 transition"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{aiParsing ? 'Parsing...' : 'AI Parse'}</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      aria-label="Close voice confirm"
+                      className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {aiParsing && (
+                  <div className="rounded-[22px] bg-[var(--app-bg)] p-4 space-y-2.5">
+                    <div className="h-3.5 w-32 rounded-full spatial-shimmer" />
+                    <div className="h-3 w-48 rounded-full spatial-shimmer" />
+                  </div>
+                )}
+
+                <div className="rounded-2xl bg-[var(--app-bg)] p-3.5 flex items-center justify-between gap-3">
+                  <p className="text-sm font-extrabold text-[var(--ink)] leading-snug">
+                    {readbackText}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      speakHinglish(
+                        `${name}, ${amountToHinglishWords(amount)} rupaye, ${readbackType}. Sahi hai?`,
+                        language
+                      )
+                    }
+                    className="shrink-0 inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl spatial-card text-xs font-extrabold text-[var(--brand-accent)] active:scale-95 transition"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    <span>Listen</span>
+                  </button>
+                </div>
+
+                {willExceedLimit && (
+                  <div className="rounded-2xl bg-[var(--alert-tint)] p-3.5 flex items-start gap-2.5 text-[var(--alert-amber)]">
+                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <div className="text-xs font-semibold">
+                      <p className="font-extrabold">Credit Limit Alert for {matchedAccount?.name}</p>
+                      <p className="font-tabular mt-0.5">
+                        New balance {formatINR(willExceedLimit.projected)} exceeds limit{' '}
+                        {formatINR(willExceedLimit.limit)} by {formatINR(willExceedLimit.excess)}.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Single Clean Inline-Editable Receipt Summary Card */}
+                <div className="rounded-[24px] bg-[var(--app-bg)] divide-y divide-black/5 dark:divide-white/5 overflow-hidden">
+                  <div
+                    onClick={() => setActiveField('name')}
+                    className="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition"
+                  >
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] shrink-0">
+                      Name
+                    </span>
+                    {activeField === 'name' ? (
+                      <input
+                        type="text"
+                        autoFocus
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        onBlur={() => setActiveField(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') setActiveField(null);
+                        }}
+                        className="flex-1 text-right bg-[var(--surface)] border border-[var(--brand-accent)] rounded-xl px-3 min-h-[40px] text-base font-extrabold text-[var(--ink)] outline-none"
+                      />
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-base font-extrabold text-[var(--ink)] text-right">
+                        <span>{name || 'Tap to enter name'}</span>
+                        <Edit3 className="w-3.5 h-3.5 text-[var(--ink-muted)]" />
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    onClick={() => setActiveField('amount')}
+                    className="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition"
+                  >
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] shrink-0">
+                      Amount
+                    </span>
+                    {activeField === 'amount' ? (
+                      <input
+                        type="number"
+                        autoFocus
+                        min="1"
+                        value={amount || ''}
+                        onChange={(e) => setAmount(Number(e.target.value) || 0)}
+                        onBlur={() => setActiveField(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') setActiveField(null);
+                        }}
+                        className="w-36 text-right bg-[var(--surface)] border border-[var(--brand-accent)] rounded-xl px-3 min-h-[42px] text-xl font-extrabold font-tabular text-[var(--ink)] outline-none"
+                      />
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-2xl font-extrabold font-tabular ${
+                          direction === 'given'
+                            ? 'text-[var(--credit-red)]'
+                            : 'text-[var(--debit-green)]'
+                        }`}
+                      >
+                        <span>{formatINR(amount)}</span>
+                        <Edit3 className="w-3.5 h-3.5 opacity-60" />
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="px-4 py-3 flex items-center justify-between gap-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] shrink-0">
+                      Type
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setDirection('given')}
+                        className={`min-h-[40px] px-3 rounded-xl text-xs font-extrabold active:scale-95 transition ${
+                          direction === 'given'
+                            ? 'bg-[var(--credit-red)] text-white shadow-xs'
+                            : 'bg-[var(--surface)] text-[var(--ink-muted)]'
+                        }`}
+                      >
+                        Given (Udhaar)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDirection('received')}
+                        className={`min-h-[40px] px-3 rounded-xl text-xs font-extrabold active:scale-95 transition ${
+                          direction === 'received'
+                            ? 'bg-[var(--debit-green)] text-white shadow-xs'
+                            : 'bg-[var(--surface)] text-[var(--ink-muted)]'
+                        }`}
+                      >
+                        Received (Mila)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setActiveField('note')}
+                    className="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition"
+                  >
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] shrink-0">
+                      Note
+                    </span>
+                    {activeField === 'note' ? (
+                      <input
+                        type="text"
+                        autoFocus
+                        value={note}
+                        placeholder="e.g. Chini 2kg"
+                        onChange={(e) => setNote(e.target.value)}
+                        onBlur={() => setActiveField(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') setActiveField(null);
+                        }}
+                        className="flex-1 text-right bg-[var(--surface)] ring-2 ring-[var(--brand-accent)] rounded-xl px-3 min-h-[40px] text-sm font-semibold text-[var(--ink)] outline-none"
+                      />
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--ink)] text-right">
+                        <span className={note ? '' : 'text-[var(--ink-muted)] font-medium'}>
+                          {note || 'Tap to add note'}
+                        </span>
+                        <Edit3 className="w-3.5 h-3.5 text-[var(--ink-muted)]" />
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {confirmError && (
+                  <p className="text-sm font-semibold text-[var(--credit-red)]">{confirmError}</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    transition={SPRING_FAST}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => handleSave(false)}
+                    className="min-h-[50px] rounded-2xl bg-[var(--debit-green)] disabled:opacity-60 text-white font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-md"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{saving ? 'Saving...' : 'Save & Close'}</span>
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    transition={SPRING_FAST}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => handleSave(true)}
+                    className="min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-md"
+                  >
+                    <Repeat className="w-4 h-4" />
+                    <span>Save &amp; Next</span>
+                  </motion.button>
+                </div>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setStage('listen')}
+                  className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] text-[var(--ink)] font-bold text-sm active:scale-95 transition"
+                >
+                  Re-Record Voice
+                </button>
+              </>
+            )}
+
+            {stage === 'batch' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
+                      Batch Entries ({batchItems.filter((i) => i.selected).length})
+                    </h2>
+                    <p className="text-xs text-[var(--ink-muted)]">
+                      Multiple entries detected from one voice phrase
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label="Close batch voice"
+                    className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {batchItems.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-2xl bg-[var(--app-bg)] p-3.5 flex items-center justify-between gap-3"
+                    >
+                      <label className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={item.selected}
+                          onChange={(e) => {
+                            const next = [...batchItems];
+                            next[idx] = { ...item, selected: e.target.checked };
+                            setBatchItems(next);
+                          }}
+                          className="w-4 h-4 accent-[var(--brand)] shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-sm text-[var(--ink)] truncate">
+                            {item.name || 'Customer'}
+                          </p>
+                          <p className="text-xs text-[var(--ink-muted)] truncate">
+                            {item.direction === 'given' ? 'Given (Udhaar)' : 'Received (Mila)'}
+                            {item.note ? ` · ${item.note}` : ''}
+                          </p>
+                        </div>
+                      </label>
+                      <span
+                        className={`font-extrabold font-tabular text-base shrink-0 ${
+                          item.direction === 'given'
+                            ? 'text-[var(--credit-red)]'
+                            : 'text-[var(--debit-green)]'
+                        }`}
+                      >
+                        {formatINR(item.amount)}
+                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-          </>
-        )}
 
-        {stage === 'confirm' && (
-          <>
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                  Confirm Voice Entry
-                </h2>
-                <p className="text-[11px] font-medium text-slate-500">
-                  Parsed via {parseSource === 'ai' ? 'Hybrid Gemini AI' : 'Instant Offline Parser'}
-                </p>
-              </div>
-              <div className="flex items-center gap-1">
-                {rawPhrase && parseSource !== 'ai' && (
+                {confirmError && (
+                  <p className="text-sm font-semibold text-[var(--credit-red)]">{confirmError}</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    transition={SPRING_FAST}
+                    type="button"
+                    disabled={saving}
+                    onClick={handleSaveBatch}
+                    className="min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm shadow-md"
+                  >
+                    {saving ? 'Saving...' : `Save All (${batchItems.filter((i) => i.selected).length})`}
+                  </motion.button>
                   <button
                     type="button"
-                    disabled={aiParsing}
-                    onClick={() => applyAiFallback(rawPhrase)}
-                    className="inline-flex items-center gap-1 min-h-[38px] px-2.5 rounded-xl bg-[var(--brand-tint)] text-[var(--brand)] text-xs font-bold"
+                    disabled={saving}
+                    onClick={() => setStage('listen')}
+                    className="min-h-[48px] rounded-2xl bg-[var(--app-bg)] font-bold text-sm text-[var(--ink)] active:scale-95 transition"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>{aiParsing ? 'Parsing...' : 'AI Parse'}</span>
+                    Re-Record
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setEditing((v) => !v)}
-                  className="inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-xl text-xs font-bold text-[var(--brand)] hover:bg-[var(--brand-tint)]"
-                >
-                  <Edit3 className="w-4 h-4" />
-                  <span>{editing ? 'Done' : 'Edit'}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-4 space-y-2.5">
-              <p className="text-lg font-extrabold text-slate-900 dark:text-white">
-                {readbackText}
-              </p>
-              <button
-                type="button"
-                onClick={() =>
-                  speakHinglish(
-                    `${name}, ${amountToHinglishWords(amount)} rupaye, ${readbackType}. Sahi hai?`,
-                    language
-                  )
-                }
-                className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] text-xs font-bold text-slate-700 dark:text-slate-200"
-              >
-                <Volume2 className="w-4 h-4 text-[var(--brand)]" />
-                <span>Listen Again</span>
-              </button>
-            </div>
-
-            {willExceedLimit && (
-              <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 p-3.5 flex items-start gap-2.5 text-amber-900 dark:text-amber-200">
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div className="text-xs font-semibold">
-                  <p className="font-extrabold">Credit Limit Alert for {matchedAccount?.name}</p>
-                  <p className="font-tabular mt-0.5">
-                    New balance {formatINR(willExceedLimit.projected)} exceeds limit{' '}
-                    {formatINR(willExceedLimit.limit)} by {formatINR(willExceedLimit.excess)}.
-                  </p>
                 </div>
-              </div>
+              </>
             )}
 
-            <div className="divide-y divide-[var(--surface-border)] rounded-2xl border border-[var(--surface-border)] px-4">
-              <div className="py-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-500">Name</span>
-                <span className="text-lg font-extrabold text-slate-900 dark:text-white">
-                  {name || '—'}
-                </span>
-              </div>
-              <div className="py-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-500">Amount</span>
-                <span
-                  className={`text-2xl font-extrabold font-tabular ${
-                    direction === 'given' ? 'text-red-600' : 'text-emerald-600'
-                  }`}
-                >
-                  {formatINR(amount)}
-                </span>
-              </div>
-              <div className="py-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-slate-500">Type</span>
-                <span
-                  className={`text-base font-extrabold ${
-                    direction === 'given' ? 'text-red-600' : 'text-emerald-600'
-                  }`}
-                >
-                  {direction === 'given' ? 'Given (Udhaar)' : 'Received (Mila)'}
-                </span>
-              </div>
-              {note && (
-                <div className="py-3 flex items-center justify-between gap-4">
-                  <span className="text-sm font-semibold text-slate-500">Note</span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                    {note}
-                  </span>
+            {stage === 'bill' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-display text-xl font-extrabold text-[var(--ink)] flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-[var(--brand-accent)]" />
+                      <span>Spoken Multi-Item Bill</span>
+                    </h2>
+                    <p className="text-xs text-[var(--ink-muted)]">
+                      Party: <strong>{voiceBillCustomer}</strong> ·{' '}
+                      {voiceBillStatus === 'paid' ? 'Paid Cash/UPI' : 'Post as Udhaar'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label="Close voice bill"
+                    className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-              )}
-            </div>
 
-            {editing && (
-              <div className="space-y-3 pt-1 border-t border-[var(--surface-border)]">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">
-                    Customer / Party Name
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-base font-bold"
-                  />
+                <div className="rounded-2xl bg-[var(--app-bg)] divide-y divide-black/5 dark:divide-white/5">
+                  {voiceBillItems.map((it, idx) => (
+                    <div key={idx} className="px-3.5 py-2.5 flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-bold text-[var(--ink)]">{it.name}</p>
+                        <p className="text-[var(--ink-muted)] font-tabular">
+                          {it.qty} × {formatINR(it.rate)}
+                          {it.gstRate > 0 ? ` (+${it.gstRate}% GST)` : ''}
+                        </p>
+                      </div>
+                      <span className="font-extrabold font-tabular text-sm text-[var(--ink)]">
+                        {formatINR(it.qty * it.rate * (1 + it.gstRate / 100))}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">
-                    Amount (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={amount || ''}
-                    onChange={(e) => setAmount(Number(e.target.value) || 0)}
-                    className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xl font-extrabold font-tabular"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">
-                    Note / Item (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="e.g. Chini 2kg"
-                    className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-medium"
-                  />
-                </div>
+
                 <div className="grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
-                    onClick={() => setDirection('given')}
-                    className={`min-h-[46px] rounded-xl font-bold text-sm border-2 ${
-                      direction === 'given'
-                        ? 'bg-red-600 border-red-600 text-white'
-                        : 'border-[var(--surface-border)] text-slate-700 dark:text-slate-200'
-                    }`}
+                    onClick={() => {
+                      if (onCreateBillFromVoice) {
+                        onCreateBillFromVoice({
+                          customerName: voiceBillCustomer,
+                          paymentStatus: voiceBillStatus,
+                          items: voiceBillItems,
+                        });
+                      }
+                      onClose();
+                    }}
+                    className="min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-xs inline-flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition"
                   >
-                    Given (Udhaar)
+                    <FileText className="w-4 h-4" />
+                    <span>Open Bill Builder</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDirection('received')}
-                    className={`min-h-[46px] rounded-xl font-bold text-sm border-2 ${
-                      direction === 'received'
-                        ? 'bg-emerald-600 border-emerald-600 text-white'
-                        : 'border-[var(--surface-border)] text-slate-700 dark:text-slate-200'
-                    }`}
+                    onClick={() => setStage('listen')}
+                    className="min-h-[48px] rounded-2xl bg-[var(--app-bg)] font-bold text-xs text-[var(--ink)] active:scale-95 transition"
                   >
-                    Received (Mila)
+                    Re-Record
                   </button>
                 </div>
-              </div>
+              </>
             )}
 
-            {confirmError && (
-              <p className="text-sm font-semibold text-red-600">{confirmError}</p>
-            )}
-
-            <div className="grid grid-cols-2 gap-2.5 pt-1">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => handleSave(false)}
-                className="min-h-[52px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-extrabold text-sm flex items-center justify-center gap-1.5"
-              >
-                <Check className="w-4 h-4" />
-                <span>{saving ? 'Saving...' : 'Save & Close'}</span>
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => handleSave(true)}
-                className="min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-1.5"
-              >
-                <Repeat className="w-4 h-4" />
-                <span>Save &amp; Next</span>
-              </button>
-            </div>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => setStage('listen')}
-              className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] text-slate-700 dark:text-slate-200 font-bold text-sm"
-            >
-              Re-Record Voice
-            </button>
-          </>
-        )}
-
-        {stage === 'batch' && (
-          <>
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                  Batch Entries ({batchItems.filter((i) => i.selected).length})
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Multiple entries detected from one voice phrase
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close batch voice"
-                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-2.5 max-h-72 overflow-y-auto">
-              {batchItems.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-2xl border border-[var(--surface-border)] p-3.5 flex items-center justify-between gap-3"
-                >
-                  <label className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={item.selected}
-                      onChange={(e) => {
-                        const next = [...batchItems];
-                        next[idx] = { ...item, selected: e.target.checked };
-                        setBatchItems(next);
-                      }}
-                      className="w-4 h-4 accent-[var(--brand)] shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <p className="font-extrabold text-sm truncate">{item.name || 'Customer'}</p>
-                      <p className="text-xs text-slate-500 truncate">
-                        {item.direction === 'given' ? 'Given (Udhaar)' : 'Received (Mila)'}
-                        {item.note ? ` · ${item.note}` : ''}
-                      </p>
-                    </div>
-                  </label>
-                  <span
-                    className={`font-extrabold font-tabular text-base shrink-0 ${
-                      item.direction === 'given' ? 'text-red-600' : 'text-emerald-600'
-                    }`}
+            {stage === 'balance' && (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
+                    Spoken Balance Check
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label="Close balance check"
+                    className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition"
                   >
-                    {formatINR(item.amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {confirmError && (
-              <p className="text-sm font-semibold text-red-600">{confirmError}</p>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={handleSaveBatch}
-                className="min-h-[50px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm"
-              >
-                {saving ? 'Saving...' : `Save All (${batchItems.filter((i) => i.selected).length})`}
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => setStage('listen')}
-                className="min-h-[50px] rounded-2xl border border-[var(--surface-border)] font-bold text-sm"
-              >
-                Re-Record
-              </button>
-            </div>
-          </>
-        )}
-
-        {stage === 'bill' && (
-          <>
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-[var(--brand)]" />
-                  <span>Spoken Multi-Item Bill</span>
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Party: <strong>{voiceBillCustomer}</strong> ·{' '}
-                  {voiceBillStatus === 'paid' ? 'Paid Cash/UPI' : 'Post as Udhaar'}
-                </p>
-              </div>
-              <button type="button" onClick={onClose} aria-label="Close voice bill">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="rounded-2xl border border-[var(--surface-border)] divide-y divide-[var(--surface-border)]">
-              {voiceBillItems.map((it, idx) => (
-                <div key={idx} className="px-3.5 py-2.5 flex items-center justify-between text-xs">
-                  <div>
-                    <p className="font-bold text-slate-900 dark:text-white">{it.name}</p>
-                    <p className="text-slate-500 font-tabular">
-                      {it.qty} × {formatINR(it.rate)}
-                      {it.gstRate > 0 ? ` (+${it.gstRate}% GST)` : ''}
-                    </p>
-                  </div>
-                  <span className="font-extrabold font-tabular text-sm">
-                    {formatINR(it.qty * it.rate * (1 + it.gstRate / 100))}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  if (onCreateBillFromVoice) {
-                    onCreateBillFromVoice({
-                      customerName: voiceBillCustomer,
-                      paymentStatus: voiceBillStatus,
-                      items: voiceBillItems,
-                    });
-                  }
-                  onClose();
-                }}
-                className="min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-xs inline-flex items-center justify-center gap-1.5"
-              >
-                <FileText className="w-4 h-4" />
-                <span>Open in GST Bill Builder</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setStage('listen')}
-                className="min-h-[48px] rounded-xl border border-[var(--surface-border)] font-bold text-xs"
-              >
-                Re-Record
-              </button>
-            </div>
-          </>
-        )}
-
-        {stage === 'balance' && (
-          <>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                Spoken Balance Check
-              </h2>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close balance check"
-                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {matchedAccount ? (
-              <div className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-5 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-lg font-extrabold">{matchedAccount.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {matchedAccount.phone ? `+91 ${matchedAccount.phone}` : 'No mobile saved'}
-                      {matchedAccount.dueDate ? ` · Due ${matchedAccount.dueDate}` : ''}
-                    </p>
-                  </div>
-                  <div className="text-right font-tabular">
-                    <p
-                      className={`text-2xl font-extrabold ${
-                        matchedAccount.balance > 0
-                          ? 'text-red-600'
-                          : matchedAccount.balance < 0
-                          ? 'text-emerald-600'
-                          : 'text-slate-600'
-                      }`}
-                    >
-                      {formatINR(Math.abs(matchedAccount.balance))}
-                    </p>
-                    <p className="text-xs font-bold text-slate-500">
-                      {matchedAccount.balance > 0
-                        ? t.due
-                        : matchedAccount.balance < 0
-                        ? t.advance
-                        : t.settled}
-                    </p>
-                  </div>
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
 
-                {matchedAccount.creditLimit && matchedAccount.creditLimit > 0 && (
-                  <p className="text-xs font-semibold font-tabular text-slate-600 dark:text-slate-300">
-                    Credit Limit: {formatINR(matchedAccount.creditLimit)}
-                    {matchedAccount.balance > matchedAccount.creditLimit ? ' · Limit Exceeded' : ''}
-                  </p>
+                {matchedAccount ? (
+                  <div className="rounded-[22px] bg-[var(--app-bg)] p-5 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-extrabold text-[var(--ink)]">{matchedAccount.name}</p>
+                        <p className="text-xs text-[var(--ink-muted)]">
+                          {matchedAccount.phone ? `+91 ${matchedAccount.phone}` : 'No mobile saved'}
+                          {matchedAccount.dueDate ? ` · Due ${matchedAccount.dueDate}` : ''}
+                        </p>
+                      </div>
+                      <div className="text-right font-tabular">
+                        <p
+                          className={`text-2xl font-extrabold ${
+                            matchedAccount.balance > 0
+                              ? 'text-[var(--credit-red)]'
+                              : matchedAccount.balance < 0
+                                ? 'text-[var(--debit-green)]'
+                                : 'text-[var(--ink-muted)]'
+                          }`}
+                        >
+                          {formatINR(Math.abs(matchedAccount.balance))}
+                        </p>
+                        <p className="text-xs font-bold text-[var(--ink-muted)]">
+                          {matchedAccount.balance > 0
+                            ? t.due
+                            : matchedAccount.balance < 0
+                              ? t.advance
+                              : t.settled}
+                        </p>
+                      </div>
+                    </div>
+
+                    {matchedAccount.creditLimit && matchedAccount.creditLimit > 0 && (
+                      <p className="text-xs font-semibold font-tabular text-[var(--ink-muted)]">
+                        Credit Limit: {formatINR(matchedAccount.creditLimit)}
+                        {matchedAccount.balance > matchedAccount.creditLimit ? ' · Limit Exceeded' : ''}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenAccount(matchedAccount);
+                        }}
+                        className="flex-1 min-h-[44px] px-4 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center justify-center gap-1.5 active:scale-95 transition"
+                      >
+                        <span>Open Ledger</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                      {matchedAccount.balance > 0 && (
+                        <a
+                          href={buildWhatsAppUrl(
+                            matchedAccount.phone,
+                            buildReminderMessage({
+                              customerName: matchedAccount.name,
+                              amount: matchedAccount.balance,
+                              shopName: business.name,
+                              upiId: business.upiId,
+                              language,
+                            })
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 min-h-[44px] px-4 rounded-2xl bg-[var(--debit-green)] text-white text-xs font-extrabold inline-flex items-center justify-center gap-1.5 active:scale-95 transition"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          <span>WhatsApp</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-[22px] bg-[var(--app-bg)] p-6 text-center space-y-2">
+                    <p className="text-base font-extrabold text-[var(--ink)]">
+                      No party found matching &quot;{queriedName || 'Customer'}&quot;
+                    </p>
+                    <p className="text-xs text-[var(--ink-muted)]">
+                      Try speaking their saved name or record a new Udhaar entry.
+                    </p>
+                  </div>
                 )}
 
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onOpenAccount(matchedAccount);
-                    }}
-                    className="flex-1 min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center justify-center gap-1.5"
-                  >
-                    <span>Open Ledger</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                  {matchedAccount.balance > 0 && (
-                    <a
-                      href={buildWhatsAppUrl(
-                        matchedAccount.phone,
-                        buildReminderMessage({
-                          customerName: matchedAccount.name,
-                          amount: matchedAccount.balance,
-                          shopName: business.name,
-                          upiId: business.upiId,
-                          language,
-                        })
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 min-h-[44px] px-4 rounded-xl bg-emerald-600 text-white text-xs font-extrabold inline-flex items-center justify-center gap-1.5"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      <span>WhatsApp</span>
-                    </a>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl bg-[var(--app-bg)] border border-[var(--surface-border)] p-6 text-center space-y-2">
-                <p className="text-base font-extrabold">
-                  No party found matching &quot;{queriedName || 'Customer'}&quot;
-                </p>
-                <p className="text-xs text-slate-500">
-                  Try speaking their saved name or record a new Udhaar entry.
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStage('listen');
+                    startMic();
+                  }}
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] font-bold text-sm text-[var(--ink)] active:scale-95 transition"
+                >
+                  Ask Another Question
+                </button>
+              </>
+            )}
+
+            {stage === 'saved' && (
+              <div className="py-10 flex flex-col items-center justify-center text-center gap-4">
+                <motion.div
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={SPRING_FAST}
+                  className="w-20 h-20 rounded-full bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shadow-lg"
+                >
+                  <Check className="w-10 h-10 stroke-[3]" />
+                </motion.div>
+                <h3 className="font-display text-2xl font-extrabold text-[var(--debit-green)]">
+                  Entry Saved!
+                </h3>
+                <p className="text-sm font-tabular text-[var(--ink-muted)]">
+                  {batchItems.length > 1
+                    ? `${batchItems.filter((i) => i.selected).length} entries saved to khata`
+                    : `${name} · ${formatINR(amount)} (${direction === 'given' ? 'Given' : 'Received'})`}
                 </p>
               </div>
             )}
-
-            <button
-              type="button"
-              onClick={() => {
-                setStage('listen');
-                startMic();
-              }}
-              className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] font-bold text-sm"
-            >
-              Ask Another Question
-            </button>
-          </>
-        )}
-
-        {stage === 'saved' && (
-          <div className="py-10 flex flex-col items-center justify-center text-center gap-4">
-            <motion.div
-              initial={{ scale: 0.6 }}
-              animate={{ scale: 1 }}
-              className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center"
-            >
-              <Check className="w-10 h-10 stroke-[3]" />
-            </motion.div>
-            <h3 className="text-2xl font-extrabold text-emerald-600">Entry Saved!</h3>
-            <p className="text-sm text-slate-500">
-              {batchItems.length > 1
-                ? `${batchItems.filter((i) => i.selected).length} entries saved to khata`
-                : `${name} · ${formatINR(amount)} (${direction === 'given' ? 'Given' : 'Received'})`}
-            </p>
-          </div>
-        )}
-      </motion.div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

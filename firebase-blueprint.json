@@ -11,15 +11,14 @@
           "type": "string",
           "enum": ["en", "hi", "hinglish", "mr", "gu", "ta", "te", "pa", "ml", "kn", "bn"]
         },
-        "accentTheme": { "type": "string", "enum": ["obsidian", "green", "crimson"] },
-        "appearance": { "type": "string", "enum": ["light", "dark", "system"] },
+        "appearance": { "type": "string", "enum": ["light", "dark"] },
         "activeBusinessId": { "type": "string", "minLength": 0, "maxLength": 128 },
         "appLockPin": { "type": "string", "minLength": 0, "maxLength": 128 },
         "onboardingDone": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "mobileNumber", "language", "accentTheme", "appearance", "activeBusinessId", "onboardingDone", "createdAt", "updatedAt"]
+      "required": ["uid", "mobileNumber", "language", "appearance", "activeBusinessId", "onboardingDone", "createdAt", "updatedAt"]
     },
     "Business": {
       "title": "Business",

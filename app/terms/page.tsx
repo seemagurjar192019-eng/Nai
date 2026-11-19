@@ -11,80 +11,80 @@ export const metadata: Metadata = {
 
 export default function TermsOfServicePage() {
   return (
-    <main className="min-h-screen bg-[#F6F2EC] dark:bg-[#0E0E0D] text-stone-800 dark:text-stone-100 py-8 px-4 sm:px-6">
-      <div className="mx-auto max-w-2xl rounded-3xl bg-white dark:bg-[#181715] border border-[#E5DEC9] dark:border-[#2A2824] shadow-sm p-6 sm:p-9 space-y-6">
-        <div className="flex items-center justify-between gap-4 border-b border-[#E5DEC9] dark:border-[#2A2824] pb-4">
+    <main className="min-h-screen spatial-shell-bg text-[var(--ink)] py-8 px-4 sm:px-6">
+      <div className="mx-auto max-w-2xl rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-6 sm:p-9 space-y-6">
+        <div className="flex items-center justify-between gap-4 bg-[var(--surface-subtle)] rounded-2xl px-4 py-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-sm font-bold text-[#161514] dark:text-[#F3EDE4] hover:underline"
+            className="inline-flex items-center gap-2 text-sm font-bold text-[var(--ink)] hover:underline"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Ucred
           </Link>
-          <span className="text-xs font-semibold text-stone-500 dark:text-stone-400">Updated: 2026</span>
+          <span className="text-xs font-semibold text-[var(--ink-muted)]">Updated: 2026</span>
         </div>
 
         <header className="space-y-2">
-          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--brand-accent)]">
             <FileText className="h-4 w-4" />
             Terms of Use
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#161514] dark:text-[#F3EDE4]">
+          <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-[var(--ink)]">
             Ucred Terms of Service
           </h1>
-          <p className="text-sm text-stone-600 dark:text-stone-400 leading-relaxed">
+          <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
             By using the Ucred web application, PWA, or Android package, you agree to the following practical terms.
           </p>
         </header>
 
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-[#161514] dark:text-[#F3EDE4]">
+          <h2 className="font-display text-base font-bold text-[var(--ink)]">
             1. Bookkeeping, AI Scans &amp; Tax Responsibility
           </h2>
-          <p className="text-sm text-stone-600 dark:text-stone-300 leading-relaxed">
+          <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
             Ucred is a digital bookkeeping, AI receipt assistance, and billing aid for shopkeepers. You remain responsible for verifying spoken voice amounts, AI-scanned parchi line items, trust indicators, customer balances, GST rates, and tax invoices before filing statutory returns.
           </p>
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-[#161514] dark:text-[#F3EDE4]">
+          <h2 className="font-display text-base font-bold text-[var(--ink)]">
             2. UPI Links &amp; Payments
           </h2>
-          <p className="text-sm text-stone-600 dark:text-stone-300 leading-relaxed">
+          <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
             Ucred does not process, hold, or clear funds. UPI QR codes and payment links route directly between your customer&apos;s UPI app and the UPI VPA configured in your Business Profile. Always verify your UPI ID before sharing reminders.
           </p>
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-[#161514] dark:text-[#F3EDE4]">
+          <h2 className="font-display text-base font-bold text-[var(--ink)]">
             3. Multi-Staff Counter Access &amp; Backups
           </h2>
-          <p className="text-sm text-stone-600 dark:text-stone-300 leading-relaxed">
-            Keep your Google account secure, set 4-digit PINs for App Lock and Staff Operators on shared counter phones, and download periodic JSON/CSV backups from Settings.
+          <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
+            Keep your verified mobile SIM and OTP messages secure, set 4-digit PINs for App Lock and Staff Operators on shared counter phones, and download periodic JSON/CSV backups from Settings.
           </p>
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-[#161514] dark:text-[#F3EDE4]">
+          <h2 className="font-display text-base font-bold text-[var(--ink)]">
             4. Account Termination
           </h2>
-          <p className="text-sm text-stone-600 dark:text-stone-300 leading-relaxed">
+          <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
             You may stop using Ucred and erase your entire account and associated data at any time via Settings or{' '}
-            <Link href="/delete-account" className="font-bold text-[#161514] dark:text-[#F3EDE4] underline">
+            <Link href="/delete-account" className="font-bold text-[var(--ink)] underline">
               Delete Account
             </Link>
             .
           </p>
         </section>
 
-        <footer className="border-t border-[#E5DEC9] dark:border-[#2A2824] pt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500 dark:text-stone-400">
+        <footer className="bg-[var(--surface-subtle)] rounded-2xl px-4 py-3.5 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--ink-muted)]">
           <span>
             Read our{' '}
-            <Link href="/privacy" className="font-semibold text-[#161514] dark:text-[#F3EDE4] underline">
+            <Link href="/privacy" className="font-semibold text-[var(--ink)] underline">
               Privacy Policy
             </Link>
           </span>
-          <Link href="/" className="font-bold text-[#161514] dark:text-[#F3EDE4] hover:underline">
+          <Link href="/" className="font-bold text-[var(--ink)] hover:underline">
             Return to Ucred &rarr;
           </Link>
         </footer>

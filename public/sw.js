@@ -1,14 +1,15 @@
-const CACHE_NAME = 'ucred-nextjs-v5';
+const CACHE_NAME = 'ucred-nextjs-v7';
 const SHELL_ASSETS = [
-  '/',
-  '/privacy',
-  '/terms',
-  '/delete-account',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
   '/pwa-maskable-512x512.png',
   '/apple-touch-icon.png',
 ];
+
+const IS_DEV_HOST =
+  self.location.hostname === 'localhost' ||
+  self.location.hostname === '127.0.0.1' ||
+  self.location.hostname.startsWith('ais-dev-');
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -49,6 +50,12 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
 
+  // Never serve cached HTML or Next.js chunks in local/dev preview environments
+  // so SSR HTML and client JS bundles never go out of sync across edits.
+  if (IS_DEV_HOST && (req.mode === 'navigate' || url.pathname.startsWith('/_next/'))) {
+    return;
+  }
+
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
@@ -66,7 +73,7 @@ self.addEventListener('fetch', (event) => {
               (home) =>
                 home ||
                 new Response(
-                  '<!doctype html><html><body style="font-family:sans-serif;padding:24px;text-align:center;background:#F6F2EC;color:#161514;"><h2>Ucred is Offline</h2><p>Please check your internet connection and reload.</p></body></html>',
+                  '<!doctype html><html><body style="font-family:sans-serif;padding:24px;text-align:center;background:#F8FAFC;color:#0F172A;"><h2>Ucred is Offline</h2><p>Please check your internet connection and reload.</p></body></html>',
                   { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
                 )
             );
@@ -76,8 +83,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network-first for Next.js static bundles (offline fallback only)
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      fetch(req)
+        .then((networkRes) => {
+          if (networkRes && networkRes.ok) {
+            const clone = networkRes.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
+          }
+          return networkRes;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
   if (
-    url.pathname.startsWith('/_next/static/') ||
     url.pathname.endsWith('.png') ||
     url.pathname.endsWith('.webp') ||
     url.pathname.endsWith('.svg') ||

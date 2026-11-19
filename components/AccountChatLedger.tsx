@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertTriangle,
   ArrowDown,
@@ -11,6 +12,8 @@ import {
   Check,
   Delete,
   Edit3,
+  Eye,
+  EyeOff,
   FileText,
   Lock,
   MessageCircle,
@@ -54,6 +57,8 @@ interface AccountChatLedgerProps {
   language: LanguageCode;
   transactions: LedgerTransaction[];
   trustScore?: CustomerTrustScore;
+  hideBalance?: boolean;
+  onToggleHideBalance?: () => void;
   onBack: () => void;
   onAddTransaction: (payload: {
     direction: TxDirection;
@@ -123,6 +128,8 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
   language,
   transactions,
   trustScore,
+  hideBalance = false,
+  onToggleHideBalance,
   onBack,
   onAddTransaction,
   onUpdateTransaction,
@@ -404,8 +411,8 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
   // Calculator Modal View
   if (calcDirection) {
     return (
-      <div className="fixed inset-0 z-50 bg-[var(--app-bg)] flex flex-col">
-        <div className="max-w-lg w-full mx-auto flex-1 flex flex-col justify-between p-4">
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-center">
+        <div className="w-full max-w-[430px] spatial-shell-bg flex-1 flex flex-col justify-between p-4 pb-safe shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -413,27 +420,29 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 type="button"
                 onClick={() => setCalcDirection(null)}
                 aria-label="Back to ledger"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div
                 style={{ backgroundColor: getAvatarColor(account.name) }}
-                className="w-10 h-10 rounded-full text-white font-bold flex items-center justify-center shrink-0"
+                className="w-10 h-10 rounded-full text-white font-bold flex items-center justify-center shrink-0 shadow-sm"
               >
                 {account.name.charAt(0).toUpperCase()}
               </div>
               <div>
-                <h2 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
+                <h2 className="font-display text-base font-extrabold text-[var(--ink)] leading-tight">
                   {editingTx ? `Edit · ${account.name}` : account.name}
                 </h2>
                 <p
                   className={`text-xs font-bold font-tabular ${
-                    calcDirection === 'given' ? 'text-red-600' : 'text-emerald-600'
+                    calcDirection === 'given'
+                      ? 'text-[var(--credit-red)]'
+                      : 'text-[var(--debit-green)]'
                   }`}
                 >
                   {calcDirection === 'given' ? 'Credit Given (Udhaar)' : 'Payment Received (Jama)'} ·{' '}
-                  {formatINR(absBal)} {balLabel}
+                  {hideBalance ? '₹••••' : formatINR(absBal)} {balLabel}
                 </p>
               </div>
             </div>
@@ -444,12 +453,12 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     key={d}
                     type="button"
                     onClick={() => setCalcDirection(d)}
-                    className={`min-h-[34px] px-2.5 rounded-lg text-xs font-bold border ${
+                    className={`min-h-[38px] px-2.5 rounded-xl text-xs font-bold active:scale-95 transition ${
                       calcDirection === d
                         ? d === 'given'
-                          ? 'bg-red-600 border-red-600 text-white'
-                          : 'bg-emerald-600 border-emerald-600 text-white'
-                        : 'border-[var(--surface-border)]'
+                          ? 'bg-[var(--credit-red)] text-white shadow-sm'
+                          : 'bg-[var(--debit-green)] text-white shadow-sm'
+                        : 'spatial-card text-[var(--ink)]'
                     }`}
                   >
                     {d === 'given' ? 'Given' : 'Received'}
@@ -462,19 +471,21 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           {/* Big Amount Display */}
           <div className="py-4 text-center space-y-1.5">
             <div
-              className={`text-5xl font-extrabold font-tabular tracking-tight ${
-                calcDirection === 'given' ? 'text-red-600' : 'text-emerald-600'
+              className={`font-display text-5xl font-extrabold font-tabular tracking-tight ${
+                calcDirection === 'given'
+                  ? 'text-[var(--credit-red)]'
+                  : 'text-[var(--debit-green)]'
               }`}
             >
               ₹{calcExpr}
             </div>
             {/[+\-×]/.test(calcExpr) && (
-              <p className="text-sm font-bold font-tabular text-slate-500">
+              <p className="text-sm font-bold font-tabular text-[var(--ink-muted)]">
                 = {formatINR(calcNumericAmount)}
               </p>
             )}
             {calcLimitWarning && (
-              <p className="inline-flex items-center gap-1.5 text-xs font-bold font-tabular text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 rounded-xl px-3 py-1.5">
+              <p className="inline-flex items-center gap-1.5 text-xs font-bold font-tabular text-[var(--alert-amber)] bg-[var(--alert-tint)] rounded-2xl px-3.5 py-1.5 shadow-xs">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                 <span>
                   Limit {formatINR(calcLimitWarning.limit)} exceeded by{' '}
@@ -486,30 +497,30 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
 
           {/* Notes / Date / Bill Attachment / Galla Sync */}
           <div className="space-y-2.5">
-            <div className="flex items-center gap-2 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] px-3.5 min-h-[48px]">
-              <Receipt className="w-4 h-4 text-slate-400 shrink-0" />
+            <div className="flex items-center gap-2 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 px-3.5 min-h-[48px]">
+              <Receipt className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
               <input
                 type="text"
                 value={calcNote}
                 onChange={(e) => setCalcNote(e.target.value)}
                 placeholder="Add Notes (e.g. 2kg chini, atta)"
-                className="flex-1 bg-transparent text-sm font-medium text-slate-900 dark:text-white outline-none"
+                className="flex-1 bg-transparent text-sm font-medium text-[var(--ink)] outline-none"
               />
               <button
                 type="button"
                 onClick={handleDictateNote}
                 aria-label="Speak note"
-                className="min-w-[38px] min-h-[38px] rounded-full flex items-center justify-center text-[var(--brand)] hover:bg-black/5 dark:hover:bg-white/10"
+                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--brand-accent)] hover:bg-[var(--brand-tint)] active:scale-95 transition"
               >
                 <Mic className="w-4 h-4" />
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
-              <label className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] px-3.5 min-h-[46px] text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer">
+              <label className="flex items-center justify-between gap-2 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 px-3.5 min-h-[46px] text-xs font-bold text-[var(--ink)] cursor-pointer">
                 <span className="inline-flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-[var(--brand)]" />
-                  <span>Bill Date</span>
+                  <Calendar className="w-4 h-4 text-[var(--brand-accent)]" />
+                  <span>Date</span>
                 </span>
                 <input
                   type="date"
@@ -522,13 +533,13 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] px-3.5 min-h-[46px] text-xs font-bold text-slate-700 dark:text-slate-200"
+                className="flex items-center justify-between gap-2 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 px-3.5 min-h-[46px] text-xs font-bold text-[var(--ink)] active:scale-95 transition"
               >
                 <span className="inline-flex items-center gap-1.5">
-                  <Camera className="w-4 h-4 text-[var(--brand)]" />
+                  <Camera className="w-4 h-4 text-[var(--brand-accent)]" />
                   <span>{calcBillImage ? 'Bill Added ✓' : 'Add Bills'}</span>
                 </span>
-                <span className="text-[var(--brand)] text-base leading-none">+</span>
+                <span className="text-[var(--brand-accent)] text-base leading-none">+</span>
               </button>
               <input
                 ref={fileInputRef}
@@ -540,11 +551,11 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
             </div>
 
             {!editingTx && (
-              <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] px-3.5 py-2">
-                <span className="text-[11px] font-bold text-slate-500">
+              <div className="flex items-center justify-between gap-2 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 px-3.5 py-2">
+                <span className="text-[11px] font-bold text-[var(--ink-muted)]">
                   Sync to Today&apos;s Galla
                 </span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   {(
                     [
                       { id: null, label: 'Off' },
@@ -556,10 +567,10 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                       key={opt.label}
                       type="button"
                       onClick={() => setSyncGallaMode(opt.id)}
-                      className={`min-h-[30px] px-2.5 rounded-lg text-[11px] font-extrabold border ${
+                      className={`min-h-[34px] px-3 rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
                         syncGallaMode === opt.id
-                          ? 'bg-[var(--brand)] border-[var(--brand)] text-[var(--brand-fg)]'
-                          : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-300'
+                          ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
+                          : 'bg-[var(--app-bg)] text-[var(--ink-muted)]'
                       }`}
                     >
                       {opt.label}
@@ -570,7 +581,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
             )}
 
             {calcError && (
-              <p className="text-xs font-bold text-red-600 text-center">{calcError}</p>
+              <p className="text-xs font-bold text-[var(--credit-red)] text-center">{calcError}</p>
             )}
 
             <div className="flex gap-2.5 pt-1">
@@ -581,9 +592,9 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     setCalcDirection(null);
                     onOpenCreateBill(account.name, account.phone);
                   }}
-                  className="min-h-[52px] px-4 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface)] text-sm font-bold text-slate-800 dark:text-slate-100 inline-flex items-center gap-1.5 whitespace-nowrap"
+                  className="min-h-[52px] px-4 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-bold text-[var(--ink)] inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 transition"
                 >
-                  <FileText className="w-4 h-4 text-[var(--brand)]" />
+                  <FileText className="w-4 h-4 text-[var(--brand-accent)]" />
                   <span>Create Bill</span>
                 </button>
               )}
@@ -591,7 +602,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 type="button"
                 disabled={calcSaving}
                 onClick={handleConfirmCalc}
-                className="flex-1 min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-base flex items-center justify-center gap-2"
+                className="flex-1 min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-base flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
               >
                 <Check className="w-5 h-5" />
                 <span>{calcSaving ? 'Saving...' : 'Confirm'}</span>
@@ -610,10 +621,10 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   onClick={() => handleKeypadPress(btn)}
                   className={`min-h-[54px] rounded-2xl font-tabular text-xl font-bold flex items-center justify-center transition active:scale-95 ${
                     btn === '='
-                      ? 'bg-[var(--brand)] text-[var(--brand-fg)]'
+                      ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-md'
                       : isOp
-                      ? 'bg-[var(--brand-tint)] text-[var(--brand)]'
-                      : 'bg-[var(--surface)] border border-[var(--surface-border)] text-slate-900 dark:text-white'
+                        ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
+                        : 'spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--ink)]'
                   }`}
                 >
                   {btn === 'BACK' ? <Delete className="w-5 h-5" /> : btn}
@@ -626,22 +637,24 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
     );
   }
 
+  let runningRowIdx = 0;
+
   return (
-    <div className="flex flex-col min-h-[calc(100vh-140px)] bg-[var(--app-bg)] rounded-3xl border border-[var(--surface-border)] overflow-hidden">
-      {/* Ledger Chat Top Bar */}
-      <div className="no-print bg-[var(--surface)] border-b border-[var(--surface-border)] px-3 py-2.5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
+    <div className="flex flex-col h-full rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 overflow-hidden">
+      {/* Ledger Top Bar */}
+      <div className="no-print bg-[var(--surface)]/95 backdrop-blur-xl shadow-[0_6px_18px_-10px_rgba(15,23,42,0.1)] px-3 py-2.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={onBack}
             aria-label="Back to Ledger"
-            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-black/5 dark:hover:bg-white/10 shrink-0"
+            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div
             style={{ backgroundColor: getAvatarColor(account.name) }}
-            className="w-10 h-10 rounded-full text-white font-bold flex items-center justify-center shrink-0"
+            className="w-10 h-10 rounded-full text-white font-bold flex items-center justify-center shrink-0 shadow-xs"
           >
             {account.name.charAt(0).toUpperCase()}
           </div>
@@ -657,12 +670,12 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               setConfirmDeleteCustomer(false);
               setShowProfileDrawer(true);
             }}
-            className="text-left min-w-0"
+            className="text-left min-w-0 min-h-[44px] flex flex-col justify-center"
           >
-            <h2 className="text-base font-extrabold text-slate-900 dark:text-white truncate">
+            <h2 className="font-display text-base font-extrabold text-[var(--ink)] truncate">
               {account.name}
             </h2>
-            <p className="text-xs font-semibold text-[var(--brand)] truncate">
+            <p className="text-[11px] font-semibold text-[var(--brand-accent)] truncate">
               {trustScore && account.kind === 'customer'
                 ? `Trust ${trustScore.score}/100 · ${trustScore.recoveryTimingHint}`
                 : 'View Profile'}
@@ -672,16 +685,26 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           </button>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0">
+          {onToggleHideBalance && (
+            <button
+              type="button"
+              onClick={onToggleHideBalance}
+              aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
+              className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+            >
+              {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          )}
           {onOpenParchiScanner && (
             <button
               type="button"
               onClick={onOpenParchiScanner}
               aria-label="Scan Parchi"
               title="Scan Parchi (AI)"
-              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
+              className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
             >
-              <Camera className="w-5 h-5" />
+              <Camera className="w-4 h-4" />
             </button>
           )}
           <button
@@ -689,36 +712,36 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
             onClick={() => window.print()}
             aria-label="Print PDF Statement"
             title="Print / Save PDF Statement"
-            className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
+            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
           >
-            <FileText className="w-5 h-5" />
+            <FileText className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={() => setSearchOpen((v) => !v)}
             aria-label="Search entries"
-            className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
+            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
           >
-            <Search className="w-5 h-5" />
+            <Search className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {searchOpen && (
-        <div className="no-print bg-[var(--surface)] border-b border-[var(--surface-border)] px-4 py-2">
+        <div className="no-print bg-[var(--surface)] px-4 py-2">
           <input
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search notes or ₹ amount..."
-            className="w-full min-h-[40px] rounded-xl bg-black/5 dark:bg-white/10 px-3 text-sm outline-none"
+            className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
           />
         </div>
       )}
 
       {/* Timeline Filter Strip */}
       {transactions.length > 0 && (
-        <div className="no-print bg-[var(--surface)] border-b border-[var(--surface-border)] px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="no-print bg-[var(--surface)]/80 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {(
             [
               { id: 'all', label: 'All Entries' },
@@ -731,10 +754,10 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               key={f.id}
               type="button"
               onClick={() => setTimelineFilter(f.id)}
-              className={`min-h-[32px] px-3 rounded-lg text-xs font-bold whitespace-nowrap border transition ${
+              className={`min-h-[38px] px-3.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition active:scale-95 ${
                 timelineFilter === f.id
-                  ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand)]'
-                  : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-300'
+                  ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-xs'
+                  : 'bg-[var(--app-bg)] text-[var(--ink-muted)]'
               }`}
             >
               {f.label}
@@ -744,9 +767,14 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
       )}
 
       {actionError && (
-        <div className="no-print mx-3 mt-2 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 px-3 py-2 text-xs font-bold text-red-700 dark:text-red-300 flex items-center justify-between gap-2">
+        <div className="no-print mx-3 mt-2 rounded-2xl bg-[var(--credit-tint)] px-3.5 py-2.5 text-xs font-bold text-[var(--credit-red)] flex items-center justify-between gap-2">
           <span>{actionError}</span>
-          <button type="button" onClick={() => setActionError('')} aria-label="Dismiss error">
+          <button
+            type="button"
+            onClick={() => setActionError('')}
+            aria-label="Dismiss error"
+            className="min-w-[32px] min-h-[32px] flex items-center justify-center"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -761,23 +789,23 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
         </p>
       </div>
 
-      {/* 2-Column Chat-Style Timeline */}
-      <div className="flex-1 p-4 space-y-5 overflow-y-auto">
+      {/* Modern Timeline Ledger Cards (Full-Width Spatial Stream) */}
+      <div className="flex-1 bg-[var(--app-bg)]/55 p-3.5 space-y-4 overflow-y-auto no-scrollbar">
         {timeline.length === 0 ? (
           <div className="py-16 flex flex-col items-center justify-center text-center gap-3">
-            <div className="w-16 h-16 rounded-full bg-[var(--brand-tint)] text-[var(--brand)] flex items-center justify-center">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-cyan-500/15 text-[var(--brand-accent)] flex items-center justify-center shadow-inner">
               <Lock className="w-7 h-7" />
             </div>
-            <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 max-w-xs">
+            <p className="text-sm font-semibold text-[var(--ink-muted)] max-w-xs">
               All transactions between you and {account.name} are totally private &amp; synced
               securely.
             </p>
           </div>
         ) : (
           timeline.map((group) => (
-            <div key={group.dateLabel} className="space-y-3">
+            <div key={group.dateLabel} className="space-y-2.5">
               <div className="flex justify-center">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-[var(--surface)] border border-[var(--surface-border)] px-3 py-1 rounded-lg">
+                <span className="text-[11px] font-extrabold text-[var(--ink-muted)] bg-[var(--surface)]/90 shadow-xs ring-1 ring-white/80 dark:ring-white/10 px-3 py-1 rounded-full">
                   {group.dateLabel}
                 </span>
               </div>
@@ -785,45 +813,90 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               {group.items.map(({ tx, runningBalance }) => {
                 const isGiven = tx.direction === 'given';
                 const armed = armedDeleteTxId === tx.id;
-                const metaParts: string[] = [];
+                const delaySec = Math.min(runningRowIdx++, 12) * 0.035;
+                const metaParts: string[] = [formatTimeOnly(tx.billDate)];
                 if (tx.createdByName) metaParts.push(tx.createdByName);
                 if (tx.gallaSynced) metaParts.push('Galla Synced');
-                return (
-                  <div
-                    key={tx.id}
-                    className={`flex flex-col ${isGiven ? 'items-end' : 'items-start'}`}
-                  >
-                    <div
-                      className={`max-w-[82%] sm:max-w-[65%] rounded-2xl bg-[var(--surface)] border px-4 py-3 shadow-xs space-y-1.5 ${
-                        isGiven
-                          ? 'border-red-200 dark:border-red-900/60'
-                          : 'border-emerald-200 dark:border-emerald-900/60'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-1.5">
-                          {isGiven ? (
-                            <ArrowUp className="w-4 h-4 text-red-600 shrink-0" />
-                          ) : (
-                            <ArrowDown className="w-4 h-4 text-emerald-600 shrink-0" />
-                          )}
-                          <span
-                            className={`text-xl font-extrabold font-tabular ${
-                              isGiven ? 'text-red-600' : 'text-emerald-600'
-                            }`}
-                          >
-                            {formatINR(tx.amount)}
-                          </span>
-                        </div>
 
-                        <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
-                          <span>{formatTimeOnly(tx.billDate)}</span>
-                          <Check className="w-3.5 h-3.5 text-[var(--brand)]" />
+                return (
+                  <motion.div
+                    key={tx.id}
+                    initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 28, delay: delaySec }}
+                    className="rounded-[20px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-3.5 space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        {/* 3D Squircle Direction Indicator */}
+                        <span
+                          className={`w-10 h-10 rounded-2xl bg-gradient-to-br text-white flex items-center justify-center shadow-inner shrink-0 ${
+                            isGiven
+                              ? 'from-red-500 to-rose-600'
+                              : 'from-emerald-500 to-green-600'
+                          }`}
+                        >
+                          {isGiven ? (
+                            <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                          ) : (
+                            <ArrowDown className="w-4 h-4 stroke-[2.5]" />
+                          )}
+                        </span>
+
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`text-[11px] font-extrabold uppercase tracking-wider ${
+                                isGiven ? 'text-[var(--credit-red)]' : 'text-[var(--debit-green)]'
+                              }`}
+                            >
+                              {isGiven ? 'Udhaar Given' : 'Jama Received'}
+                            </span>
+                            <Check className="w-3 h-3 text-[var(--brand-accent)] shrink-0" />
+                          </div>
+
+                          {(tx.note || tx.voiceRaw) && (
+                            <p className="text-sm font-bold text-[var(--ink)] leading-snug break-words">
+                              {tx.note || `"${tx.voiceRaw}"`}
+                            </p>
+                          )}
+
+                          <p className="text-[11px] font-medium text-[var(--ink-muted)]">
+                            {metaParts.join(' · ')}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right Column: Amount + Running Balance Badge + Actions */}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span
+                          className={`font-display text-lg font-extrabold font-tabular leading-tight ${
+                            isGiven ? 'text-[var(--credit-red)]' : 'text-[var(--debit-green)]'
+                          }`}
+                        >
+                          {isGiven ? '-' : '+'}
+                          {hideBalance ? '₹••••' : formatINR(tx.amount)}
+                        </span>
+
+                        <span className="px-2 py-0.5 rounded-full bg-[var(--app-bg)] text-[10px] font-bold font-tabular text-[var(--ink-muted)]">
+                          Bal:{' '}
+                          {hideBalance
+                            ? '₹••••'
+                            : `${formatINR(Math.abs(runningBalance))} ${
+                                runningBalance > 0
+                                  ? t.due
+                                  : runningBalance < 0
+                                    ? t.advance
+                                    : t.settled
+                              }`}
+                        </span>
+
+                        <div className="no-print flex items-center gap-1 pt-0.5">
                           <button
                             type="button"
                             onClick={() => openEditCalculator(tx)}
                             aria-label={`Edit entry ${formatINR(tx.amount)}`}
-                            className="no-print ml-1 p-1 rounded text-slate-400 hover:text-[var(--brand)] transition"
+                            className="min-w-[34px] min-h-[34px] rounded-xl flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--brand-accent)] active:scale-95 transition"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
@@ -845,58 +918,41 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                               }
                             }}
                             aria-label={`Delete entry ${formatINR(tx.amount)}`}
-                            className={`no-print px-1.5 py-0.5 rounded text-[11px] font-bold transition ${
+                            className={`min-w-[34px] min-h-[34px] px-2 rounded-xl text-[11px] font-bold flex items-center justify-center active:scale-95 transition ${
                               armed
-                                ? 'bg-red-600 text-white'
-                                : 'text-slate-400 hover:text-red-600'
+                                ? 'bg-[var(--credit-red)] text-white'
+                                : 'text-[var(--ink-muted)] hover:bg-[var(--credit-tint)] hover:text-[var(--credit-red)]'
                             }`}
                           >
                             {armed ? 'Confirm?' : <Trash2 className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       </div>
-
-                      {(tx.note || tx.voiceRaw) && (
-                        <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                          {tx.note || `"${tx.voiceRaw}"`}
-                        </p>
-                      )}
-
-                      {metaParts.length > 0 && (
-                        <p className="text-[10px] font-semibold text-slate-400">
-                          {metaParts.join(' · ')}
-                        </p>
-                      )}
-
-                      {tx.billImage &&
-                        (brokenImgIds[tx.id] ? (
-                          <span className="inline-block text-[11px] font-semibold text-slate-400 italic pt-1">
-                            Bill photo unavailable
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewImage(tx.billImage)}
-                            className="block pt-1"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={tx.billImage}
-                              alt="Bill attachment"
-                              onError={() =>
-                                setBrokenImgIds((prev) => ({ ...prev, [tx.id]: true }))
-                              }
-                              className="max-h-28 rounded-lg border border-[var(--surface-border)] object-cover"
-                            />
-                          </button>
-                        ))}
                     </div>
 
-                    <span className="mt-1 px-1 text-[11px] font-semibold font-tabular text-slate-500 dark:text-slate-400">
-                      {formatINR(Math.abs(runningBalance))}{' '}
-                      {runningBalance > 0 ? t.due : runningBalance < 0 ? t.advance : t.settled}
-                    </span>
-                  </div>
+                    {tx.billImage &&
+                      (brokenImgIds[tx.id] ? (
+                        <span className="inline-block text-[11px] font-semibold text-[var(--ink-muted)] italic">
+                          Bill photo unavailable
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewImage(tx.billImage)}
+                          className="block pt-1"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={tx.billImage}
+                            alt="Bill attachment"
+                            onError={() =>
+                              setBrokenImgIds((prev) => ({ ...prev, [tx.id]: true }))
+                            }
+                            className="max-h-28 rounded-xl object-cover shadow-xs ring-1 ring-black/5 dark:ring-white/10"
+                          />
+                        </button>
+                      ))}
+                  </motion.div>
                 );
               })}
             </div>
@@ -905,7 +961,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
       </div>
 
       {/* Bottom Quick Action Bar + Sticky Received / Voice / Given */}
-      <div className="no-print bg-[var(--surface)] border-t border-[var(--surface-border)] px-4 py-3 space-y-3">
+      <div className="no-print bg-[var(--surface)]/95 backdrop-blur-xl shadow-[0_-10px_24px_-12px_rgba(15,23,42,0.12)] px-4 py-3 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
             <a
@@ -917,14 +973,14 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 }
               }}
               aria-label="Call customer"
-              className="w-10 h-10 rounded-full border border-[var(--surface-border)] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
+              className="w-11 h-11 rounded-2xl bg-[var(--app-bg)] flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
             >
               <Phone className="w-4 h-4" />
             </a>
             <a
               href={`sms:${account.phone || ''}?body=${encodeURIComponent(reminderMsg)}`}
               aria-label="Send SMS reminder"
-              className="w-10 h-10 rounded-full border border-[var(--surface-border)] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
+              className="w-11 h-11 rounded-2xl bg-[var(--app-bg)] flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
             >
               <MessageSquare className="w-4 h-4" />
             </a>
@@ -933,7 +989,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Send WhatsApp reminder"
-              className="w-10 h-10 rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600"
+              className="w-11 h-11 rounded-2xl bg-[var(--debit-tint)] flex items-center justify-center text-[var(--debit-green)] active:scale-95 transition"
             >
               <MessageCircle className="w-4 h-4" />
             </a>
@@ -941,7 +997,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               type="button"
               onClick={() => setShowQrModal(true)}
               aria-label="Show UPI QR"
-              className="w-10 h-10 rounded-full border border-[var(--surface-border)] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
+              className="w-11 h-11 rounded-2xl bg-[var(--app-bg)] flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
             >
               <QrCode className="w-4 h-4" />
             </button>
@@ -954,91 +1010,121 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 setShowDueModal(true);
               }}
               aria-label="Set due date or promise date"
-              className="w-10 h-10 rounded-full border border-[var(--surface-border)] flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10"
+              className="w-11 h-11 rounded-2xl bg-[var(--app-bg)] flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
             >
               <Calendar className="w-4 h-4" />
             </button>
           </div>
 
           <div className="text-right">
-            <p className="text-xs font-semibold text-slate-500">Balance {balLabel}</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+              Balance {balLabel}
+            </p>
             <p
-              className={`text-base font-extrabold font-tabular ${
-                account.balance > 0 ? 'text-red-600' : 'text-emerald-600'
+              className={`font-display text-lg font-extrabold font-tabular ${
+                account.balance > 0
+                  ? 'text-[var(--credit-red)]'
+                  : account.balance < 0
+                    ? 'text-[var(--debit-green)]'
+                    : 'text-[var(--ink)]'
               }`}
             >
-              {formatINR(absBal)}
+              {hideBalance ? '₹••••' : formatINR(absBal)}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
+        <div className="flex items-center gap-2">
+          <motion.button
             type="button"
+            whileTap={{ scale: 0.94 }}
             onClick={() => openCalculator('received')}
-            className="flex-1 min-h-[50px] rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400 font-extrabold text-sm flex items-center justify-center gap-1.5 transition"
+            className="flex-1 min-h-[48px] rounded-2xl bg-[var(--debit-tint)] text-[var(--debit-green)] font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-xs transition"
           >
             <ArrowDown className="w-4 h-4" />
             <span>{t.received}</span>
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
             type="button"
+            whileTap={{ scale: 0.9 }}
             onClick={() => onOpenVoiceForCustomer(account.name)}
             aria-label="Voice entry for this customer"
-            className="w-14 min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] flex items-center justify-center shrink-0 shadow-sm"
+            style={{ background: 'var(--munim-gradient)' }}
+            className="w-14 min-h-[48px] rounded-2xl text-white flex items-center justify-center shrink-0 shadow-lg transition"
           >
             <Mic className="w-5 h-5" />
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
             type="button"
+            whileTap={{ scale: 0.94 }}
             onClick={() => openCalculator('given')}
-            className="flex-1 min-h-[50px] rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-extrabold text-sm flex items-center justify-center gap-1.5 transition"
+            className="flex-1 min-h-[48px] rounded-2xl bg-[var(--credit-tint)] text-[var(--credit-red)] font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-xs transition"
           >
             <ArrowUp className="w-4 h-4" />
             <span>{t.given}</span>
-          </button>
+          </motion.button>
         </div>
       </div>
 
-      {/* Customer Profile / Edit Modal */}
+      {/* Customer Profile / Edit Bottom Sheet */}
+      <AnimatePresence>
       {showProfileDrawer && (
-        <div
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           onClick={() => {
             if (!profileSaving) setShowProfileDrawer(false);
           }}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
         >
-          <div
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.4 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 90 && !profileSaving) setShowProfileDrawer(false);
+            }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 max-h-[90dvh] overflow-y-auto no-scrollbar pb-safe"
           >
+            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold flex items-center gap-2">
-                <UserCog className="w-5 h-5 text-[var(--brand)]" />
+              <h3 className="font-display text-lg font-extrabold flex items-center gap-2 text-[var(--ink)]">
+                <UserCog className="w-5 h-5 text-[var(--brand-accent)]" />
                 <span>Party Profile</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setShowProfileDrawer(false)}
-                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500"
+                aria-label="Close profile"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Name</label>
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                  Name
+                </label>
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Mobile Number</label>
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                  Mobile Number
+                </label>
                 <input
                   type="tel"
                   maxLength={10}
@@ -1048,33 +1134,35 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
                   }}
                   placeholder="9876543210"
-                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold font-tabular"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Due Date</label>
+                  <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                    Due Date
+                  </label>
                   <input
                     type="date"
                     value={editDueDate}
                     onChange={(e) => setEditDueDate(e.target.value)}
-                    className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xs font-tabular"
+                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-xs font-tabular text-[var(--ink)] outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                  <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
                     Promise-to-Pay Date
                   </label>
                   <input
                     type="date"
                     value={editPromiseDate}
                     onChange={(e) => setEditPromiseDate(e.target.value)}
-                    className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-xs font-tabular"
+                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-xs font-tabular text-[var(--ink)] outline-none"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
                   Credit Limit (₹ Optional)
                 </label>
                 <input
@@ -1083,12 +1171,14 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   value={editCreditLimit}
                   onChange={(e) => setEditCreditLimit(e.target.value)}
                   placeholder="e.g. 5000 (0 = No Limit)"
-                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm font-bold font-tabular"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none"
                 />
               </div>
             </div>
 
-            {profileError && <p className="text-xs font-bold text-red-600">{profileError}</p>}
+            {profileError && (
+              <p className="text-xs font-bold text-[var(--credit-red)]">{profileError}</p>
+            )}
 
             <button
               type="button"
@@ -1117,23 +1207,23 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   setProfileSaving(false);
                 }
               }}
-              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60"
+              className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold disabled:opacity-60 shadow-md active:scale-95 transition"
             >
               {profileSaving ? 'Saving...' : 'Save Changes'}
             </button>
 
-            <div className="pt-2 border-t border-[var(--surface-border)]">
+            <div className="pt-2 border-t border-black/5 dark:border-white/5">
               {!confirmDeleteCustomer ? (
                 <button
                   type="button"
                   onClick={() => setConfirmDeleteCustomer(true)}
-                  className="w-full min-h-[44px] rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  className="w-full min-h-[44px] rounded-2xl text-sm font-bold text-[var(--credit-red)] hover:bg-[var(--credit-tint)] active:scale-95 transition"
                 >
                   Delete Party &amp; Ledger
                 </button>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-xs font-bold text-red-600 text-center">
+                  <p className="text-xs font-bold text-[var(--credit-red)] text-center">
                     Permanently delete {account.name} and all entries?
                   </p>
                   <div className="grid grid-cols-2 gap-2">
@@ -1152,14 +1242,14 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                           setProfileSaving(false);
                         }
                       }}
-                      className="min-h-[44px] rounded-xl bg-red-600 text-white text-sm font-bold disabled:opacity-60"
+                      className="min-h-[44px] rounded-2xl bg-[var(--credit-red)] text-white text-sm font-bold disabled:opacity-60 active:scale-95 transition"
                     >
                       {profileSaving ? 'Deleting...' : 'Yes, Delete'}
                     </button>
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteCustomer(false)}
-                      className="min-h-[44px] rounded-xl bg-black/5 dark:bg-white/10 text-sm font-bold"
+                      className="min-h-[44px] rounded-2xl bg-[var(--app-bg)] text-sm font-bold text-[var(--ink)] active:scale-95 transition"
                     >
                       Cancel
                     </button>
@@ -1167,92 +1257,129 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 </div>
               )}
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
-      {/* UPI QR Payment Modal */}
+      {/* UPI QR Payment Bottom Sheet */}
+      <AnimatePresence>
       {showQrModal && (
-        <div
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           onClick={() => setShowQrModal(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
         >
-          <div
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.4 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 90) setShowQrModal(false);
+            }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 text-center space-y-4"
+            className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 text-center space-y-4 pb-safe"
           >
+            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold">Collect via UPI QR</h3>
+              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
+                Collect via UPI QR
+              </h3>
               <button
                 type="button"
                 onClick={() => setShowQrModal(false)}
-                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-500"
+                aria-label="Close QR"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[var(--ink-muted)]">
               {business.upiId
                 ? `UPI ID: ${business.upiId}`
                 : 'Set your real UPI ID in Settings for live payments'}
             </p>
-            <div className="mx-auto w-fit p-4 bg-white rounded-2xl border border-slate-200">
+            <div className="mx-auto w-fit p-4 bg-white rounded-3xl shadow-md">
               <QRCodeSVG value={upiUri} size={180} />
             </div>
-            <p className="text-xl font-extrabold font-tabular text-[var(--brand)]">
+            <p className="font-display text-xl font-extrabold font-tabular text-[var(--brand-accent)]">
               {account.balance > 0 ? formatINR(account.balance) : 'Any Amount'}
             </p>
             <a
               href={buildWhatsAppUrl(account.phone, reminderMsg)}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold flex items-center justify-center gap-2"
+              className="w-full min-h-[48px] rounded-2xl bg-[var(--debit-green)] text-white font-bold flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
             >
               <MessageCircle className="w-4 h-4" />
               <span>Share Reminder on WhatsApp</span>
             </a>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
-      {/* Due Date & Promise-to-Pay Quick Picker */}
+      {/* Due Date & Promise-to-Pay Bottom Sheet */}
+      <AnimatePresence>
       {showDueModal && (
-        <div
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           onClick={() => {
             if (!dueSaving) setShowDueModal(false);
           }}
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
         >
-          <div
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.4 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 90 && !dueSaving) setShowDueModal(false);
+            }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--surface-border)] p-6 space-y-4"
+            className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe"
           >
-            <h3 className="text-lg font-extrabold">Due Date &amp; Payment Promise</h3>
+            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
+            <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
+              Due Date &amp; Payment Promise
+            </h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
                   Collection Due Date
                 </label>
                 <input
                   type="date"
                   value={editDueDate}
                   onChange={(e) => setEditDueDate(e.target.value)}
-                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 font-tabular"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 font-tabular text-[var(--ink)]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
                   Customer Promise-to-Pay Date
                 </label>
                 <input
                   type="date"
                   value={editPromiseDate}
                   onChange={(e) => setEditPromiseDate(e.target.value)}
-                  className="w-full min-h-[46px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 font-tabular"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 font-tabular text-[var(--ink)]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
                   Promise Note (Optional)
                 </label>
                 <input
@@ -1260,11 +1387,11 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   value={editPromiseNote}
                   onChange={(e) => setEditPromiseNote(e.target.value)}
                   placeholder="e.g. Kal shaam ko UPI karega"
-                  className="w-full min-h-[44px] rounded-xl border border-[var(--surface-border)] bg-transparent px-3 text-sm"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm text-[var(--ink)]"
                 />
               </div>
             </div>
-            {dueError && <p className="text-xs font-bold text-red-600">{dueError}</p>}
+            {dueError && <p className="text-xs font-bold text-[var(--credit-red)]">{dueError}</p>}
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -1285,7 +1412,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     setDueSaving(false);
                   }
                 }}
-                className="min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60"
+                className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60 active:scale-95 transition"
               >
                 {dueSaving ? 'Saving...' : 'Save Dates'}
               </button>
@@ -1293,18 +1420,23 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 type="button"
                 disabled={dueSaving}
                 onClick={() => setShowDueModal(false)}
-                className="min-h-[46px] rounded-xl bg-black/5 dark:bg-white/10 font-bold"
+                className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] text-[var(--ink)] font-bold active:scale-95 transition"
               >
                 Cancel
               </button>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Bill Image Lightbox */}
+      <AnimatePresence>
       {previewImage && (
-        <div
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           onClick={() => setPreviewImage(null)}
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
         >
@@ -1312,10 +1444,11 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           <img
             src={previewImage}
             alt="Attached bill"
-            className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl"
+            className="max-w-full max-h-[85vh] rounded-3xl shadow-2xl"
           />
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 };
