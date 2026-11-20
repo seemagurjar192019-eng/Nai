@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function PrivacyPolicyPage() {
   return (
     <main className="min-h-screen spatial-shell-bg text-[var(--ink)] py-8 px-4 sm:px-6">
-      <div className="mx-auto max-w-2xl rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-6 sm:p-9 space-y-6">
+      <div className="mx-auto max-w-2xl rounded-[28px] spatial-hero p-6 sm:p-9 space-y-6">
         <div className="flex items-center justify-between gap-4 bg-[var(--surface-subtle)] rounded-2xl px-4 py-3">
           <Link
             href="/"
@@ -33,24 +33,27 @@ export default function PrivacyPolicyPage() {
             Ucred Privacy Policy
           </h1>
           <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-            Ucred (&ldquo;Smart Voice Khata &amp; Galla OS&rdquo;) helps shopkeepers manage customer credits (Udhaar), payments (Jama), GST bills, inventory, cash-drawer Galla records, and counter staff logs. This policy explains what data we store and how you control it.
+            Ucred (&ldquo;Smart Voice Khata &amp; Galla OS&rdquo;) helps shopkeepers manage customer credits (Udhaar), payments (Jama), GST bills, inventory, cash-drawer Galla records, and counter staff logs. You can start immediately in Instant Guest Mode or optionally connect your mobile number via OTP for encrypted cloud sync.
           </p>
         </header>
 
         <section className="space-y-2.5">
           <h2 className="font-display text-base font-bold text-[var(--ink)] flex items-center gap-2">
             <Database className="h-4 w-4 text-[var(--brand-accent)]" />
-            1. Information You Store in Ucred
+            1. Guest Storage &amp; Optional Account Data
           </h2>
           <ul className="list-disc pl-5 text-sm text-[var(--ink-muted)] space-y-1.5 leading-relaxed">
             <li>
-              <strong className="text-[var(--ink)]">Verified Phone Identity:</strong> Your verified 10-digit Indian mobile number (`+91`) and Firebase Authentication UID used exclusively to scope and protect your shop ledger.
+              <strong className="text-[var(--ink)]">Instant Guest Mode (On-Device):</strong> When used without signing in, your shops, customer/supplier khata entries, Galla cashbook, stock, and bills are stored locally on your device via browser/IndexedDB storage. No mobile number is required to start.
+            </li>
+            <li>
+              <strong className="text-[var(--ink)]">Optional Mobile OTP Identity:</strong> If you choose &ldquo;Backup / Sync via Mobile OTP&rdquo;, your verified 10-digit Indian mobile number (`+91`) and Firebase Authentication UID are used exclusively to scope, merge, and protect your cloud ledger across devices.
             </li>
             <li>
               <strong className="text-[var(--ink)]">Business, Khata &amp; Galla Records:</strong> Business profile, GSTIN, UPI ID, customer/supplier accounts, promise-to-pay dates, transactions, GST bills, stock inventory, Galla cashbook inflows/expenses, counter staff names/roles, activity audit logs, and compressed receipt photos you attach.
             </li>
             <li>
-              <strong className="text-[var(--ink)]">Preferences &amp; Security:</strong> Language, Light/Dark appearance, and salted SHA-256 hashes of any 4-digit App Lock or Staff PINs.
+              <strong className="text-[var(--ink)]">Preferences &amp; Security:</strong> Theme, language, and salted SHA-256 hashes of any 4-digit App Lock or Staff PINs.
             </li>
           </ul>
         </section>
@@ -58,10 +61,13 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-2.5">
           <h2 className="font-display text-base font-bold text-[var(--ink)] flex items-center gap-2">
             <Mic className="h-4 w-4 text-[var(--brand-accent)]" />
-            2. Microphone, Hybrid Voice &amp; AI Parchi Processing
+            2. Microphone &amp; Camera Access (Just-In-Time Only)
           </h2>
           <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-            Microphone access is activated only when you tap Voice / Counter Mode. Simple commands resolve offline directly on your device. When you request Smart AI parsing for complex spoken sentences or upload a receipt photo inside the AI Parchi Scanner, only that text transcript or compressed slip image is sent securely over HTTPS to our server API for structured field extraction—never raw audio recordings and never used for ad targeting.
+            <strong className="text-[var(--ink)]">Microphone:</strong> Activated only when you tap the Munim Voice Orb or Counter Mode. Common Hindi/Hinglish/English entries resolve offline on your device. Only complex spoken text transcripts are sent securely over HTTPS for AI parsing—never raw audio recordings and never for advertising.
+          </p>
+          <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
+            <strong className="text-[var(--ink)]">Camera &amp; Photos:</strong> Activated only when you tap &ldquo;Take Photo&rdquo; or &ldquo;Upload&rdquo; inside the AI Parchi Scanner or attach a receipt to an entry. Compressed slip images are sent over HTTPS solely to extract party names, items, and totals into your ledger.
           </p>
         </section>
 
@@ -72,13 +78,10 @@ export default function PrivacyPolicyPage() {
           </h2>
           <ul className="list-disc pl-5 text-sm text-[var(--ink-muted)] space-y-1.5 leading-relaxed">
             <li>
-              <strong className="text-[var(--ink)]">Private Cloud Sync:</strong> All records live inside Google Cloud Firestore scoped strictly to your authenticated phone UID.
+              <strong className="text-[var(--ink)]">Private Cloud Sync:</strong> When signed in via OTP, records sync inside Google Cloud Firestore scoped strictly to your authenticated phone UID.
             </li>
             <li>
-              <strong className="text-[var(--ink)]">Offline First:</strong> IndexedDB persistence lets your shop keep billing and posting khata even when internet drops.
-            </li>
-            <li>
-              <strong className="text-[var(--ink)]">No Data Selling &amp; No Ads:</strong> Ucred never sells, rents, or shares your customer phone numbers, credit balances, or sales with third-party advertisers or credit bureaus.
+              <strong className="text-[var(--ink)]">No Data Selling &amp; No Ads:</strong> Ucred never sells, rents, or shares your customer phone numbers, credit balances, or sales with third-party advertisers, data brokers, or credit bureaus.
             </li>
             <li>
               <strong className="text-[var(--ink)]">Direct WhatsApp &amp; UPI:</strong> Payment reminders and receipts open your device&apos;s WhatsApp or UPI app directly with your chosen amount and VPA.
@@ -89,14 +92,14 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-2.5">
           <h2 className="font-display text-base font-bold text-[var(--ink)] flex items-center gap-2">
             <Trash2 className="h-4 w-4 text-[var(--brand-accent)]" />
-            4. Export, Retention &amp; Permanent Deletion
+            4. Export, Local Wipe &amp; Permanent Deletion
           </h2>
           <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-            Export a full JSON backup or CSV ledger report anytime from Settings, clear an individual shop, or permanently delete your entire Ucred account and cloud records via Settings or our{' '}
+            Export a full JSON backup or CSV ledger report anytime from Settings. In Guest Mode, use <strong className="text-[var(--ink)]">Clear All Business Data</strong> in Settings to wipe on-device records. Signed-in users can permanently delete their account and cloud records via Settings or our{' '}
             <Link href="/delete-account" className="font-bold text-[var(--ink)] underline">
-              Account Deletion instructions
+              Data &amp; Account Deletion instructions
             </Link>
-            .
+            . Support contact: <span className="font-bold text-[var(--ink)]">support@ucred.app</span>.
           </p>
         </section>
 

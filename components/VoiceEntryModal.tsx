@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle,
   ArrowRight,
@@ -23,6 +23,7 @@ import {
   parseVoiceCommand,
   type ParsedHinglishEntry,
 } from '@/lib/bolbahi-parser';
+import { SmartEntrySavedStage } from './SmartEntrySavedStage';
 import {
   buildReminderMessage,
   buildWhatsAppUrl,
@@ -650,7 +651,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       setStage('saved');
       setTimeout(() => {
         onClose();
-      }, 950);
+      }, 1150);
     } catch (err) {
       setSaving(false);
       setConfirmError(err instanceof Error ? err.message : 'Failed to save entry.');
@@ -699,7 +700,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       setStage('saved');
       setTimeout(() => {
         onClose();
-      }, 950);
+      }, 1150);
     } catch (err) {
       setSaving(false);
       setConfirmError(err instanceof Error ? err.message : 'Failed to save batch entries.');
@@ -732,26 +733,45 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
           aria-label="Voice Khata and Counter Entry"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 0, transition: { duration: 0.18, ease: 'easeOut' } }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
           onClick={() => {
             if (!saving) onClose();
           }}
-          className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end justify-center"
+          className={`fixed inset-0 z-50 bg-black/45 flex justify-center ${
+            stage === 'confirm' || stage === 'saved' ? 'items-center p-4' : 'items-end'
+          }`}
         >
           <motion.div
             key="voice-modal-sheet"
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
+            initial={stage === 'confirm' ? { opacity: 0, scale: 0.94, y: 16 } : { y: '100%' }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={
+              stage === 'saved'
+                ? {
+                    opacity: 0,
+                    scale: 0.35,
+                    y: 110,
+                    transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+                  }
+                : {
+                    y: '100%',
+                    transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+                  }
+            }
             transition={SPRING_SHEET}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-4 max-h-[92dvh] overflow-y-auto no-scrollbar pb-safe overflow-hidden"
+            className={`relative w-full bg-[var(--surface)] space-y-4 max-h-[90dvh] overflow-y-auto no-scrollbar overflow-hidden ${
+              stage === 'confirm' || stage === 'saved'
+                ? 'p-5 max-w-[385px] rounded-[28px] shadow-[0_20px_50px_rgba(17,24,39,0.22)]'
+                : 'px-6 pt-4 pb-6 max-w-[430px] rounded-t-[32px] spatial-sheet pb-safe'
+            }`}
           >
-            {/* Superlist-Inspired Soft Radial Indigo-Cyan Bottom Ambient Glow */}
+            {/* Subtle Solid-Safe Radial Indigo Bottom Glow in Listen Stage */}
             {stage === 'listen' && (
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-[radial-gradient(ellipse_at_bottom,_rgba(79,70,229,0.22),_rgba(6,182,212,0.14),_transparent_72%)]"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-[radial-gradient(ellipse_at_bottom,_rgba(79,70,229,0.14),_transparent_70%)]"
               />
             )}
 
@@ -811,7 +831,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 {/* Top-Stacking Live Streaming Cards (Superlist Capture Feel) */}
                 <div className="space-y-2 max-h-56 overflow-y-auto no-scrollbar">
                   {aiParsing && (
-                    <div className="rounded-[22px] bg-[var(--surface)] shadow-md ring-1 ring-black/5 dark:ring-white/10 p-4 space-y-2.5">
+                    <div className="rounded-[22px] bg-[var(--surface)] shadow-[var(--spatial-shadow)] p-4 space-y-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <div className="h-3.5 w-28 rounded-full spatial-shimmer" />
                         <div className="h-5 w-20 rounded-full spatial-shimmer" />
@@ -831,7 +851,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       {liveStreamPreview.map((entry, idx) => (
                         <div
                           key={`${entry.name}_${idx}`}
-                          className="rounded-[22px] bg-[var(--surface)] shadow-md ring-1 ring-[var(--brand-accent)]/25 p-3.5 flex items-center justify-between gap-3"
+                          className="rounded-[22px] bg-[var(--surface)] shadow-[var(--spatial-shadow)] ring-2 ring-[var(--brand)] p-3.5 flex items-center justify-between gap-3"
                         >
                           <div className="min-w-0">
                             <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
@@ -880,7 +900,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       initial={{ opacity: 0, y: -10, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={SPRING_FAST}
-                      className="flex items-center justify-between gap-2 text-xs bg-[var(--surface)] shadow-md ring-1 ring-black/5 dark:ring-white/10 rounded-[20px] px-3.5 py-2.5"
+                      className="flex items-center justify-between gap-2 text-xs bg-[var(--surface)] shadow-[var(--spatial-shadow)] rounded-[20px] px-3.5 py-2.5"
                     >
                       <span className="font-extrabold text-[var(--ink)] truncate">
                         {item.customerName} · {item.direction === 'given' ? 'Udhaar' : 'Mila'}
@@ -960,7 +980,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                           ? `${prefillCustomerName} paanch sau udhaar`
                           : 'Ramesh 500 udhaar aur Suresh 300 mila'
                       }
-                      className="flex-1 min-h-[46px] rounded-2xl bg-[var(--surface)] shadow-xs ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm font-medium text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                      className="flex-1 min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-medium text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                     />
                     <button
                       type="button"
@@ -985,7 +1005,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                         key={sample}
                         type="button"
                         onClick={() => applyTranscriptToConfirm(sample)}
-                        className="min-h-[36px] px-3 rounded-xl bg-[var(--surface)]/90 shadow-xs text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--brand-accent)] whitespace-nowrap shrink-0 active:scale-95 transition"
+                        className="min-h-[36px] px-3 rounded-xl bg-[var(--app-bg)] text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--brand-accent)] whitespace-nowrap shrink-0 active:scale-95 transition"
                       >
                         {sample}
                       </button>
@@ -993,8 +1013,8 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                   </div>
                 </div>
 
-                {/* Clean 3-Button Superlist Bottom Bar: Pause/Resume (||) | 22-Bar Waveform | Save (✓) */}
-                <div className="mt-1 rounded-full bg-[var(--surface)]/95 backdrop-blur-xl shadow-lg ring-1 ring-black/5 dark:ring-white/10 p-2 flex items-center justify-between gap-2">
+                {/* Clean 3-Button Solid Bottom Bar: Pause/Resume (||) | 22-Bar Waveform | Save (✓) */}
+                <div className="mt-1 rounded-full bg-[var(--surface-subtle)] shadow-md p-2 flex items-center justify-between gap-2">
                   <motion.button
                     whileTap={{ scale: 0.9 }}
                     transition={SPRING_FAST}
@@ -1005,7 +1025,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition ${
                       listening
                         ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
-                        : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
+                        : 'bg-[var(--surface)] text-[var(--ink)]'
                     }`}
                   >
                     {listening ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
@@ -1021,11 +1041,15 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     onClick={handleBottomSaveAction}
                     aria-label="Parse and save voice entry"
                     style={{ background: 'var(--munim-gradient)' }}
-                    className="w-12 h-12 rounded-full text-white flex items-center justify-center shadow-md shrink-0 disabled:opacity-60"
+                    className="tactile-key-primary w-12 h-12 rounded-full text-white flex items-center justify-center shrink-0 disabled:opacity-60"
                   >
                     <Check className="w-5 h-5 stroke-[2.75]" />
                   </motion.button>
                 </div>
+
+                <p className="text-[10px] font-medium text-center text-[var(--ink-muted)]">
+                  Mic listens only while this drawer is open — zero background audio stored.
+                </p>
               </div>
             )}
 
@@ -1104,7 +1128,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 )}
 
                 {/* Single Clean Inline-Editable Receipt Summary Card */}
-                <div className="rounded-[24px] bg-[var(--app-bg)] divide-y divide-black/5 dark:divide-white/5 overflow-hidden">
+                <div className="rounded-[24px] bg-[var(--app-bg)] divide-y divide-[var(--surface-subtle)] overflow-hidden">
                   <div
                     onClick={() => setActiveField('name')}
                     className="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition"
@@ -1377,7 +1401,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                   </button>
                 </div>
 
-                <div className="rounded-2xl bg-[var(--app-bg)] divide-y divide-black/5 dark:divide-white/5">
+                <div className="rounded-2xl bg-[var(--app-bg)] divide-y divide-[var(--surface-subtle)]">
                   {voiceBillItems.map((it, idx) => (
                     <div key={idx} className="px-3.5 py-2.5 flex items-center justify-between text-xs">
                       <div>
@@ -1537,24 +1561,30 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
             )}
 
             {stage === 'saved' && (
-              <div className="py-10 flex flex-col items-center justify-center text-center gap-4">
-                <motion.div
-                  initial={{ scale: 0.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={SPRING_FAST}
-                  className="w-20 h-20 rounded-full bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shadow-lg"
-                >
-                  <Check className="w-10 h-10 stroke-[3]" />
-                </motion.div>
-                <h3 className="font-display text-2xl font-extrabold text-[var(--debit-green)]">
-                  Entry Saved!
-                </h3>
-                <p className="text-sm font-tabular text-[var(--ink-muted)]">
-                  {batchItems.length > 1
-                    ? `${batchItems.filter((i) => i.selected).length} entries saved to khata`
-                    : `${name} · ${formatINR(amount)} (${direction === 'given' ? 'Given' : 'Received'})`}
-                </p>
-              </div>
+              <SmartEntrySavedStage
+                partyName={
+                  batchItems.length > 1
+                    ? `${batchItems.filter((i) => i.selected).length} Parties`
+                    : name
+                }
+                previousBalance={matchedAccount?.balance ?? 0}
+                newBalance={
+                  batchItems.length > 1
+                    ? batchItems
+                        .filter((i) => i.selected)
+                        .reduce((s, it) => s + (it.direction === 'given' ? it.amount : -it.amount), 0)
+                    : (matchedAccount?.balance ?? 0) +
+                      (direction === 'given' ? amount : -amount)
+                }
+                amount={
+                  batchItems.length > 1
+                    ? batchItems
+                        .filter((i) => i.selected)
+                        .reduce((s, it) => s + it.amount, 0)
+                    : amount
+                }
+                direction={direction}
+              />
             )}
           </motion.div>
         </motion.div>

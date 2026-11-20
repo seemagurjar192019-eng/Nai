@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   Check,
@@ -126,7 +126,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     return (
       <div className="max-w-[430px] mx-auto min-h-dvh relative overflow-x-hidden shadow-2xl flex flex-col items-center justify-between spatial-shell-bg px-6 py-12 text-center">
         <div className="flex-1 flex flex-col items-center justify-center gap-5 stagger-fade-up">
-          <div className="w-24 h-24 rounded-[28px] overflow-hidden spatial-hero ring-1 ring-white/80 dark:ring-white/10 shrink-0">
+          <div className="w-24 h-24 rounded-[28px] overflow-hidden spatial-hero shrink-0">
             <Image
               src={UCRED_LOGO_PATH}
               alt="Ucred"
@@ -150,19 +150,19 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         <div className="w-full max-w-sm space-y-5">
           <div className="grid grid-cols-3 gap-3 text-[11px] font-bold tracking-wider uppercase text-[var(--ink-muted)]">
             <div className="flex flex-col items-center gap-2">
-              <span className="w-11 h-11 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--brand-accent)] flex items-center justify-center">
+              <span className="w-11 h-11 rounded-2xl spatial-card text-[var(--brand-accent)] flex items-center justify-center">
                 <ShieldCheck className="w-5 h-5" />
               </span>
               <span>OTP Verified</span>
             </div>
             <div className="flex flex-col items-center gap-2">
-              <span className="w-11 h-11 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--brand-accent)] flex items-center justify-center">
+              <span className="w-11 h-11 rounded-2xl spatial-card text-[var(--brand-accent)] flex items-center justify-center">
                 <Lock className="w-5 h-5" />
               </span>
               <span>Cloud Synced</span>
             </div>
             <div className="flex flex-col items-center gap-2">
-              <span className="w-11 h-11 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--brand-accent)] flex items-center justify-center">
+              <span className="w-11 h-11 rounded-2xl spatial-card text-[var(--brand-accent)] flex items-center justify-center">
                 <UserCheck className="w-5 h-5" />
               </span>
               <span>100% Private</span>
@@ -184,7 +184,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         <div className="w-full flex-1 flex flex-col gap-5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
-              <span className="w-10 h-10 rounded-2xl overflow-hidden spatial-card ring-1 ring-white/80 dark:ring-white/10 shrink-0">
+              <span className="w-10 h-10 rounded-2xl overflow-hidden spatial-card shrink-0">
                 <Image
                   src={UCRED_LOGO_PATH}
                   alt="Ucred"
@@ -203,7 +203,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 type="button"
                 onClick={onToggleAppearance}
                 aria-label="Toggle Light or Dark mode"
-                className="min-w-[44px] min-h-[44px] rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
+                className="min-w-[44px] min-h-[44px] rounded-xl spatial-card flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
               >
                 {appearance === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
@@ -239,7 +239,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   } ${
                     selected
                       ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)] shadow-md'
-                      : 'spatial-card ring-1 ring-white/80 dark:ring-white/10'
+                      : 'spatial-card'
                   }`}
                 >
                   <span className="text-lg font-bold leading-snug text-[var(--ink)]">
@@ -264,7 +264,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             <button
               type="button"
               onClick={() => onStepChange('login')}
-              className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 text-[var(--brand-fg)] text-base font-bold shadow-lg transition"
+              className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 text-[var(--brand-fg)] text-base font-bold tactile-key-primary transition"
             >
               Continue ({LANGUAGE_OPTIONS.find((o) => o.code === language)?.nativeName || 'English'})
             </button>
@@ -285,7 +285,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between gap-3 pb-6">
             <div className="flex items-center gap-2.5">
-              <span className="w-10 h-10 rounded-2xl overflow-hidden spatial-card ring-1 ring-white/80 dark:ring-white/10 shrink-0">
+              <span className="w-10 h-10 rounded-2xl overflow-hidden spatial-card shrink-0">
                 <Image
                   src={UCRED_LOGO_PATH}
                   alt="Ucred"
@@ -305,7 +305,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 type="button"
                 onClick={onToggleAppearance}
                 aria-label="Toggle Light or Dark mode"
-                className="min-w-[44px] min-h-[44px] rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
+                className="min-w-[44px] min-h-[44px] rounded-xl spatial-card flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
               >
                 {appearance === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
@@ -314,13 +314,13 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 <button
                   type="button"
                   onClick={() => setLangMenuOpen((v) => !v)}
-                  className="inline-flex items-center gap-1.5 min-h-[44px] px-3.5 py-1.5 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-semibold text-[var(--ink)] active:scale-95 transition"
+                  className="inline-flex items-center gap-1.5 min-h-[44px] px-3.5 py-1.5 rounded-xl spatial-card text-sm font-semibold text-[var(--ink)] active:scale-95 transition"
                 >
                   <span>{currentLangObj.nativeName}</span>
                   <ChevronDown className="w-4 h-4 text-[var(--ink-muted)]" />
                 </button>
                 {langMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 rounded-[22px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-1.5 z-30">
+                  <div className="absolute right-0 mt-2 w-48 rounded-[22px] spatial-sheet p-1.5 z-30">
                     {LANGUAGE_OPTIONS.slice(0, 6).map((opt) => (
                       <button
                         key={opt.code}
@@ -358,8 +358,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
           </div>
 
           {/* Auth Card */}
-          <div className="rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-6 sm:p-7 space-y-6 my-auto stagger-fade-up">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+          <div className="rounded-[28px] spatial-hero p-6 sm:p-7 space-y-6 my-auto stagger-fade-up">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
               {otpSentTo ? <KeyRound className="w-6 h-6" /> : <Smartphone className="w-6 h-6" />}
             </div>
 
@@ -444,7 +444,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   type="button"
                   disabled={authBusy}
                   onClick={() => void handleSendOtpClick()}
-                  className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 disabled:opacity-60 text-[var(--brand-fg)] text-base font-bold shadow-lg transition flex items-center justify-center gap-2"
+                  className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 disabled:opacity-60 text-[var(--brand-fg)] text-base font-bold tactile-key-primary transition flex items-center justify-center gap-2"
                 >
                   {authBusy ? 'Sending OTP...' : t.sendOtp}
                 </button>
@@ -506,7 +506,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 <button
                   type="submit"
                   disabled={authBusy}
-                  className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 disabled:opacity-60 text-[var(--brand-fg)] text-base font-bold shadow-lg transition"
+                  className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 disabled:opacity-60 text-[var(--brand-fg)] text-base font-bold tactile-key-primary transition"
                 >
                   {authBusy ? 'Verifying OTP...' : 'Verify & Open Khata'}
                 </button>
@@ -529,7 +529,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             )}
 
             <div className="flex items-center justify-between text-xs text-[var(--ink-muted)] pt-2">
-              <span>Ucred Royal Indigo · {appearance === 'dark' ? 'Dark' : 'Light'}</span>
+              <span>Ucred Spatial OS · {appearance === 'dark' ? 'Dark' : 'Light'}</span>
               <div className="flex items-center gap-3">
                 <Link href="/terms" className="font-semibold text-[var(--ink)] hover:underline">
                   Terms
@@ -545,11 +545,11 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         {showLegalModal && (
           <div
             onClick={() => setShowLegalModal(null)}
-            className="fixed inset-0 z-50 bg-slate-950/55 flex items-center justify-center p-4 backdrop-blur-xs"
+            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md rounded-[28px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 sheet-slide-up"
+              className="w-full max-w-md rounded-[28px] spatial-sheet p-6 space-y-4 sheet-slide-up"
             >
               <h2 className="font-display text-lg font-extrabold text-[var(--ink)]">
                 {showLegalModal === 'terms' ? 'Terms & Conditions' : 'Privacy Policy & Security'}
@@ -562,7 +562,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               <button
                 type="button"
                 onClick={() => setShowLegalModal(null)}
-                className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold shadow-md active:scale-95 transition"
+                className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold tactile-key-primary active:scale-95 transition"
               >
                 Close
               </button>
@@ -581,7 +581,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
           initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-          className="w-24 h-24 rounded-full bg-[var(--debit-tint)] text-[var(--debit-green)] shadow-lg ring-4 ring-[var(--debit-green)]/30 flex items-center justify-center"
+          className="w-24 h-24 rounded-full bg-[var(--debit-tint)] text-[var(--debit-green)] shadow-lg ring-4 ring-[var(--debit-green)] flex items-center justify-center"
         >
           <Check className="w-12 h-12 stroke-[3]" />
         </motion.div>
@@ -597,8 +597,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
     return (
       <div className="max-w-[430px] mx-auto min-h-dvh relative overflow-x-hidden shadow-2xl flex flex-col justify-between spatial-shell-bg px-6 py-10">
         <div className="w-full flex-1 flex flex-col items-center justify-center text-center gap-6 stagger-fade-up">
-          <div className="w-32 h-32 rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 flex flex-col items-center justify-center gap-2 p-4">
-            <span className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+          <div className="w-32 h-32 rounded-[28px] spatial-hero flex flex-col items-center justify-center gap-2 p-4">
+            <span className="w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
               <Store className="w-8 h-8" />
             </span>
             <span className="text-xs font-bold uppercase tracking-widest text-[var(--ink-muted)]">
@@ -615,7 +615,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
             </p>
           </div>
 
-          <div className="w-full rounded-[24px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4.5 text-left space-y-2 text-xs text-[var(--ink-muted)]">
+          <div className="w-full rounded-[24px] spatial-card p-4.5 text-left space-y-2 text-xs text-[var(--ink-muted)]">
             <p className="font-bold text-[var(--ink)]">Ready for live shop operations:</p>
             <p>· Hybrid Hinglish &amp; Hindi voice entries + multi-item spoken bills</p>
             <p>· AI Parchi scanner from handwritten paper slips</p>
@@ -627,7 +627,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
           <button
             type="button"
             onClick={onWelcomeDone}
-            className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 text-[var(--brand-fg)] text-base font-bold transition shadow-lg"
+            className="w-full min-h-[52px] rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] active:scale-95 text-[var(--brand-fg)] text-base font-bold transition tactile-key-primary"
           >
             {t.startBtn}
           </button>
@@ -644,15 +644,15 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
           <button
             type="button"
             onClick={() => onStepChange('welcome')}
-            className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-bold text-[var(--ink)] active:scale-95 transition"
+            className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl spatial-card text-sm font-bold text-[var(--ink)] active:scale-95 transition"
           >
             <ArrowLeft className="w-5 h-5" />
             <span>{t.setupBusiness}</span>
           </button>
         </div>
 
-        <div className="rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-5 my-auto stagger-fade-up">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+        <div className="rounded-[28px] spatial-hero p-6 space-y-5 my-auto stagger-fade-up">
+          <div className="w-12 h-12 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
             <Store className="w-6 h-6" />
           </div>
 
@@ -720,7 +720,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 upiId: shopUpiInput.trim(),
               })
             }
-            className="w-full min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-50 text-[var(--brand-fg)] font-extrabold text-base shadow-lg active:scale-95 transition"
+            className="w-full min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-50 text-[var(--brand-fg)] font-extrabold text-base tactile-key-primary active:scale-95 transition"
           >
             {authBusy ? 'Creating Shop...' : 'Open My Ucred Cockpit'}
           </button>

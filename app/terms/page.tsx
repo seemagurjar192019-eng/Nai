@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function TermsOfServicePage() {
   return (
     <main className="min-h-screen spatial-shell-bg text-[var(--ink)] py-8 px-4 sm:px-6">
-      <div className="mx-auto max-w-2xl rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-6 sm:p-9 space-y-6">
+      <div className="mx-auto max-w-2xl rounded-[28px] spatial-hero p-6 sm:p-9 space-y-6">
         <div className="flex items-center justify-between gap-4 bg-[var(--surface-subtle)] rounded-2xl px-4 py-3">
           <Link
             href="/"
@@ -57,10 +57,10 @@ export default function TermsOfServicePage() {
 
         <section className="space-y-2">
           <h2 className="font-display text-base font-bold text-[var(--ink)]">
-            3. Multi-Staff Counter Access &amp; Backups
+            3. Guest Mode, Multi-Staff Access &amp; Backups
           </h2>
           <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-            Keep your verified mobile SIM and OTP messages secure, set 4-digit PINs for App Lock and Staff Operators on shared counter phones, and download periodic JSON/CSV backups from Settings.
+            In Instant Guest Mode, entries stay stored locally on your device—connect +91 Mobile OTP backup or download periodic JSON/CSV backups from Settings to avoid data loss if you clear device storage. When synced, keep your verified mobile SIM and OTP messages secure and set 4-digit PINs for App Lock and Staff Operators on shared counter phones.
           </p>
         </section>
 

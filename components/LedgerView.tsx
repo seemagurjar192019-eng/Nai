@@ -1,24 +1,23 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useDrag } from '@use-gesture/react';
 import {
-  AlertTriangle,
   ArrowDown,
-  ArrowRight,
   ArrowUp,
   Camera,
   Check,
+  ChevronDown,
+  Delete,
   Eye,
   EyeOff,
   Filter,
-  Landmark,
+  MessageSquare,
   Mic,
-  Package,
   Plus,
   Sparkles,
   UserPlus,
-  Users,
   Volume2,
   Wallet,
   X,
@@ -30,7 +29,14 @@ import {
   getUIStrings,
   isValidIndianMobile,
 } from '@/lib/i18n';
-import { computeNetCashflowSummary } from '@/lib/ucred-intelligence';
+import {
+  applyKeypadKey,
+  computeNetCashflowSummary,
+  getTopDuePartiesToday,
+  type KeypadKey,
+} from '@/lib/ucred-intelligence';
+import { AnimatedRupeeNumber } from './AnimatedRupeeNumber';
+import { SmartEntrySavedStage } from './SmartEntrySavedStage';
 import type {
   AccountKind,
   CashbookMode,
@@ -54,6 +60,7 @@ interface LedgerViewProps {
   gallaPulse: DailyGallaPulse;
   trustScoresByAccount: Record<string, CustomerTrustScore>;
   selectedAccountId?: string | null;
+  recentlyUpdatedAccountId?: string | null;
   hideBalance: boolean;
   onToggleHideBalance: () => void;
   addPartySignal?: number;
@@ -74,6 +81,7 @@ interface LedgerViewProps {
       syncToGalla?: { mode: CashbookMode } | null;
     }
   ) => Promise<void>;
+  onSwipeRemind?: (account: LedgerAccount) => void;
   onOpenCollection: () => void;
   onOpenVoiceEntry: () => void;
   onOpenCounterMode: () => void;
@@ -101,9 +109,9 @@ const SORT_OPTIONS: Array<{ id: SortByOption; label: string }> = [
 ];
 
 const RING_RADIUS = 19;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const SPRING_FAST = { type: 'spring' as const, stiffness: 420, damping: 28 };
 const SPRING_SHEET = { type: 'spring' as const, stiffness: 360, damping: 32 };
+const KEYPAD_KEYS: KeypadKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'backspace'];
 
 function TrustAvatarRing({
   name,
@@ -117,7 +125,6 @@ function TrustAvatarRing({
   size?: 'sm' | 'md';
 }) {
   const clamped = Math.max(0, Math.min(100, hasTrust ? score : 100));
-  const offset = RING_CIRCUMFERENCE * (1 - clamped / 100);
   const strokeColor = !hasTrust
     ? 'var(--brand-accent)'
     : clamped >= 70
@@ -139,7 +146,7 @@ function TrustAvatarRing({
           fill="none"
           className="stroke-[var(--surface-subtle)]"
         />
-        <circle
+        <motion.circle
           cx="22"
           cy="22"
           r={RING_RADIUS}
@@ -147,10 +154,9 @@ function TrustAvatarRing({
           fill="none"
           stroke={strokeColor}
           strokeLinecap="round"
-          strokeDasharray={RING_CIRCUMFERENCE}
-          strokeDashoffset={offset}
-          className="trust-ring-draw"
-          style={{ transition: 'stroke-dashoffset 0.55s cubic-bezier(0.16, 1, 0.3, 1)' }}
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: clamped / 100 }}
+          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
         />
       </svg>
       <div
@@ -163,6 +169,199 @@ function TrustAvatarRing({
   );
 }
 
+interface SwipeablePartyCardProps {
+  account: LedgerAccount;
+  idx: number;
+  trust?: CustomerTrustScore;
+  hideBalance: boolean;
+  isSelected: boolean;
+  isRecentlySaved: boolean;
+  dueLabel: string;
+  advanceLabel: string;
+  settledLabel: string;
+  onSelect: (acc: LedgerAccount) => void;
+  onQuickAdd: (acc: LedgerAccount, presetDirection: TxDirection) => void;
+  onSwipeRemind?: (acc: LedgerAccount) => void;
+}
+
+const SwipeablePartyCard: React.FC<SwipeablePartyCardProps> = ({
+  account,
+  idx,
+  trust,
+  hideBalance,
+  isSelected,
+  isRecentlySaved,
+  dueLabel,
+  advanceLabel,
+  settledLabel,
+  onSelect,
+  onQuickAdd,
+  onSwipeRemind,
+}) => {
+  const [dragX, setDragX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const bind = useDrag(
+    ({ down, movement: [mx], tap }) => {
+      if (tap) {
+        setDragX(0);
+        setIsDragging(false);
+        return;
+      }
+      if (down) {
+        const clamped = Math.max(-88, Math.min(88, mx * 0.72));
+        setIsDragging(true);
+        setDragX(clamped);
+      } else {
+        setIsDragging(false);
+        setDragX(0);
+        if (mx > 60) {
+          onQuickAdd(account, 'received');
+        } else if (mx < -60) {
+          if (onSwipeRemind) onSwipeRemind(account);
+          else onSelect(account);
+        }
+      }
+    },
+    {
+      axis: 'x',
+      filterTaps: true,
+      threshold: 10,
+    }
+  );
+
+  const absBal = Math.abs(account.balance);
+  const statusText =
+    account.balance > 0 ? dueLabel : account.balance < 0 ? advanceLabel : settledLabel;
+  const overLimit = Boolean(
+    account.creditLimit && account.creditLimit > 0 && account.balance > account.creditLimit
+  );
+  const hintText =
+    trust && account.kind === 'customer'
+      ? `Trust ${trust.score}/100`
+      : account.lastNote || (account.phone ? `+91 ${account.phone}` : 'Tap for ledger');
+
+  return (
+    <div className="relative rounded-[24px] overflow-hidden touch-pan-y">
+      {/* Solid Underlay Swipe Hints */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 rounded-[24px] flex items-center justify-between px-3 pointer-events-none bg-[var(--surface-subtle)]"
+      >
+        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[var(--debit-green)]">
+          <ArrowDown className="w-3.5 h-3.5" />
+          <span>Receive</span>
+        </span>
+        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[var(--brand-accent)]">
+          <span>Remind</span>
+          <MessageSquare className="w-3.5 h-3.5" />
+        </span>
+      </div>
+
+      <motion.div
+        {...(bind() as Record<string, unknown>)}
+        style={{ touchAction: 'pan-y' }}
+        initial={{ opacity: 0, y: 12, scale: 0.96 }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          x: dragX,
+          scale: isRecentlySaved ? 1.03 : 1,
+        }}
+        whileHover={{ y: -2 }}
+        transition={
+          isDragging
+            ? { duration: 0 }
+            : { ...SPRING_FAST, delay: Math.min(idx, 10) * 0.03 }
+        }
+        className={`relative rounded-[24px] min-h-[150px] spatial-card ${
+          isRecentlySaved
+            ? 'bg-[var(--debit-tint)] ring-2 ring-[var(--debit-green)]'
+            : isSelected
+              ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand)]'
+              : 'bg-[var(--surface)]'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => onSelect(account)}
+          aria-label={`Open ${account.name} khata`}
+          className="w-full h-full p-3.5 flex flex-col justify-between gap-3 text-left rounded-[24px] active:scale-[0.98] transition"
+        >
+          {/* Top Row: Trust Avatar Ring */}
+          <div className="flex items-start pr-12">
+            <TrustAvatarRing
+              name={account.name}
+              score={trust?.score ?? 100}
+              hasTrust={Boolean(trust && account.kind === 'customer')}
+              size="sm"
+            />
+          </div>
+
+          {/* Middle Row: Party Name + Trust/Hint */}
+          <div className="min-w-0 w-full space-y-0.5">
+            <p className="text-[15px] font-extrabold text-[var(--ink)] leading-snug truncate">
+              {account.name}
+            </p>
+            <p
+              className={`text-[11px] font-semibold truncate ${
+                trust?.band === 'high-risk' && account.balance > 0
+                  ? 'text-[var(--credit-red)]'
+                  : 'text-[var(--ink-muted)]'
+              }`}
+            >
+              {overLimit ? `Over Limit · ${formatINR(account.creditLimit || 0)}` : hintText}
+            </p>
+          </div>
+
+          {/* Bottom Row: Rolling Tabular Balance + Status Label */}
+          <div className="w-full flex items-baseline justify-between gap-1.5 pt-2 border-t border-[var(--surface-subtle)]">
+            <p
+              className={`font-display text-lg font-extrabold truncate ${
+                account.balance > 0
+                  ? 'text-[var(--credit-red)]'
+                  : account.balance < 0
+                    ? 'text-[var(--debit-green)]'
+                    : 'text-[var(--ink-muted)]'
+              }`}
+            >
+              <AnimatedRupeeNumber value={absBal} hidden={hideBalance} />
+            </p>
+            <span
+              className={`text-[10px] font-extrabold uppercase tracking-wider shrink-0 ${
+                overLimit
+                  ? 'text-[var(--alert-amber)]'
+                  : account.balance > 0
+                    ? 'text-[var(--credit-red)]'
+                    : account.balance < 0
+                      ? 'text-[var(--debit-green)]'
+                      : 'text-[var(--ink-muted)]'
+              }`}
+            >
+              {overLimit ? 'Limit' : statusText}
+            </span>
+          </div>
+        </button>
+
+        <motion.button
+          whileTap={{ scale: 0.9, y: 1 }}
+          transition={SPRING_FAST}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onQuickAdd(account, 'given');
+          }}
+          aria-label={`Quick ₹ entry for ${account.name}`}
+          className="absolute top-2.5 right-2.5 z-10 min-w-[44px] min-h-[44px] px-2.5 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] font-extrabold text-xs inline-flex items-center justify-center gap-0.5 shadow-xs"
+        >
+          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+          <span>₹</span>
+        </motion.button>
+      </motion.div>
+    </div>
+  );
+};
+
 export const LedgerView: React.FC<LedgerViewProps> = ({
   accounts,
   transactions,
@@ -172,12 +371,14 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   gallaPulse,
   trustScoresByAccount,
   selectedAccountId,
+  recentlyUpdatedAccountId,
   hideBalance,
   onToggleHideBalance,
   addPartySignal = 0,
   onSelectAccount,
   onCreateAccount,
   onQuickTransaction,
+  onSwipeRemind,
   onOpenCollection,
   onOpenVoiceEntry,
   onOpenParchiScanner,
@@ -188,8 +389,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   const [filterChip, setFilterChip] = useState<LedgerFilterChip>('customer');
   const [sortBy, setSortBy] = useState<SortByOption>('latest-activity');
   const [showFilterSortSheet, setShowFilterSortSheet] = useState(false);
-  const [pulseIdx, setPulseIdx] = useState(0);
-  const deckRef = useRef<HTMLDivElement | null>(null);
+  const [heroExpanded, setHeroExpanded] = useState(false);
 
   // Add Customer / Supplier Bottom Sheet
   const [showAddModal, setShowAddModal] = useState(false);
@@ -201,7 +401,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   const [addingBusy, setAddingBusy] = useState(false);
   const [addError, setAddError] = useState('');
 
-  // Inline + ₹ Quick-Entry Bottom Sheet
+  // Custom 3D Keypad Quick Entry Bottom Sheet
   const [quickEntryAccount, setQuickEntryAccount] = useState<LedgerAccount | null>(null);
   const [quickDirection, setQuickDirection] = useState<TxDirection>('given');
   const [quickAmount, setQuickAmount] = useState('');
@@ -209,7 +409,13 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   const [quickGallaMode, setQuickGallaMode] = useState<CashbookMode | null>(null);
   const [quickSaving, setQuickSaving] = useState(false);
   const [quickError, setQuickError] = useState('');
-  const quickAmountInputRef = useRef<HTMLInputElement | null>(null);
+  const [quickCelebration, setQuickCelebration] = useState<{
+    partyName: string;
+    previousBalance: number;
+    newBalance: number;
+    amount: number;
+    direction: TxDirection;
+  } | null>(null);
   const filterChipRef = useRef<LedgerFilterChip>(filterChip);
 
   const todayStr = getLocalDateKey();
@@ -233,61 +439,42 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   }, [addPartySignal]);
 
   useEffect(() => {
-    if (!quickEntryAccount) return;
-    const timer = setTimeout(() => {
-      quickAmountInputRef.current?.focus();
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [quickEntryAccount]);
-
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (quickEntryAccount && !quickSaving) setQuickEntryAccount(null);
+      if (quickEntryAccount && !quickSaving && !quickCelebration) setQuickEntryAccount(null);
       else if (showFilterSortSheet) setShowFilterSortSheet(false);
       else if (showAddModal && !addingBusy) setShowAddModal(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [quickEntryAccount, quickSaving, showFilterSortSheet, showAddModal, addingBusy]);
+  }, [quickEntryAccount, quickSaving, quickCelebration, showFilterSortSheet, showAddModal, addingBusy]);
 
   const cashflow = useMemo(() => computeNetCashflowSummary(accounts), [accounts]);
 
+  const topDueParties = useMemo(
+    () => getTopDuePartiesToday(accounts, trustScoresByAccount, todayStr, 3),
+    [accounts, trustScoresByAccount, todayStr]
+  );
+
   const todayStats = useMemo(() => {
-    let givenToday = 0;
-    let receivedToday = 0;
+    let entriesToday = 0;
+    const activeDates = new Set<string>();
     for (const tx of transactions) {
-      if ((tx.billDate || '').slice(0, 10) === todayStr) {
-        if (tx.direction === 'given') givenToday += tx.amount;
-        else receivedToday += tx.amount;
-      }
+      const dateKey = (tx.billDate || '').slice(0, 10);
+      if (dateKey) activeDates.add(dateKey);
+      if (dateKey === todayStr) entriesToday += 1;
     }
-    const overdueAccs = accounts.filter(
+    const overdueCount = accounts.filter(
       (a) => a.kind === 'customer' && a.balance > 0 && a.dueDate !== '' && a.dueDate <= todayStr
-    );
-    const overdueAmount = overdueAccs.reduce((s, a) => s + a.balance, 0);
-    const highRiskAccs = accounts.filter(
-      (a) => a.kind === 'customer' && a.balance > 0 && (trustScoresByAccount[a.id]?.score ?? 100) < 50
-    );
-    const topRecoveryParty =
-      accounts
-        .filter((a) => a.kind === 'customer' && a.balance > 0)
-        .sort(
-          (a, b) =>
-            (trustScoresByAccount[b.id]?.priorityScore || 0) -
-            (trustScoresByAccount[a.id]?.priorityScore || 0)
-        )[0] || null;
+    ).length;
     const lowStockCount = stockItems.filter((s) => s.quantity <= s.lowStockThreshold).length;
     return {
-      givenToday,
-      receivedToday,
-      overdueCount: overdueAccs.length,
-      overdueAmount,
-      highRiskCount: highRiskAccs.length,
-      topRecoveryParty,
+      entriesToday,
+      activeDays: Math.max(activeDates.size, accounts.length > 0 ? 1 : 0),
+      overdueCount,
       lowStockCount,
     };
-  }, [transactions, accounts, stockItems, todayStr, trustScoresByAccount]);
+  }, [transactions, accounts, stockItems, todayStr]);
 
   const filteredAccounts = useMemo(() => {
     let list = [...accounts];
@@ -345,7 +532,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   const handleAddSubmit = async () => {
     setAddError('');
     if (!newName.trim()) {
-      setAddError('Please enter party name.');
+      setAddError('Enter party name first.');
       return;
     }
     if (newPhone && !isValidIndianMobile(newPhone)) {
@@ -369,13 +556,14 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     }
   };
 
-  const openQuickEntrySheet = (acc: LedgerAccount) => {
+  const openQuickEntrySheet = (acc: LedgerAccount, presetDirection: TxDirection = 'given') => {
     setQuickEntryAccount(acc);
-    setQuickDirection('given');
+    setQuickDirection(presetDirection);
     setQuickAmount('');
     setQuickNote('');
     setQuickGallaMode(null);
     setQuickError('');
+    setQuickCelebration(null);
   };
 
   const handleSaveQuickEntry = async () => {
@@ -383,10 +571,16 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
     setQuickError('');
     const amt = Math.round((Number(quickAmount) || 0) * 100) / 100;
     if (amt <= 0) {
-      setQuickError('Enter an amount greater than ₹0.');
-      quickAmountInputRef.current?.focus();
+      setQuickError('Tap keypad digits above to enter an amount greater than ₹0.');
       return;
     }
+
+    const prevBal = quickEntryAccount.balance;
+    const projectedBal =
+      quickDirection === 'given'
+        ? Math.round((prevBal + amt) * 100) / 100
+        : Math.round((prevBal - amt) * 100) / 100;
+
     setQuickSaving(true);
     try {
       await onQuickTransaction(quickEntryAccount, {
@@ -395,21 +589,23 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
         note: quickNote.trim(),
         syncToGalla: quickGallaMode ? { mode: quickGallaMode } : null,
       });
-      setQuickEntryAccount(null);
-    } catch (err) {
-      setQuickError(err instanceof Error ? err.message : 'Failed to save entry.');
-    } finally {
-      setQuickSaving(false);
-    }
-  };
 
-  const scrollToPulseCard = (index: number) => {
-    setPulseIdx(index);
-    const el = deckRef.current;
-    if (!el) return;
-    const card = el.children[index] as HTMLElement | undefined;
-    if (card) {
-      el.scrollTo({ left: card.offsetLeft - 16, behavior: 'smooth' });
+      setQuickCelebration({
+        partyName: quickEntryAccount.name,
+        previousBalance: prevBal,
+        newBalance: projectedBal,
+        amount: amt,
+        direction: quickDirection,
+      });
+
+      window.setTimeout(() => {
+        setQuickCelebration(null);
+        setQuickEntryAccount(null);
+        setQuickSaving(false);
+      }, 1250);
+    } catch (err) {
+      setQuickSaving(false);
+      setQuickError(err instanceof Error ? err.message : 'Failed to save entry.');
     }
   };
 
@@ -419,350 +615,329 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
 
   const netPositive = cashflow.netCashflow > 0;
   const netNegative = cashflow.netCashflow < 0;
-  const netTitle = netPositive
-    ? 'Net Receivable'
-    : netNegative
-      ? 'Net Payable'
-      : 'All Settled';
 
   return (
-    <div className="space-y-4 pb-6">
-      {/* Horizontal Swipeable Pulse Deck (Snap 3D Spatial Cards) */}
-      <div className="space-y-2">
-        <div
-          ref={deckRef}
-          onScroll={(e) => {
-            const target = e.currentTarget;
-            const width = target.clientWidth || 360;
-            const nextIdx = Math.round(target.scrollLeft / (width * 0.85));
-            if (nextIdx !== pulseIdx && nextIdx >= 0 && nextIdx <= 2) {
-              setPulseIdx(nextIdx);
-            }
-          }}
-          aria-label="Business Pulse Deck"
-          className="flex overflow-x-auto snap-x snap-mandatory scroll-pl-4 gap-3 -mx-4 px-4 no-scrollbar pb-1"
+    <div className="space-y-3.5 pb-32">
+      {/* 1. Expandable 'Net Receivable' Hero Bento Card (Zero Glass · Twinkling Sparkles · Odometer · Bar) */}
+      <section
+        aria-label="Net Receivable Hero"
+        className="rounded-[28px] spatial-hero p-4 space-y-3 relative overflow-hidden"
+      >
+        {/* Subtle Twinkling Sparkle Stars (Safe Padding — Zero Pill Collisions) */}
+        <span
+          aria-hidden="true"
+          className="twinkle-star pointer-events-none absolute top-14 right-4 text-[var(--brand-accent)]"
         >
-          {/* Card 1: Net Cashflow Hero Bento Card */}
-          <section className="snap-start w-[91%] max-w-[91%] shrink-0 rounded-[28px] spatial-hero ring-1 ring-white/90 dark:ring-white/10 p-4 space-y-3.5 relative overflow-hidden">
-            <div
-              aria-hidden="true"
-              className="absolute -top-16 -right-14 w-44 h-44 rounded-full bg-indigo-500/12 dark:bg-blue-500/12 blur-2xl pointer-events-none"
-            />
+          <Sparkles className="w-3 h-3" />
+        </span>
+        <span
+          aria-hidden="true"
+          style={{ animationDelay: '1.1s' }}
+          className="twinkle-star pointer-events-none absolute top-12 left-4 text-amber-400"
+        >
+          <Sparkles className="w-3 h-3" />
+        </span>
+        <span
+          aria-hidden="true"
+          style={{ animationDelay: '2.1s' }}
+          className="twinkle-star pointer-events-none absolute top-[72px] right-24 text-cyan-500"
+        >
+          <Sparkles className="w-3 h-3" />
+        </span>
 
-            <div className="relative flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span
-                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                    netPositive
-                      ? 'bg-[var(--debit-green)]'
-                      : netNegative
-                        ? 'bg-[var(--credit-red)]'
-                        : 'bg-[var(--brand-accent)]'
-                  }`}
-                />
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--ink-muted)] truncate">
-                  {netTitle} · {accounts.length} {t.accounts}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  transition={SPRING_FAST}
-                  type="button"
-                  onClick={onToggleHideBalance}
-                  aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
-                  className="min-w-[40px] min-h-[40px] rounded-full bg-[var(--app-bg)]/85 hover:bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)]"
-                >
-                  {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </motion.button>
-                <motion.button
-                  whileTap={{ scale: 0.92 }}
-                  transition={SPRING_FAST}
-                  type="button"
-                  onClick={onOpenDailySummary}
-                  className="min-h-[38px] px-3 rounded-full bg-[var(--brand-tint)] text-[var(--brand-accent)] text-[11px] font-extrabold inline-flex items-center gap-1.5 whitespace-nowrap shadow-xs"
-                >
-                  <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                  <span>Munim Sunao</span>
-                </motion.button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-baseline justify-between gap-2">
-                <p
-                  className={`font-display text-[30px] leading-none font-extrabold font-tabular tracking-tight ${
-                    netPositive
-                      ? 'text-[var(--debit-green)]'
-                      : netNegative
-                        ? 'text-[var(--credit-red)]'
-                        : 'text-[var(--ink)]'
-                  }`}
-                >
-                  {hideBalance
-                    ? '₹••••'
-                    : `${netNegative ? '-' : ''}${formatINR(Math.abs(cashflow.netCashflow))}`}
-                </p>
-                <span className="text-[11px] font-bold font-tabular text-[var(--ink-muted)]">
-                  {cashflow.receivableSharePct}% Lena · {cashflow.payableSharePct}% Dena
-                </span>
-              </div>
-
-              <div
-                aria-label="Receivable versus payable ratio"
-                className="h-2.5 w-full rounded-full bg-[var(--surface-subtle)] overflow-hidden flex p-0.5 gap-0.5"
-              >
-                <div
-                  style={{ width: `${cashflow.receivableSharePct}%` }}
-                  className="h-full rounded-full bg-[var(--debit-green)] transition-all duration-500 ease-out"
-                />
-                <div
-                  style={{ width: `${cashflow.payableSharePct}%` }}
-                  className="h-full rounded-full bg-[var(--credit-red)] transition-all duration-500 ease-out"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-2xl bg-[var(--debit-tint)] px-2.5 py-2 space-y-0.5">
-                <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--debit-green)]">
-                  <ArrowDown className="w-3 h-3 shrink-0" />
-                  <span>Lena</span>
-                </div>
-                <p className="font-display text-xs font-extrabold font-tabular text-[var(--debit-green)] truncate">
-                  {hideBalance ? '₹••••' : formatINR(cashflow.totalReceivable)}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-[var(--credit-tint)] px-2.5 py-2 space-y-0.5">
-                <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--credit-red)]">
-                  <ArrowUp className="w-3 h-3 shrink-0" />
-                  <span>Dena</span>
-                </div>
-                <p className="font-display text-xs font-extrabold font-tabular text-[var(--credit-red)] truncate">
-                  {hideBalance ? '₹••••' : formatINR(cashflow.totalPayable)}
-                </p>
-              </div>
-
-              <motion.button
-                whileTap={{ scale: 0.94 }}
+        {/* Top Row: Hero Label + Expand Drawer Button | Privacy Eye + Munim Sunao */}
+        <div className="relative z-10 flex items-center justify-between gap-1.5">
+          <button
+            type="button"
+            onClick={() => setHeroExpanded((v) => !v)}
+            aria-expanded={heroExpanded}
+            className="min-h-[34px] inline-flex items-center gap-1 text-left whitespace-nowrap shrink-0 active:scale-95 transition"
+          >
+            <span className="text-[10px] font-extrabold uppercase tracking-wide text-[var(--ink-muted)] whitespace-nowrap">
+              {netPositive ? 'Net Receivable' : netNegative ? 'Net Payable' : 'All Settled'}
+            </span>
+            <span className="px-1.5 py-0.5 rounded-full bg-[var(--surface-subtle)] text-[10px] font-extrabold text-[var(--ink-muted)] inline-flex items-center gap-0.5 whitespace-nowrap">
+              <span>Top Due</span>
+              <motion.span
+                animate={{ rotate: heroExpanded ? 180 : 0 }}
                 transition={SPRING_FAST}
-                type="button"
-                onClick={onOpenGalla}
-                className="rounded-2xl bg-[var(--brand-tint)] px-2.5 py-2 text-left space-y-0.5"
+                className="inline-flex"
               >
-                <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
-                  <Wallet className="w-3 h-3 shrink-0" />
-                  <span className="truncate">Galla</span>
-                </div>
-                <p className="font-display text-xs font-extrabold font-tabular text-[var(--brand-accent)] truncate">
-                  {hideBalance ? '₹••••' : formatINR(gallaPulse.cashDrawerBalance)}
-                </p>
-              </motion.button>
-            </div>
-          </section>
+                <ChevronDown className="w-3 h-3" />
+              </motion.span>
+            </span>
+          </button>
 
-          {/* Card 2: Live Galla Cash vs UPI & Daily Profit Card */}
-          <section className="snap-start w-[91%] max-w-[91%] shrink-0 rounded-[28px] spatial-hero ring-1 ring-white/90 dark:ring-white/10 p-4 space-y-3.5 relative overflow-hidden">
-            <div
-              aria-hidden="true"
-              className="absolute -bottom-14 -right-10 w-40 h-40 rounded-full bg-emerald-500/12 blur-2xl pointer-events-none"
-            />
-
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-xl bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center">
-                  <Wallet className="w-4 h-4" />
-                </span>
-                <div>
-                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--ink-muted)]">
-                    Live Galla &amp; Profit
-                  </p>
-                  <p className="text-[11px] font-semibold text-[var(--ink-muted)] truncate max-w-[165px]">
-                    {gallaPulse.todayStr}
-                  </p>
-                </div>
-              </div>
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                transition={SPRING_FAST}
-                type="button"
-                onClick={onOpenGalla}
-                className="min-h-[38px] px-3 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] text-[11px] font-extrabold inline-flex items-center gap-1 shadow-sm"
-              >
-                <span>Open Galla</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </motion.button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="rounded-2xl bg-[var(--app-bg)] p-3 space-y-0.5">
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-muted)] inline-flex items-center gap-1">
-                  <Wallet className="w-3 h-3 text-[var(--brand-accent)]" />
-                  <span>Cash Drawer</span>
-                </p>
-                <p className="font-display text-lg font-extrabold font-tabular text-[var(--ink)]">
-                  {hideBalance ? '₹••••' : formatINR(gallaPulse.cashDrawerBalance)}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-[var(--app-bg)] p-3 space-y-0.5">
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-muted)] inline-flex items-center gap-1">
-                  <Landmark className="w-3 h-3 text-[var(--brand-accent)]" />
-                  <span>UPI / Bank</span>
-                </p>
-                <p className="font-display text-lg font-extrabold font-tabular text-[var(--ink)]">
-                  {hideBalance ? '₹••••' : formatINR(gallaPulse.upiBankBalance)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--debit-tint)]/75 px-3.5 py-2.5 text-xs font-tabular">
-              <span className="font-bold text-[var(--ink)]">Today Est. Profit</span>
-              <span
-                className={`font-extrabold text-sm ${
-                  gallaPulse.estimatedDailyProfit >= 0
-                    ? 'text-[var(--debit-green)]'
-                    : 'text-[var(--credit-red)]'
-                }`}
-              >
-                {hideBalance
-                  ? '₹••••'
-                  : `${gallaPulse.estimatedDailyProfit >= 0 ? '+' : '-'}${formatINR(
-                      Math.abs(gallaPulse.estimatedDailyProfit)
-                    )}`}
-              </span>
-            </div>
-          </section>
-
-          {/* Card 3: Today's Vasooli Priority & Recovery Radar */}
-          <section className="snap-start w-[91%] max-w-[91%] shrink-0 rounded-[28px] spatial-hero ring-1 ring-white/90 dark:ring-white/10 p-4 space-y-3.5 relative overflow-hidden">
-            <div
-              aria-hidden="true"
-              className="absolute -top-14 -right-10 w-40 h-40 rounded-full bg-amber-500/12 blur-2xl pointer-events-none"
-            />
-
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-xl bg-[var(--alert-tint)] text-[var(--alert-amber)] flex items-center justify-center">
-                  <Sparkles className="w-4 h-4" />
-                </span>
-                <div>
-                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--ink-muted)]">
-                    Today&apos;s Vasooli Priority
-                  </p>
-                  <p className="text-[11px] font-semibold text-[var(--ink-muted)]">
-                    Smart Recovery Radar
-                  </p>
-                </div>
-              </div>
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                transition={SPRING_FAST}
-                type="button"
-                onClick={onOpenCollection}
-                className="min-h-[38px] px-3 rounded-full bg-[var(--debit-green)] text-white text-[11px] font-extrabold inline-flex items-center gap-1 shadow-sm"
-              >
-                <span>Collect Now</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </motion.button>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-2xl bg-[var(--credit-tint)]/80 px-2.5 py-2 space-y-0.5">
-                <p className="text-[10px] font-extrabold uppercase text-[var(--credit-red)]">
-                  Overdue
-                </p>
-                <p className="font-display text-sm font-extrabold font-tabular text-[var(--credit-red)] truncate">
-                  {todayStats.overdueCount} · {hideBalance ? '₹••' : formatINR(todayStats.overdueAmount)}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-[var(--alert-tint)] px-2.5 py-2 space-y-0.5">
-                <p className="text-[10px] font-extrabold uppercase text-[var(--alert-amber)]">
-                  Trust &lt; 50
-                </p>
-                <p className="font-display text-sm font-extrabold font-tabular text-[var(--alert-amber)]">
-                  {todayStats.highRiskCount} Parties
-                </p>
-              </div>
-              <div className="rounded-2xl bg-[var(--app-bg)] px-2.5 py-2 space-y-0.5">
-                <p className="text-[10px] font-extrabold uppercase text-[var(--ink-muted)] inline-flex items-center gap-1">
-                  <Package className="w-3 h-3" />
-                  <span>Low Stock</span>
-                </p>
-                <p className="font-display text-sm font-extrabold font-tabular text-[var(--ink)]">
-                  {todayStats.lowStockCount} Items
-                </p>
-              </div>
-            </div>
-
-            {todayStats.topRecoveryParty ? (
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                transition={SPRING_FAST}
-                type="button"
-                onClick={() => onSelectAccount(todayStats.topRecoveryParty!)}
-                className="w-full flex items-center justify-between gap-2 rounded-2xl bg-[var(--app-bg)] px-3.5 py-2.5 text-left"
-              >
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--ink)] truncate">
-                  <AlertTriangle className="w-3.5 h-3.5 text-[var(--alert-amber)] shrink-0" />
-                  <span className="truncate">Top Priority: {todayStats.topRecoveryParty.name}</span>
-                </span>
-                <span className="text-xs font-extrabold font-tabular text-[var(--credit-red)] shrink-0">
-                  {hideBalance ? '₹••••' : formatINR(todayStats.topRecoveryParty.balance)}
-                </span>
-              </motion.button>
-            ) : (
-              <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--debit-tint)]/75 px-3.5 py-2.5 text-xs font-bold text-[var(--debit-green)]">
-                <span className="inline-flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5" />
-                  <span>Today Vasooli Collected</span>
-                </span>
-                <span className="font-extrabold font-tabular">
-                  {hideBalance ? '₹••••' : formatINR(todayStats.receivedToday)}
-                </span>
-              </div>
-            )}
-          </section>
-        </div>
-
-        {/* Pulse Deck Indicator Dots */}
-        <div className="flex items-center justify-center gap-1.5" role="tablist" aria-label="Pulse cards">
-          {['Cashflow', 'Live Galla', 'Vasooli Radar'].map((label, idx) => (
-            <button
-              key={label}
+          <div className="flex items-center gap-1 shrink-0">
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              transition={SPRING_FAST}
               type="button"
-              role="tab"
-              aria-selected={pulseIdx === idx}
-              aria-label={`Show ${label} card`}
-              onClick={() => scrollToPulseCard(idx)}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                pulseIdx === idx
-                  ? 'w-5 bg-[var(--brand-accent)]'
-                  : 'w-1.5 bg-[var(--ink-muted)]/30'
-              }`}
-            />
-          ))}
-        </div>
-      </div>
+              onClick={onToggleHideBalance}
+              aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
+              className="w-8 h-8 rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)]"
+            >
+              {hideBalance ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            </motion.button>
 
-      {/* Sliding Spring Pill Segmented Control (Customer / Supplier) + Filter & Sort */}
+            <motion.button
+              whileTap={{ scale: 0.94 }}
+              transition={SPRING_FAST}
+              type="button"
+              onClick={onOpenDailySummary}
+              className="min-h-[34px] px-2.5 rounded-full bg-[var(--brand-tint)] text-[var(--brand-accent)] text-[11px] font-extrabold inline-flex items-center gap-1 whitespace-nowrap shrink-0"
+            >
+              <Volume2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Munim Sunao</span>
+            </motion.button>
+          </div>
+        </div>
+
+        {/* Hero Odometer Balance + Quick Vasooli Link */}
+        <div className="relative z-10 flex items-end justify-between gap-2">
+          <div>
+            <p
+              className={`font-display text-[32px] font-extrabold leading-none tracking-tight ${
+                netPositive
+                  ? 'text-[var(--debit-green)]'
+                  : netNegative
+                    ? 'text-[var(--credit-red)]'
+                    : 'text-[var(--ink)]'
+              }`}
+            >
+              <AnimatedRupeeNumber
+                value={Math.abs(cashflow.netCashflow)}
+                hidden={hideBalance}
+                prefix={netNegative ? '-' : ''}
+              />
+            </p>
+            <p className="text-xs font-semibold text-[var(--ink-muted)] mt-1">
+              Across {accounts.length} {accounts.length === 1 ? 'party' : 'parties'} · Tap Top Due to
+              inspect
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenCollection}
+            className="min-h-[36px] px-3.5 rounded-full bg-[var(--surface-subtle)] text-xs font-extrabold text-[var(--ink)] inline-flex items-center gap-1 shrink-0 active:scale-95 transition"
+          >
+            <span>Vasooli</span>
+            {todayStats.overdueCount > 0 && (
+              <span className="text-[var(--credit-red)] font-tabular">
+                · {todayStats.overdueCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Animated Green-vs-Red Ratio Capsule Bar with Shimmer Sweep */}
+        <div className="relative z-10 space-y-1">
+          <div className="h-2.5 w-full rounded-full bg-[var(--credit-tint)] overflow-hidden relative">
+            <motion.div
+              initial={{ width: '50%' }}
+              animate={{ width: `${cashflow.receivableSharePct}%` }}
+              transition={{ type: 'spring', stiffness: 220, damping: 28 }}
+              className="h-full rounded-full bg-[var(--debit-green)] relative overflow-hidden"
+            >
+              <span
+                aria-hidden="true"
+                className="bar-shimmer-sweep absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 pointer-events-none"
+              />
+            </motion.div>
+          </div>
+          <div className="flex items-center justify-between text-[10px] font-bold text-[var(--ink-muted)] font-tabular">
+            <span>Lena {cashflow.receivableSharePct}%</span>
+            <span>Dena {cashflow.payableSharePct}%</span>
+          </div>
+        </div>
+
+        {/* 3 Equal Solid Pastel Micro-Pills */}
+        <div className="relative z-10 grid grid-cols-3 gap-2">
+          <div className="rounded-2xl bg-[var(--debit-tint)] px-2.5 py-2 space-y-0.5">
+            <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-[var(--debit-green)] whitespace-nowrap">
+              <ArrowDown className="w-3 h-3 shrink-0" />
+              <span>Lena</span>
+            </div>
+            <p className="font-display text-xs font-extrabold text-[var(--debit-green)] truncate">
+              <AnimatedRupeeNumber value={cashflow.totalReceivable} hidden={hideBalance} />
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[var(--credit-tint)] px-2.5 py-2 space-y-0.5">
+            <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-[var(--credit-red)] whitespace-nowrap">
+              <ArrowUp className="w-3 h-3 shrink-0" />
+              <span>Dena</span>
+            </div>
+            <p className="font-display text-xs font-extrabold text-[var(--credit-red)] truncate">
+              <AnimatedRupeeNumber value={cashflow.totalPayable} hidden={hideBalance} />
+            </p>
+          </div>
+
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            transition={SPRING_FAST}
+            type="button"
+            onClick={onOpenGalla}
+            className="rounded-2xl bg-[var(--brand-tint)] px-2.5 py-2 text-left space-y-0.5"
+          >
+            <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-[var(--brand-accent)] whitespace-nowrap">
+              <Wallet className="w-3 h-3 shrink-0" />
+              <span>Live Galla</span>
+            </div>
+            <p className="font-display text-xs font-extrabold text-[var(--brand-accent)] truncate">
+              <AnimatedRupeeNumber value={gallaPulse.cashDrawerBalance} hidden={hideBalance} />
+            </p>
+          </motion.button>
+        </div>
+
+        {/* Expandable Spring Drawer: Top 3 Due Parties Today */}
+        <AnimatePresence initial={false}>
+          {heroExpanded && (
+            <motion.div
+              key="top-due-drawer"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0, transition: { duration: 0.2, ease: 'easeOut' } }}
+              transition={{ type: 'spring', stiffness: 340, damping: 30 }}
+              className="overflow-hidden relative z-10"
+            >
+              <div className="pt-3 border-t border-[var(--surface-subtle)] space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--ink-muted)]">
+                    Top 3 Due Parties Today
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onOpenCollection}
+                    className="text-[11px] font-extrabold text-[var(--brand-accent)] hover:underline"
+                  >
+                    Open Vasooli
+                  </button>
+                </div>
+
+                {topDueParties.length === 0 ? (
+                  <div className="rounded-2xl bg-[var(--app-bg)] p-3 text-xs font-semibold text-[var(--ink-muted)] text-center">
+                    Zero overdue dues right now — clean books!
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {topDueParties.map((spot) => (
+                      <div
+                        key={spot.account.id}
+                        className="rounded-2xl bg-[var(--app-bg)] px-3 py-2.5 flex items-center justify-between gap-2.5"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onSelectAccount(spot.account)}
+                          className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+                        >
+                          <span
+                            style={{ backgroundColor: getAvatarColor(spot.account.name) }}
+                            className="w-8 h-8 rounded-full text-white text-xs font-extrabold flex items-center justify-center shrink-0"
+                          >
+                            {spot.account.name.charAt(0).toUpperCase()}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-extrabold text-[var(--ink)] truncate">
+                              {spot.account.name}
+                            </p>
+                            <p
+                              className={`text-[10px] font-bold truncate ${
+                                spot.isDueTodayOrOverdue
+                                  ? 'text-[var(--credit-red)]'
+                                  : 'text-[var(--ink-muted)]'
+                              }`}
+                            >
+                              {spot.urgencyLabel} · Trust {spot.trustScore}
+                            </p>
+                          </div>
+                        </button>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs font-extrabold font-tabular text-[var(--credit-red)]">
+                            {hideBalance ? '₹••••' : formatINR(spot.account.balance)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => openQuickEntrySheet(spot.account, 'received')}
+                            aria-label={`Collect from ${spot.account.name}`}
+                            className="min-h-[34px] px-2.5 rounded-xl bg-[var(--debit-tint)] text-[var(--debit-green)] text-[11px] font-extrabold active:scale-95 transition"
+                          >
+                            + ₹
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+
+      {/* 2. Solid Warm 'Shop Streak' (👋 waving) + 'Today Est. Profit' Bento Bar */}
+      <motion.button
+        whileTap={{ scale: 0.98 }}
+        transition={SPRING_FAST}
+        type="button"
+        onClick={onOpenGalla}
+        className="w-full rounded-[24px] px-4 py-3 flex items-center justify-between gap-3 text-left spatial-card bg-gradient-to-r from-[#FFF7ED] via-[#FEF3C7] to-[#FFEDD5] dark:from-[#291D12] dark:via-[#261D0D] dark:to-[#2C1A10]"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span
+            aria-hidden="true"
+            className="w-10 h-10 rounded-2xl bg-[var(--surface)] shadow-xs flex items-center justify-center text-lg shrink-0"
+          >
+            <span className="wave-hand">👋</span>
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-extrabold text-amber-950 dark:text-amber-200 truncate">
+              Shop Streak · {todayStats.activeDays}{' '}
+              {todayStats.activeDays === 1 ? 'Day' : 'Days'} Active
+            </p>
+            <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-300 truncate">
+              {todayStats.entriesToday} {todayStats.entriesToday === 1 ? 'entry' : 'entries'} today
+              · Live Galla
+            </p>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+            Est. Profit
+          </p>
+          <p
+            className={`font-display text-base font-extrabold ${
+              gallaPulse.estimatedDailyProfit >= 0
+                ? 'text-[var(--debit-green)]'
+                : 'text-[var(--credit-red)]'
+            }`}
+          >
+            <AnimatedRupeeNumber
+              value={Math.abs(gallaPulse.estimatedDailyProfit)}
+              hidden={hideBalance}
+              prefix={gallaPulse.estimatedDailyProfit >= 0 ? '+' : '-'}
+            />
+          </p>
+        </div>
+      </motion.button>
+
+      {/* 3. Elastic Segmented Control (Customer / Supplier) + Filter & Sort */}
       <div className="flex items-center justify-between gap-2">
-        <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 flex-1 max-w-[235px] shadow-inner">
+        <div className="relative grid grid-cols-2 rounded-full bg-[var(--surface-subtle)] p-1 flex-1 max-w-[235px]">
           <button
             type="button"
             onClick={() => setFilterChip('customer')}
-            className={`relative min-h-[40px] px-3 rounded-xl text-xs font-extrabold transition-colors ${
-              filterChip === 'customer'
-                ? 'text-[var(--brand)] dark:text-[var(--brand-accent)]'
-                : 'text-[var(--ink-muted)]'
+            className={`relative min-h-[40px] px-3 rounded-full text-xs font-extrabold transition-colors ${
+              filterChip === 'customer' ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
             }`}
           >
             {filterChip === 'customer' && !hasSecondaryFilter && (
               <motion.span
                 layoutId="ledgerKindPill"
                 transition={SPRING_FAST}
-                className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-sm"
+                className="absolute inset-0 rounded-full bg-[var(--surface)] shadow-sm"
               />
             )}
             <span className="relative z-10">{t.customer}</span>
@@ -770,17 +945,15 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
           <button
             type="button"
             onClick={() => setFilterChip('supplier')}
-            className={`relative min-h-[40px] px-3 rounded-xl text-xs font-extrabold transition-colors ${
-              filterChip === 'supplier'
-                ? 'text-[var(--brand)] dark:text-[var(--brand-accent)]'
-                : 'text-[var(--ink-muted)]'
+            className={`relative min-h-[40px] px-3 rounded-full text-xs font-extrabold transition-colors ${
+              filterChip === 'supplier' ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
             }`}
           >
             {filterChip === 'supplier' && !hasSecondaryFilter && (
               <motion.span
                 layoutId="ledgerKindPill"
                 transition={SPRING_FAST}
-                className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-sm"
+                className="absolute inset-0 rounded-full bg-[var(--surface)] shadow-sm"
               />
             )}
             <span className="relative z-10">{t.supplier}</span>
@@ -792,10 +965,10 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
           transition={SPRING_FAST}
           type="button"
           onClick={() => setShowFilterSortSheet(true)}
-          className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 ${
+          className={`min-h-[44px] px-3.5 rounded-full text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 ${
             hasSecondaryFilter || sortBy !== 'latest-activity'
               ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-sm'
-              : 'spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--ink)]'
+              : 'spatial-card text-[var(--ink)]'
           }`}
         >
           <Filter className="w-3.5 h-3.5" />
@@ -803,36 +976,58 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
         </motion.button>
       </div>
 
-      {/* 2-Column Spatial Bento Party Grid or Clean Guided First-Action Strip */}
+      {/* 4. 2-Column Swipeable Bento Party Grid or Playful Growing Sprout Empty State */}
       {accounts.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 12, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={SPRING_FAST}
-          className="rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-5"
+          className="rounded-[26px] spatial-card p-5 space-y-3.5 text-center"
         >
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
+          {/* Playful Growing Sprout Illustration */}
+          <div className="flex justify-center">
+            <div className="w-12 h-12 rounded-full bg-[var(--debit-tint)] flex items-center justify-center">
+              <svg
+                viewBox="0 0 48 48"
+                className="w-8 h-8 sprout-grow"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path d="M24 38V20" stroke="#15803D" strokeWidth="3.2" strokeLinecap="round" />
+                <path d="M24 26C17.5 26 14 21.5 14 15.5C20 15.5 24 19.5 24 26Z" fill="#22C55E" />
+                <path d="M24 22C30.5 22 34 17.5 34 11.5C28 11.5 24 15.5 24 22Z" fill="#15803D" />
+                <path
+                  d="M15 39H33"
+                  stroke="#15803D"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                  strokeOpacity="0.4"
+                />
+              </svg>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
               Ready For Live Shop Records
             </p>
-            <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
+            <h1 className="font-display text-lg font-extrabold text-[var(--ink)]">
               Start Your Real Shop Khata
-            </h2>
-            <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-              Your ledger starts completely clean. Add your first customer or supplier, speak an
-              entry in Hindi or Hinglish, or snap a parchi slip.
+            </h1>
+            <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
+              Add your first party, tap the blue-cyan orb below to speak, or snap a parchi slip.
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-2.5">
             <motion.button
-              whileTap={{ scale: 0.96 }}
+              whileTap={{ scale: 0.96, y: 2 }}
               transition={SPRING_FAST}
               type="button"
               onClick={() =>
                 handleOpenAddModal(filterChip === 'supplier' ? 'supplier' : 'customer')
               }
-              className="min-h-[48px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-sm font-extrabold flex items-center justify-center gap-2 shadow-md"
+              className="tactile-key-primary min-h-[48px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-sm font-extrabold flex items-center justify-center gap-2"
             >
               <UserPlus className="w-4 h-4 shrink-0" />
               <span>{filterChip === 'supplier' ? 'Add First Supplier' : 'Add First Customer'}</span>
@@ -844,10 +1039,10 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 transition={SPRING_FAST}
                 type="button"
                 onClick={onOpenVoiceEntry}
-                className="min-h-[46px] px-3 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold flex items-center justify-center gap-1.5"
+                className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-[11px] font-extrabold whitespace-nowrap flex items-center justify-center gap-1.5"
               >
-                <Mic className="w-4 h-4 shrink-0" />
-                <span>Speak First Entry</span>
+                <Mic className="w-3.5 h-3.5 shrink-0" />
+                <span>Speak Entry</span>
               </motion.button>
 
               <motion.button
@@ -855,30 +1050,29 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 transition={SPRING_FAST}
                 type="button"
                 onClick={onOpenParchiScanner}
-                className="min-h-[46px] px-3 rounded-2xl bg-[var(--app-bg)] text-xs font-bold text-[var(--ink)] flex items-center justify-center gap-1.5"
+                className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--app-bg)] text-[11px] font-bold text-[var(--ink)] whitespace-nowrap flex items-center justify-center gap-1.5"
               >
-                <Camera className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
-                <span>Scan First Parchi</span>
+                <Camera className="w-3.5 h-3.5 text-[var(--brand-accent)] shrink-0" />
+                <span>Scan Parchi</span>
               </motion.button>
             </div>
           </div>
         </motion.div>
       ) : filteredAccounts.length === 0 ? (
-        <div className="rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-8 text-center space-y-3">
+        <div className="rounded-[26px] spatial-card p-8 text-center space-y-3">
           <p className="font-display text-base font-bold text-[var(--ink)]">
             No {filterChip === 'supplier' ? 'suppliers' : 'parties'} matched this view.
           </p>
           <p className="text-sm text-[var(--ink-muted)]">
-            Tap the <strong>Munim Voice Orb</strong> to speak an entry, scan a parchi, or add a
-            party manually.
+            Tap the glowing Voice Orb below, scan a parchi, or add a party manually.
           </p>
           <div className="flex items-center justify-center gap-2.5 pt-2 flex-wrap">
             <motion.button
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.95, y: 2 }}
               transition={SPRING_FAST}
               type="button"
               onClick={onOpenVoiceEntry}
-              className="min-h-[44px] px-4 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-2 shadow-sm"
+              className="tactile-key-primary min-h-[44px] px-4 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-2"
             >
               <Mic className="w-4 h-4" />
               <span>{t.voiceEntry}</span>
@@ -898,115 +1092,35 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {filteredAccounts.map((acc, idx) => {
-            const absBal = Math.abs(acc.balance);
-            const statusText =
-              acc.balance > 0 ? t.due : acc.balance < 0 ? t.advance : t.settled;
-            const overLimit = Boolean(
-              acc.creditLimit && acc.creditLimit > 0 && acc.balance > acc.creditLimit
-            );
-            const trust = trustScoresByAccount[acc.id];
-            const hintText =
-              trust && acc.kind === 'customer'
-                ? `Trust ${trust.score}/100`
-                : acc.lastNote || (acc.phone ? `+91 ${acc.phone}` : 'Tap for ledger');
-            const isSelected = Boolean(selectedAccountId && selectedAccountId === acc.id);
-
-            return (
-              <motion.div
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-2 gap-3.5">
+            {filteredAccounts.map((acc, idx) => (
+              <SwipeablePartyCard
                 key={acc.id}
-                initial={{ opacity: 0, y: 12, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{
-                  ...SPRING_FAST,
-                  delay: Math.min(idx, 12) * 0.04,
-                }}
-                className={`relative rounded-[24px] min-h-[146px] shadow-[0_10px_25px_-8px_rgba(15,23,42,0.08)] dark:shadow-[0_12px_28px_-10px_rgba(0,0,0,0.6)] ${
-                  isSelected
-                    ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)]/50'
-                    : 'bg-[var(--surface)] ring-1 ring-white/85 dark:ring-white/10'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => onSelectAccount(acc)}
-                  aria-label={`Open ${acc.name} khata`}
-                  className="w-full h-full p-3.5 flex flex-col justify-between gap-3 text-left rounded-[24px] active:scale-[0.98] transition"
-                >
-                  {/* Top Row: Trust Avatar Ring (reserves right padding for + ₹ button) */}
-                  <div className="flex items-start pr-12">
-                    <TrustAvatarRing
-                      name={acc.name}
-                      score={trust?.score ?? 100}
-                      hasTrust={Boolean(trust && acc.kind === 'customer')}
-                      size="sm"
-                    />
-                  </div>
-
-                  {/* Middle Row: Party Name + Trust/Hint */}
-                  <div className="min-w-0 w-full space-y-0.5">
-                    <p className="text-[15px] font-extrabold text-[var(--ink)] leading-snug truncate">
-                      {acc.name}
-                    </p>
-                    <p
-                      className={`text-[11px] font-semibold truncate ${
-                        trust?.band === 'high-risk' && acc.balance > 0
-                          ? 'text-[var(--credit-red)]'
-                          : 'text-[var(--ink-muted)]'
-                      }`}
-                    >
-                      {overLimit ? `Over Limit · ${formatINR(acc.creditLimit || 0)}` : hintText}
-                    </p>
-                  </div>
-
-                  {/* Bottom Row: Large Tabular Balance + Status Pill */}
-                  <div className="w-full flex items-baseline justify-between gap-1.5 pt-1 border-t border-black/5 dark:border-white/5">
-                    <p
-                      className={`font-display text-lg font-extrabold font-tabular truncate ${
-                        acc.balance > 0
-                          ? 'text-[var(--credit-red)]'
-                          : acc.balance < 0
-                            ? 'text-[var(--debit-green)]'
-                            : 'text-[var(--ink-muted)]'
-                      }`}
-                    >
-                      {hideBalance ? '₹••••' : formatINR(absBal)}
-                    </p>
-                    <span
-                      className={`text-[10px] font-extrabold uppercase tracking-wider shrink-0 ${
-                        overLimit
-                          ? 'text-[var(--alert-amber)]'
-                          : acc.balance > 0
-                            ? 'text-[var(--credit-red)]/85'
-                            : acc.balance < 0
-                              ? 'text-[var(--debit-green)]/85'
-                              : 'text-[var(--ink-muted)]'
-                      }`}
-                    >
-                      {overLimit ? 'Limit' : statusText}
-                    </span>
-                  </div>
-                </button>
-
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  transition={SPRING_FAST}
-                  type="button"
-                  onClick={() => openQuickEntrySheet(acc)}
-                  aria-label={`Quick ₹ entry for ${acc.name}`}
-                  className="absolute top-2.5 right-2.5 z-10 min-w-[44px] min-h-[44px] px-2.5 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] font-extrabold text-xs inline-flex items-center justify-center gap-0.5 shadow-inner"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>₹</span>
-                </motion.button>
-              </motion.div>
-            );
-          })}
+                account={acc}
+                idx={idx}
+                trust={trustScoresByAccount[acc.id]}
+                hideBalance={hideBalance}
+                isSelected={Boolean(selectedAccountId && selectedAccountId === acc.id)}
+                isRecentlySaved={Boolean(
+                  recentlyUpdatedAccountId && recentlyUpdatedAccountId === acc.id
+                )}
+                dueLabel={t.due}
+                advanceLabel={t.advance}
+                settledLabel={t.settled}
+                onSelect={onSelectAccount}
+                onQuickAdd={openQuickEntrySheet}
+                onSwipeRemind={onSwipeRemind}
+              />
+            ))}
+          </div>
+          <p className="text-[10px] font-semibold text-center text-[var(--ink-muted)] pt-1">
+            Tip: Swipe any card right to quick-receive ₹ or left to remind
+          </p>
         </div>
       )}
 
-      {/* Inline + ₹ Quick-Entry Spring Bottom Sheet (<2s Rush-Hour Counter Logging) */}
+      {/* 5. Custom 3D Tactile Numeric Keypad Quick-Entry Bottom Sheet */}
       <AnimatePresence>
         {quickEntryAccount && (
           <motion.div
@@ -1016,252 +1130,301 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
             aria-label={`Quick entry for ${quickEntryAccount.name}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0.18, ease: 'easeOut' } }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             onClick={() => {
-              if (!quickSaving) setQuickEntryAccount(null);
+              if (!quickSaving && !quickCelebration) setQuickEntryAccount(null);
             }}
-            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
           >
             <motion.div
               key="quick-entry-sheet"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={SPRING_SHEET}
-              drag="y"
-              dragConstraints={{ top: 0 }}
-              dragElastic={{ top: 0, bottom: 0.35 }}
-              onDragEnd={(_, info) => {
-                if (!quickSaving && info.offset.y > 110) {
-                  setQuickEntryAccount(null);
-                }
+              exit={{
+                y: '100%',
+                transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
               }}
+              transition={SPRING_SHEET}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 max-h-[90dvh] overflow-y-auto pb-safe"
+              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-5 pt-3 space-y-3.5 max-h-[92dvh] overflow-y-auto no-scrollbar pb-safe"
             >
-              <div className="w-10 h-1.5 rounded-full bg-[var(--surface-subtle)] mx-auto cursor-grab" />
+              <div className="w-10 h-1.5 rounded-full bg-[var(--surface-subtle)] mx-auto" />
 
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <TrustAvatarRing
-                    name={quickEntryAccount.name}
-                    score={trustScoresByAccount[quickEntryAccount.id]?.score ?? 100}
-                    hasTrust={Boolean(
-                      trustScoresByAccount[quickEntryAccount.id] &&
-                        quickEntryAccount.kind === 'customer'
-                    )}
-                  />
-                  <div className="min-w-0">
-                    <h3 className="font-display text-lg font-extrabold text-[var(--ink)] truncate">
-                      {quickEntryAccount.name}
-                    </h3>
-                    <p
-                      className={`text-xs font-bold font-tabular ${
-                        quickEntryAccount.balance > 0
-                          ? 'text-[var(--credit-red)]'
-                          : quickEntryAccount.balance < 0
-                            ? 'text-[var(--debit-green)]'
-                            : 'text-[var(--ink-muted)]'
+              {quickCelebration ? (
+                <SmartEntrySavedStage
+                  partyName={quickCelebration.partyName}
+                  previousBalance={quickCelebration.previousBalance}
+                  newBalance={quickCelebration.newBalance}
+                  amount={quickCelebration.amount}
+                  direction={quickCelebration.direction}
+                />
+              ) : (
+                <>
+                  {/* Party Trust Header */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <TrustAvatarRing
+                        name={quickEntryAccount.name}
+                        score={trustScoresByAccount[quickEntryAccount.id]?.score ?? 100}
+                        hasTrust={Boolean(
+                          trustScoresByAccount[quickEntryAccount.id] &&
+                            quickEntryAccount.kind === 'customer'
+                        )}
+                        size="sm"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="font-display text-base font-extrabold text-[var(--ink)] truncate">
+                          {quickEntryAccount.name}
+                        </h3>
+                        <p
+                          className={`text-xs font-bold font-tabular ${
+                            quickEntryAccount.balance > 0
+                              ? 'text-[var(--credit-red)]'
+                              : quickEntryAccount.balance < 0
+                                ? 'text-[var(--debit-green)]'
+                                : 'text-[var(--ink-muted)]'
+                          }`}
+                        >
+                          Current:{' '}
+                          {hideBalance
+                            ? '₹••••'
+                            : formatINR(Math.abs(quickEntryAccount.balance))}{' '}
+                          {quickEntryAccount.balance > 0
+                            ? t.due
+                            : quickEntryAccount.balance < 0
+                              ? t.advance
+                              : t.settled}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={quickSaving}
+                      onClick={() => setQuickEntryAccount(null)}
+                      aria-label="Close quick entry"
+                      className="min-w-[44px] min-h-[44px] rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition shrink-0"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Direction Toggle Pills */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <motion.button
+                      whileTap={{ scale: 0.94, y: 1 }}
+                      transition={SPRING_FAST}
+                      type="button"
+                      onClick={() => setQuickDirection('given')}
+                      className={`min-h-[44px] rounded-2xl text-xs font-extrabold flex items-center justify-center gap-1.5 ${
+                        quickDirection === 'given'
+                          ? 'bg-[var(--credit-red)] text-white shadow-md'
+                          : 'bg-[var(--credit-tint)] text-[var(--credit-red)]'
                       }`}
                     >
-                      Current: {hideBalance ? '₹••••' : formatINR(Math.abs(quickEntryAccount.balance))}{' '}
-                      {quickEntryAccount.balance > 0
-                        ? t.due
-                        : quickEntryAccount.balance < 0
-                          ? t.advance
-                          : t.settled}
-                    </p>
+                      <ArrowUp className="w-4 h-4 shrink-0" />
+                      <span>Given (Udhaar)</span>
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.94, y: 1 }}
+                      transition={SPRING_FAST}
+                      type="button"
+                      onClick={() => setQuickDirection('received')}
+                      className={`min-h-[44px] rounded-2xl text-xs font-extrabold flex items-center justify-center gap-1.5 ${
+                        quickDirection === 'received'
+                          ? 'bg-[var(--debit-green)] text-white shadow-md'
+                          : 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
+                      }`}
+                    >
+                      <ArrowDown className="w-4 h-4 shrink-0" />
+                      <span>Received (Jama)</span>
+                    </motion.button>
                   </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={quickSaving}
-                  onClick={() => setQuickEntryAccount(null)}
-                  aria-label="Close quick entry"
-                  className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition shrink-0"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
 
-              {/* Tactile 2-Way Udhaar vs Jama Toggle */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <motion.button
-                  whileTap={{ scale: 0.94 }}
-                  transition={SPRING_FAST}
-                  type="button"
-                  onClick={() => setQuickDirection('given')}
-                  className={`min-h-[48px] rounded-2xl text-sm font-extrabold flex items-center justify-center gap-1.5 ${
-                    quickDirection === 'given'
-                      ? 'bg-[var(--credit-red)] text-white shadow-md'
-                      : 'bg-[var(--credit-tint)] text-[var(--credit-red)]'
-                  }`}
-                >
-                  <ArrowUp className="w-4 h-4 shrink-0" />
-                  <span>Given (Udhaar)</span>
-                </motion.button>
-                <motion.button
-                  whileTap={{ scale: 0.94 }}
-                  transition={SPRING_FAST}
-                  type="button"
-                  onClick={() => setQuickDirection('received')}
-                  className={`min-h-[48px] rounded-2xl text-sm font-extrabold flex items-center justify-center gap-1.5 ${
-                    quickDirection === 'received'
-                      ? 'bg-[var(--debit-green)] text-white shadow-md'
-                      : 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
-                  }`}
-                >
-                  <ArrowDown className="w-4 h-4 shrink-0" />
-                  <span>Received (Jama)</span>
-                </motion.button>
-              </div>
-
-              {/* Large Auto-Focused Numeric Amount Input */}
-              <div className="rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-4 py-3 flex items-center gap-2 focus-within:ring-2 focus-within:ring-[var(--brand-accent)]">
-                <span
-                  className={`font-display text-3xl font-extrabold ${
-                    quickDirection === 'given'
-                      ? 'text-[var(--credit-red)]'
-                      : 'text-[var(--debit-green)]'
-                  }`}
-                >
-                  ₹
-                </span>
-                <input
-                  ref={quickAmountInputRef}
-                  type="number"
-                  inputMode="decimal"
-                  min="1"
-                  step="any"
-                  value={quickAmount}
-                  onChange={(e) => {
-                    setQuickError('');
-                    setQuickAmount(e.target.value);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !quickSaving) {
-                      void handleSaveQuickEntry();
-                    }
-                  }}
-                  placeholder="0"
-                  className="w-full bg-transparent font-display text-3xl font-extrabold font-tabular text-[var(--ink)] outline-none"
-                />
-              </div>
-
-              {/* Quick Amount Chips */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                {[100, 500, 1000].map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => {
-                      setQuickError('');
-                      const nextVal = Math.round(((Number(quickAmount) || 0) + preset) * 100) / 100;
-                      setQuickAmount(String(nextVal));
-                    }}
-                    className="min-h-[38px] px-3.5 rounded-xl bg-[var(--surface-subtle)] text-xs font-extrabold font-tabular text-[var(--ink)] whitespace-nowrap active:scale-95 transition"
+                  {/* Live Tabular Amount Readout (Zero OS Keyboard Popup) */}
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="rounded-2xl bg-[var(--app-bg)] px-4 py-3 flex items-center justify-between gap-2"
                   >
-                    +₹{preset}
-                  </button>
-                ))}
-                {quickEntryAccount.balance > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuickError('');
-                      setQuickDirection('received');
-                      setQuickAmount(String(Math.round(quickEntryAccount.balance * 100) / 100));
-                    }}
-                    className="min-h-[38px] px-3.5 rounded-xl bg-[var(--debit-tint)] text-xs font-extrabold font-tabular text-[var(--debit-green)] whitespace-nowrap active:scale-95 transition"
-                  >
-                    Clear Due ({formatINR(quickEntryAccount.balance)})
-                  </button>
-                )}
-              </div>
-
-              {/* Optional Note + Galla Sync */}
-              <div className="space-y-2.5">
-                <input
-                  type="text"
-                  value={quickNote}
-                  onChange={(e) => setQuickNote(e.target.value)}
-                  placeholder="Note (e.g. Chini, Atta, UPI) — optional"
-                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm font-medium text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                />
-
-                <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--app-bg)] px-3.5 py-2">
-                  <span className="text-[11px] font-bold text-[var(--ink-muted)]">
-                    Sync to Galla
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {(
-                      [
-                        { id: null, label: 'Off' },
-                        { id: 'cash', label: 'Cash' },
-                        { id: 'upi', label: 'UPI' },
-                      ] as const
-                    ).map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setQuickGallaMode(opt.id)}
-                        className={`min-h-[34px] px-3 rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
-                          quickGallaMode === opt.id
-                            ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
-                            : 'bg-[var(--surface)] text-[var(--ink-muted)]'
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span
+                        className={`font-display text-3xl font-extrabold ${
+                          quickDirection === 'given'
+                            ? 'text-[var(--credit-red)]'
+                            : 'text-[var(--debit-green)]'
                         }`}
                       >
-                        {opt.label}
+                        ₹
+                      </span>
+                      <span
+                        data-testid="quick-keypad-amount"
+                        className="font-display text-3xl font-extrabold font-tabular text-[var(--ink)] truncate"
+                      >
+                        {quickAmount || '0'}
+                      </span>
+                    </div>
+                    {quickAmount !== '' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickError('');
+                          setQuickAmount((prev) => applyKeypadKey(prev, 'clear'));
+                        }}
+                        className="min-h-[32px] px-2.5 rounded-xl bg-[var(--surface)] text-[11px] font-bold text-[var(--ink-muted)] shadow-xs active:scale-95 transition shrink-0"
+                      >
+                        Clear
                       </button>
-                    ))}
+                    )}
                   </div>
-                </div>
-              </div>
 
-              {quickError && (
-                <p className="text-xs font-bold text-[var(--credit-red)]">{quickError}</p>
+                  {/* Quick Increment Chips */}
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                    {(['+100', '+500', '+2000'] as const).map((presetKey) => (
+                      <motion.button
+                        key={presetKey}
+                        whileTap={{ scale: 0.92 }}
+                        transition={SPRING_FAST}
+                        type="button"
+                        onClick={() => {
+                          setQuickError('');
+                          setQuickAmount((prev) => applyKeypadKey(prev, presetKey));
+                        }}
+                        className="min-h-[36px] px-3.5 rounded-xl bg-[var(--surface-subtle)] text-xs font-extrabold font-tabular text-[var(--ink)] whitespace-nowrap shrink-0"
+                      >
+                        +₹{presetKey.slice(1)}
+                      </motion.button>
+                    ))}
+                    {quickEntryAccount.balance > 0 && (
+                      <motion.button
+                        whileTap={{ scale: 0.92 }}
+                        transition={SPRING_FAST}
+                        type="button"
+                        onClick={() => {
+                          setQuickError('');
+                          setQuickDirection('received');
+                          setQuickAmount(String(Math.round(quickEntryAccount.balance * 100) / 100));
+                        }}
+                        className="min-h-[36px] px-3.5 rounded-xl bg-[var(--debit-tint)] text-xs font-extrabold font-tabular text-[var(--debit-green)] whitespace-nowrap shrink-0"
+                      >
+                        Clear Due ({formatINR(quickEntryAccount.balance)})
+                      </motion.button>
+                    )}
+                  </div>
+
+                  {/* Custom 3D Tactile Numeric Keypad (1-9, ., 0, ⌫) */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {KEYPAD_KEYS.map((key) => {
+                      const isBackspace = key === 'backspace';
+                      return (
+                        <motion.button
+                          key={key}
+                          type="button"
+                          disabled={quickSaving}
+                          whileTap={{ scale: 0.91, y: 2 }}
+                          transition={SPRING_FAST}
+                          aria-label={isBackspace ? 'Backspace' : `Keypad ${key}`}
+                          onClick={() => {
+                            setQuickError('');
+                            setQuickAmount((prev) => applyKeypadKey(prev, key));
+                          }}
+                          className="min-h-[50px] rounded-2xl bg-[var(--app-bg)] shadow-[0_3px_0_rgba(15,23,42,0.1)] dark:shadow-[0_3px_0_rgba(0,0,0,0.55)] font-display text-lg font-extrabold font-tabular text-[var(--ink)] flex items-center justify-center hover:bg-[var(--brand-tint)] disabled:opacity-50"
+                        >
+                          {isBackspace ? <Delete className="w-5 h-5" /> : key}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Optional Note + Galla Sync */}
+                  <div className="grid grid-cols-1 gap-2">
+                    <input
+                      type="text"
+                      value={quickNote}
+                      onChange={(e) => setQuickNote(e.target.value)}
+                      placeholder="Optional note (e.g. Chini, Atta, UPI)"
+                      className="w-full min-h-[42px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-xs font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    />
+
+                    <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--app-bg)] px-3.5 py-1.5">
+                      <span className="text-[11px] font-bold text-[var(--ink-muted)]">
+                        Sync to Galla
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {(
+                          [
+                            { id: null, label: 'Off' },
+                            { id: 'cash', label: 'Cash' },
+                            { id: 'upi', label: 'UPI' },
+                          ] as const
+                        ).map((opt) => (
+                          <button
+                            key={opt.label}
+                            type="button"
+                            onClick={() => setQuickGallaMode(opt.id)}
+                            className={`min-h-[32px] px-3 rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
+                              quickGallaMode === opt.id
+                                ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
+                                : 'bg-[var(--surface)] text-[var(--ink-muted)]'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {quickError && (
+                    <p role="alert" className="text-xs font-bold text-[var(--credit-red)]">
+                      {quickError}
+                    </p>
+                  )}
+
+                  <motion.button
+                    whileTap={{ scale: 0.96, y: 2 }}
+                    transition={SPRING_FAST}
+                    type="button"
+                    disabled={quickSaving}
+                    onClick={handleSaveQuickEntry}
+                    className={`w-full min-h-[52px] rounded-2xl text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-lg disabled:opacity-60 ${
+                      quickDirection === 'received'
+                        ? 'bg-[var(--debit-green)]'
+                        : 'bg-[var(--credit-red)]'
+                    }`}
+                  >
+                    <Check className="w-5 h-5" />
+                    <span>
+                      {quickSaving
+                        ? 'Saving...'
+                        : quickDirection === 'received'
+                          ? 'Save Received (Jama)'
+                          : 'Save Given (Udhaar)'}
+                    </span>
+                  </motion.button>
+                </>
               )}
-
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                transition={SPRING_FAST}
-                type="button"
-                disabled={quickSaving}
-                onClick={handleSaveQuickEntry}
-                className={`w-full min-h-[52px] rounded-2xl text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-lg disabled:opacity-60 ${
-                  quickDirection === 'received' ? 'bg-[var(--debit-green)]' : 'bg-[var(--credit-red)]'
-                }`}
-              >
-                <Check className="w-5 h-5" />
-                <span>
-                  {quickSaving
-                    ? 'Saving...'
-                    : quickDirection === 'received'
-                      ? 'Save Received (Jama)'
-                      : 'Save Given (Udhaar)'}
-                </span>
-              </motion.button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Unified Filter & Sort Spring Bottom Sheet */}
+      {/* Unified Filter & Sort Solid Bottom Sheet */}
       <AnimatePresence>
         {showFilterSortSheet && (
           <motion.div
             key="filter-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0.18, ease: 'easeOut' } }}
             onClick={() => setShowFilterSortSheet(false)}
-            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-black/45 flex items-end justify-center"
           >
             <motion.div
               key="filter-sheet"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
-              exit={{ y: '100%' }}
+              exit={{ y: '100%', transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] } }}
               transition={SPRING_SHEET}
               drag="y"
               dragConstraints={{ top: 0 }}
@@ -1270,7 +1433,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 if (info.offset.y > 110) setShowFilterSortSheet(false);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-5 max-h-[85dvh] overflow-y-auto pb-safe"
+              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-5 max-h-[85dvh] overflow-y-auto pb-safe"
             >
               <div className="w-10 h-1.5 rounded-full bg-[var(--surface-subtle)] mx-auto cursor-grab" />
               <div className="flex items-center justify-between">
@@ -1299,7 +1462,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                       onClick={() => setFilterChip(f.id)}
                       className={`min-h-[44px] px-3 rounded-2xl text-xs font-bold text-left flex items-center justify-between active:scale-95 transition ${
                         filterChip === f.id
-                          ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/40'
+                          ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
                           : 'bg-[var(--app-bg)] text-[var(--ink)]'
                       }`}
                     >
@@ -1326,7 +1489,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                       className={`w-full min-h-[46px] px-4 rounded-2xl flex items-center justify-between text-sm font-bold active:scale-[0.98] transition ${
                         sortBy === opt.id
                           ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
-                          : 'bg-[var(--app-bg)]/70 hover:bg-[var(--surface-subtle)] text-[var(--ink)]'
+                          : 'bg-[var(--app-bg)] hover:bg-[var(--surface-subtle)] text-[var(--ink)]'
                       }`}
                     >
                       <span>{opt.label}</span>
@@ -1340,24 +1503,24 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Add Customer / Supplier Spring Bottom Sheet */}
+      {/* Add Customer / Supplier Solid Bottom Sheet */}
       <AnimatePresence>
         {showAddModal && (
           <motion.div
             key="add-party-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0.18, ease: 'easeOut' } }}
             onClick={() => {
               if (!addingBusy) setShowAddModal(false);
             }}
-            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-black/45 flex items-end justify-center"
           >
             <motion.div
               key="add-party-sheet"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
-              exit={{ y: '100%' }}
+              exit={{ y: '100%', transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] } }}
               transition={SPRING_SHEET}
               drag="y"
               dragConstraints={{ top: 0 }}
@@ -1366,7 +1529,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 if (!addingBusy && info.offset.y > 110) setShowAddModal(false);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 max-h-[90dvh] overflow-y-auto pb-safe"
+              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 max-h-[90dvh] overflow-y-auto pb-safe"
             >
               <div className="w-10 h-1.5 rounded-full bg-[var(--surface-subtle)] mx-auto cursor-grab" />
               <div className="flex items-center justify-between">
@@ -1389,7 +1552,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   onClick={() => setNewKind('customer')}
                   className={`min-h-[44px] rounded-2xl text-sm font-bold active:scale-95 transition ${
                     newKind === 'customer'
-                      ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/40'
+                      ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
                       : 'bg-[var(--app-bg)] text-[var(--ink)]'
                   }`}
                 >
@@ -1400,7 +1563,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   onClick={() => setNewKind('supplier')}
                   className={`min-h-[44px] rounded-2xl text-sm font-bold active:scale-95 transition ${
                     newKind === 'supplier'
-                      ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/40'
+                      ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
                       : 'bg-[var(--app-bg)] text-[var(--ink)]'
                   }`}
                 >
@@ -1418,7 +1581,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="Ramesh Kirana"
-                    className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-2 ring-[var(--brand-accent)]/60 px-3.5 text-base font-bold text-[var(--ink)] outline-none"
+                    className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-base font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   />
                 </div>
                 <div>
@@ -1431,7 +1594,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                     placeholder="9876543210"
-                    className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-base font-bold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                    className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-base font-bold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -1443,7 +1606,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                       type="date"
                       value={newDueDate}
                       onChange={(e) => setNewDueDate(e.target.value)}
-                      className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-sm font-tabular text-[var(--ink)] outline-none"
+                      className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] px-3 text-sm font-tabular text-[var(--ink)] outline-none"
                     />
                   </div>
                   <div>
@@ -1456,7 +1619,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                       value={newCreditLimit}
                       onChange={(e) => setNewCreditLimit(e.target.value)}
                       placeholder="5000"
-                      className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none"
+                      className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none"
                     />
                   </div>
                 </div>
@@ -1465,12 +1628,12 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               {addError && <p className="text-sm font-bold text-[var(--credit-red)]">{addError}</p>}
 
               <motion.button
-                whileTap={{ scale: 0.96 }}
+                whileTap={{ scale: 0.96, y: 2 }}
                 transition={SPRING_FAST}
                 type="button"
                 disabled={addingBusy}
                 onClick={handleAddSubmit}
-                className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-base shadow-md"
+                className="tactile-key-primary w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-base"
               >
                 {addingBusy ? 'Adding...' : 'Confirm'}
               </motion.button>

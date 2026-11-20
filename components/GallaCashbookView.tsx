@@ -150,7 +150,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
               type="button"
               onClick={onBack}
               aria-label="Back to Ledger"
-              className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center active:scale-95 transition shrink-0"
+              className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card flex items-center justify-center active:scale-95 transition shrink-0"
             >
               <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
             </button>
@@ -169,7 +169,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
             type="button"
             onClick={onToggleHideBalance}
             aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
-            className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition shrink-0"
+            className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition shrink-0"
           >
             {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
@@ -198,7 +198,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
 
       {/* 2-Column Spatial Bento Grid: Cash Drawer (Galla) & UPI/Bank Balance */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-[24px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4 space-y-2">
+        <div className="rounded-[24px] spatial-card p-4 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-extrabold text-[var(--ink-muted)] uppercase tracking-wider">
               Cash Drawer
@@ -221,7 +221,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
           </p>
         </div>
 
-        <div className="rounded-[24px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4 space-y-2">
+        <div className="rounded-[24px] spatial-card p-4 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-extrabold text-[var(--ink-muted)] uppercase tracking-wider">
               UPI &amp; Bank
@@ -296,8 +296,8 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
             onClick={() => setDateScope(d.id)}
             className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 active:scale-95 transition ${
               dateScope === d.id
-                ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-sm'
-                : 'spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--ink-muted)]'
+                ? 'bg-[var(--brand)] text-[var(--brand-fg)] tactile-key-primary'
+                : 'spatial-card text-[var(--ink-muted)]'
             }`}
           >
             {d.label}
@@ -321,7 +321,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
             className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 active:scale-95 transition ${
               modeFilter === m.id
                 ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-xs'
-                : 'spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--ink-muted)]'
+                : 'spatial-card text-[var(--ink-muted)]'
             }`}
           >
             {m.label}
@@ -340,7 +340,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
 
       {/* Cashbook Entries Cards */}
       {visibleEntries.length === 0 ? (
-        <div className="rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-8 text-center space-y-3">
+        <div className="rounded-[28px] spatial-card p-8 text-center space-y-3">
           <p className="font-display text-base font-bold text-[var(--ink)]">
             No Galla entries for this view yet.
           </p>
@@ -352,7 +352,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
             <button
               type="button"
               onClick={() => openEntryModal('inflow')}
-              className="min-h-[44px] px-4 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold shadow-sm active:scale-95 transition"
+              className="min-h-[44px] px-4 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold tactile-key-primary active:scale-95 transition"
             >
               + Add Opening / Cash Sale
             </button>
@@ -367,7 +367,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
               <div
                 key={entry.id}
                 style={{ animationDelay: `${Math.min(idx, 10) * 35}ms` }}
-                className="stagger-fade-up rounded-[22px] spatial-card ring-1 ring-white/80 dark:ring-white/10 px-3.5 py-3 flex items-center justify-between gap-3"
+                className="stagger-fade-up rounded-[22px] spatial-card px-3.5 py-3 flex items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <span
@@ -442,11 +442,11 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
           role="dialog"
           aria-modal="true"
           onClick={() => !saving && setModalType(null)}
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe max-h-[90dvh] overflow-y-auto"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe max-h-[90dvh] overflow-y-auto"
           >
             <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-center justify-between">
@@ -471,7 +471,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                   onClick={() => setMode(m)}
                   className={`min-h-[44px] rounded-2xl text-xs font-extrabold uppercase active:scale-95 transition ${
                     mode === m
-                      ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/40'
+                      ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]'
                       : 'bg-[var(--app-bg)] text-[var(--ink)]'
                   }`}
                 >
@@ -513,7 +513,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="500"
-                  className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-2 ring-[var(--brand-accent)]/60 px-3 text-lg font-extrabold font-tabular text-[var(--ink)] outline-none"
+                  className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] ring-2 ring-[var(--brand-accent)] px-3 text-lg font-extrabold font-tabular text-[var(--ink)] outline-none"
                 />
               </div>
               <div>
@@ -524,7 +524,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                   type="date"
                   value={entryDate}
                   onChange={(e) => setEntryDate(e.target.value)}
-                  className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-xs font-tabular font-bold text-[var(--ink)]"
+                  className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] px-3 text-xs font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
             </div>
@@ -542,7 +542,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                     ? 'Morning opening cash / counter sale'
                     : 'Chai, transport, electricity...'
                 }
-                className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
               />
             </div>
 
@@ -552,7 +552,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
               type="button"
               disabled={saving}
               onClick={handleSave}
-              className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm shadow-md disabled:opacity-60 active:scale-95 transition"
+              className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
             >
               {saving ? 'Saving...' : 'Save to Galla'}
             </button>

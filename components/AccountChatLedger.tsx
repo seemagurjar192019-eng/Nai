@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle,
   ArrowDown,
@@ -411,7 +411,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
   // Calculator Modal View
   if (calcDirection) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-center">
+      <div className="fixed inset-0 z-50 bg-black/50 flex justify-center">
         <div className="w-full max-w-[430px] spatial-shell-bg flex-1 flex flex-col justify-between p-4 pb-safe shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between gap-3">
@@ -420,7 +420,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 type="button"
                 onClick={() => setCalcDirection(null)}
                 aria-label="Back to ledger"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center hover:bg-[var(--surface-subtle)] active:scale-95 transition"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -497,7 +497,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
 
           {/* Notes / Date / Bill Attachment / Galla Sync */}
           <div className="space-y-2.5">
-            <div className="flex items-center gap-2 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 px-3.5 min-h-[48px]">
+            <div className="flex items-center gap-2 rounded-2xl spatial-card px-3.5 min-h-[48px]">
               <Receipt className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
               <input
                 type="text"
@@ -517,7 +517,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
-              <label className="flex items-center justify-between gap-2 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 px-3.5 min-h-[46px] text-xs font-bold text-[var(--ink)] cursor-pointer">
+              <label className="flex items-center justify-between gap-2 rounded-2xl spatial-card px-3.5 min-h-[46px] text-xs font-bold text-[var(--ink)] cursor-pointer">
                 <span className="inline-flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-[var(--brand-accent)]" />
                   <span>Date</span>
@@ -533,7 +533,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-between gap-2 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 px-3.5 min-h-[46px] text-xs font-bold text-[var(--ink)] active:scale-95 transition"
+                className="flex items-center justify-between gap-2 rounded-2xl spatial-card px-3.5 min-h-[46px] text-xs font-bold text-[var(--ink)] active:scale-95 transition"
               >
                 <span className="inline-flex items-center gap-1.5">
                   <Camera className="w-4 h-4 text-[var(--brand-accent)]" />
@@ -551,7 +551,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
             </div>
 
             {!editingTx && (
-              <div className="flex items-center justify-between gap-2 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 px-3.5 py-2">
+              <div className="flex items-center justify-between gap-2 rounded-2xl spatial-card px-3.5 py-2">
                 <span className="text-[11px] font-bold text-[var(--ink-muted)]">
                   Sync to Today&apos;s Galla
                 </span>
@@ -592,7 +592,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     setCalcDirection(null);
                     onOpenCreateBill(account.name, account.phone);
                   }}
-                  className="min-h-[52px] px-4 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-bold text-[var(--ink)] inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 transition"
+                  className="min-h-[52px] px-4 rounded-2xl spatial-card text-sm font-bold text-[var(--ink)] inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 transition"
                 >
                   <FileText className="w-4 h-4 text-[var(--brand-accent)]" />
                   <span>Create Bill</span>
@@ -602,7 +602,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                 type="button"
                 disabled={calcSaving}
                 onClick={handleConfirmCalc}
-                className="flex-1 min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-base flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+                className="flex-1 min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-base flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
               >
                 <Check className="w-5 h-5" />
                 <span>{calcSaving ? 'Saving...' : 'Confirm'}</span>
@@ -624,7 +624,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                       ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-md'
                       : isOp
                         ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
-                        : 'spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--ink)]'
+                        : 'spatial-card text-[var(--ink)]'
                   }`}
                 >
                   {btn === 'BACK' ? <Delete className="w-5 h-5" /> : btn}
@@ -640,9 +640,9 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
   let runningRowIdx = 0;
 
   return (
-    <div className="flex flex-col h-full rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 overflow-hidden">
+    <div className="flex flex-col h-full rounded-[28px] spatial-card overflow-hidden">
       {/* Ledger Top Bar */}
-      <div className="no-print bg-[var(--surface)]/95 backdrop-blur-xl shadow-[0_6px_18px_-10px_rgba(15,23,42,0.1)] px-3 py-2.5 flex items-center justify-between gap-2">
+      <div className="no-print bg-[var(--surface)] shadow-[0_6px_18px_-10px_rgba(15,23,42,0.1)] px-3 py-2.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
@@ -734,14 +734,14 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search notes or ₹ amount..."
-            className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+            className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
           />
         </div>
       )}
 
       {/* Timeline Filter Strip */}
       {transactions.length > 0 && (
-        <div className="no-print bg-[var(--surface)]/80 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="no-print bg-[var(--surface)] px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {(
             [
               { id: 'all', label: 'All Entries' },
@@ -790,10 +790,10 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
       </div>
 
       {/* Modern Timeline Ledger Cards (Full-Width Spatial Stream) */}
-      <div className="flex-1 bg-[var(--app-bg)]/55 p-3.5 space-y-4 overflow-y-auto no-scrollbar">
+      <div className="flex-1 bg-[var(--app-bg)] p-3.5 space-y-4 overflow-y-auto no-scrollbar">
         {timeline.length === 0 ? (
           <div className="py-16 flex flex-col items-center justify-center text-center gap-3">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-cyan-500/15 text-[var(--brand-accent)] flex items-center justify-center shadow-inner">
+            <div className="w-16 h-16 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
               <Lock className="w-7 h-7" />
             </div>
             <p className="text-sm font-semibold text-[var(--ink-muted)] max-w-xs">
@@ -805,7 +805,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           timeline.map((group) => (
             <div key={group.dateLabel} className="space-y-2.5">
               <div className="flex justify-center">
-                <span className="text-[11px] font-extrabold text-[var(--ink-muted)] bg-[var(--surface)]/90 shadow-xs ring-1 ring-white/80 dark:ring-white/10 px-3 py-1 rounded-full">
+                <span className="text-[11px] font-extrabold text-[var(--ink-muted)] bg-[var(--surface)] shadow-xs px-3 py-1 rounded-full">
                   {group.dateLabel}
                 </span>
               </div>
@@ -824,7 +824,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     initial={{ opacity: 0, y: 12, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ type: 'spring', stiffness: 420, damping: 28, delay: delaySec }}
-                    className="rounded-[20px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-3.5 space-y-2"
+                    className="rounded-[20px] spatial-card p-3.5 space-y-2"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -948,7 +948,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                             onError={() =>
                               setBrokenImgIds((prev) => ({ ...prev, [tx.id]: true }))
                             }
-                            className="max-h-28 rounded-xl object-cover shadow-xs ring-1 ring-black/5 dark:ring-white/10"
+                            className="max-h-28 rounded-xl object-cover shadow-sm"
                           />
                         </button>
                       ))}
@@ -961,7 +961,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
       </div>
 
       {/* Bottom Quick Action Bar + Sticky Received / Voice / Given */}
-      <div className="no-print bg-[var(--surface)]/95 backdrop-blur-xl shadow-[0_-10px_24px_-12px_rgba(15,23,42,0.12)] px-4 py-3 space-y-3">
+      <div className="no-print bg-[var(--surface)] shadow-[0_-10px_24px_-12px_rgba(15,23,42,0.12)] px-4 py-3 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
             <a
@@ -1078,7 +1078,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           onClick={() => {
             if (!profileSaving) setShowProfileDrawer(false);
           }}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <motion.div
             initial={{ y: '100%' }}
@@ -1092,7 +1092,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               if (info.offset.y > 90 && !profileSaving) setShowProfileDrawer(false);
             }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 max-h-[90dvh] overflow-y-auto no-scrollbar pb-safe"
+            className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 max-h-[90dvh] overflow-y-auto no-scrollbar pb-safe"
           >
             <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-center justify-between">
@@ -1118,7 +1118,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
               <div>
@@ -1134,7 +1134,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
                   }}
                   placeholder="9876543210"
-                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2.5">
@@ -1146,7 +1146,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     type="date"
                     value={editDueDate}
                     onChange={(e) => setEditDueDate(e.target.value)}
-                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-xs font-tabular text-[var(--ink)] outline-none"
+                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3 text-xs font-tabular text-[var(--ink)] outline-none"
                   />
                 </div>
                 <div>
@@ -1157,7 +1157,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                     type="date"
                     value={editPromiseDate}
                     onChange={(e) => setEditPromiseDate(e.target.value)}
-                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-xs font-tabular text-[var(--ink)] outline-none"
+                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3 text-xs font-tabular text-[var(--ink)] outline-none"
                   />
                 </div>
               </div>
@@ -1171,7 +1171,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   value={editCreditLimit}
                   onChange={(e) => setEditCreditLimit(e.target.value)}
                   placeholder="e.g. 5000 (0 = No Limit)"
-                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none"
                 />
               </div>
             </div>
@@ -1212,7 +1212,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               {profileSaving ? 'Saving...' : 'Save Changes'}
             </button>
 
-            <div className="pt-2 border-t border-black/5 dark:border-white/5">
+            <div className="pt-2">
               {!confirmDeleteCustomer ? (
                 <button
                   type="button"
@@ -1270,7 +1270,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={() => setShowQrModal(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <motion.div
             initial={{ y: '100%' }}
@@ -1284,7 +1284,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               if (info.offset.y > 90) setShowQrModal(false);
             }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 text-center space-y-4 pb-safe"
+            className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 text-center space-y-4 pb-safe"
           >
             <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-center justify-between">
@@ -1335,7 +1335,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
           onClick={() => {
             if (!dueSaving) setShowDueModal(false);
           }}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <motion.div
             initial={{ y: '100%' }}
@@ -1349,7 +1349,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
               if (info.offset.y > 90 && !dueSaving) setShowDueModal(false);
             }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe"
+            className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
           >
             <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
@@ -1364,7 +1364,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   type="date"
                   value={editDueDate}
                   onChange={(e) => setEditDueDate(e.target.value)}
-                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 font-tabular text-[var(--ink)]"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 font-tabular text-[var(--ink)]"
                 />
               </div>
               <div>
@@ -1375,7 +1375,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   type="date"
                   value={editPromiseDate}
                   onChange={(e) => setEditPromiseDate(e.target.value)}
-                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 font-tabular text-[var(--ink)]"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 font-tabular text-[var(--ink)]"
                 />
               </div>
               <div>
@@ -1387,7 +1387,7 @@ export const AccountChatLedger: React.FC<AccountChatLedgerProps> = ({
                   value={editPromiseNote}
                   onChange={(e) => setEditPromiseNote(e.target.value)}
                   placeholder="e.g. Kal shaam ko UPI karega"
-                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm text-[var(--ink)]"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm text-[var(--ink)]"
                 />
               </div>
             </div>

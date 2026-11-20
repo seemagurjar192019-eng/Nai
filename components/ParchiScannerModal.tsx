@@ -266,9 +266,9 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="AI Parchi and Receipt Scanner"
-      className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end justify-center"
+      className="fixed inset-0 z-50 bg-black/55 flex items-end justify-center"
     >
-      <div className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-5 space-y-4 max-h-[92dvh] overflow-y-auto pb-safe">
+      <div className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-5 space-y-4 max-h-[92dvh] overflow-y-auto pb-safe">
         <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -316,7 +316,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
         />
 
         {!thumbDataUrl ? (
-          <div className="rounded-[26px] bg-[var(--app-bg)] ring-1 ring-indigo-500/20 p-7 text-center space-y-4">
+          <div className="rounded-[26px] bg-[var(--app-bg)] p-7 text-center space-y-4">
             <div
               style={{ background: 'var(--munim-gradient)' }}
               className="mx-auto w-14 h-14 rounded-2xl text-white flex items-center justify-center shadow-lg"
@@ -336,7 +336,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
               <button
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
-                className="min-h-[48px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm inline-flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+                className="min-h-[48px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm inline-flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
               >
                 <Camera className="w-4 h-4" />
                 <span>Take Photo</span>
@@ -344,20 +344,23 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
               <button
                 type="button"
                 onClick={() => galleryInputRef.current?.click()}
-                className="min-h-[48px] px-4 rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 font-extrabold text-sm text-[var(--ink)] inline-flex items-center justify-center gap-2 active:scale-95 transition"
+                className="min-h-[48px] px-4 rounded-2xl spatial-card font-extrabold text-sm text-[var(--ink)] inline-flex items-center justify-center gap-2 active:scale-95 transition"
               >
                 <Upload className="w-4 h-4 text-[var(--brand-accent)]" />
                 <span>Upload</span>
               </button>
             </div>
+            <p className="text-[11px] font-medium text-[var(--ink-muted)] leading-snug">
+              Camera is accessed only when you tap Take Photo; compressed receipt images are sent over HTTPS solely for bill item extraction.
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
             {/* Image Preview with Animated Glowing Cyan/Indigo Laser Overlay while scanning */}
             <div className="rounded-[24px] bg-[var(--app-bg)] p-2.5 space-y-2.5">
               <div
-                className={`relative rounded-2xl overflow-hidden bg-black/5 dark:bg-white/5 ${
-                  scanning ? 'ring-2 ring-cyan-400/80 shadow-[0_0_24px_rgba(6,182,212,0.28)]' : ''
+                className={`relative rounded-2xl overflow-hidden bg-[var(--surface-subtle)] ${
+                  scanning ? 'ring-2 ring-cyan-400 shadow-[0_0_24px_rgba(6,182,212,0.28)]' : ''
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -367,7 +370,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                   className="w-full max-h-52 object-contain"
                 />
                 {scanning && (
-                  <div className="absolute inset-0 pointer-events-none bg-indigo-950/15">
+                  <div className="absolute inset-0 pointer-events-none">
                     <div
                       style={{ background: 'var(--munim-gradient)' }}
                       className="parchi-laser absolute left-0 right-0 h-1 shadow-[0_0_16px_4px_rgba(6,182,212,0.75)]"
@@ -482,7 +485,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                         value={partyName}
                         onChange={(e) => setPartyName(e.target.value)}
                         placeholder="Ramesh Kirana"
-                        className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                        className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                       />
                     </div>
                     <div>
@@ -495,7 +498,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                         value={phone}
                         onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                         placeholder="9876543210"
-                        className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                        className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                       />
                     </div>
                   </div>
@@ -538,7 +541,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                         type="date"
                         value={billDate}
                         onChange={(e) => setBillDate(e.target.value)}
-                        className="w-full min-h-[44px] rounded-xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-2.5 text-xs font-tabular font-bold text-[var(--ink)]"
+                        className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-2.5 text-xs font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                       />
                     </div>
                   </div>
@@ -633,7 +636,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="Atta, Sugar & Oil"
-                      className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3 text-xs font-semibold text-[var(--ink)]"
+                      className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] px-3 text-xs font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                     />
                   </div>
                   <div>
@@ -645,7 +648,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                       min="1"
                       value={manualTotal !== '' ? manualTotal : String(computedItemsTotal || '')}
                       onChange={(e) => setManualTotal(e.target.value)}
-                      className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] ring-2 ring-[var(--brand-accent)]/60 px-3 text-base font-extrabold font-tabular text-[var(--ink)] outline-none"
+                      className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] ring-2 ring-[var(--brand-accent)] px-3 text-base font-extrabold font-tabular text-[var(--ink)] outline-none"
                     />
                   </div>
                 </div>
@@ -658,7 +661,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                     type="button"
                     disabled={posting}
                     onClick={handlePostKhata}
-                    className="min-h-[48px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-xs inline-flex items-center justify-center gap-1.5 shadow-md disabled:opacity-60 active:scale-95 transition"
+                    className="min-h-[48px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-xs inline-flex items-center justify-center gap-1.5 tactile-key-primary disabled:opacity-60 active:scale-95 transition"
                   >
                     <Check className="w-4 h-4 shrink-0" />
                     <span className="font-tabular">

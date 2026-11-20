@@ -186,7 +186,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
               type="button"
               onClick={onBack}
               aria-label="Back to Ledger"
-              className="min-w-[44px] min-h-[44px] rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center active:scale-95 transition shrink-0"
+              className="min-w-[44px] min-h-[44px] rounded-xl spatial-card flex items-center justify-center active:scale-95 transition shrink-0"
             >
               <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
             </button>
@@ -204,7 +204,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
         <button
           type="button"
           onClick={openCreateStaff}
-          className="min-h-[44px] px-3.5 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 shadow-md active:scale-95 transition"
+          className="min-h-[44px] px-3.5 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 tactile-key-primary active:scale-95 transition"
         >
           <Plus className="w-4 h-4" />
           <span>Add Staff</span>
@@ -212,7 +212,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
       </div>
 
       {/* Active Counter Operator Switcher */}
-      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4 space-y-3">
+      <section className="rounded-[26px] spatial-card p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)] flex items-center gap-1.5">
             <UserCheck className="w-4 h-4 text-[var(--brand-accent)]" />
@@ -308,7 +308,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                     className={`min-w-[40px] min-h-[40px] px-2.5 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
                       armed
                         ? 'bg-[var(--credit-red)] text-white shadow-sm'
-                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]/60'
+                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
                     }`}
                   >
                     {armed ? 'Delete?' : <Trash2 className="w-3.5 h-3.5" />}
@@ -321,10 +321,10 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
       </section>
 
       {/* Immutable Audit Timeline */}
-      <section className="rounded-[26px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4 space-y-3">
+      <section className="rounded-[26px] spatial-card p-4 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h3 className="font-display text-sm font-extrabold flex items-center gap-2 text-[var(--ink)]">
-            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+            <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
               <History className="w-4 h-4" />
             </span>
             <span>Audit Trail ({filteredLogs.length})</span>
@@ -362,7 +362,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
               onClick={() => setActionFilter(f.id)}
               className={`min-h-[38px] px-3.5 rounded-xl text-xs font-extrabold whitespace-nowrap active:scale-95 transition ${
                 actionFilter === f.id
-                  ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/40'
+                  ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]'
                   : 'bg-[var(--surface-subtle)] text-[var(--ink-muted)]'
               }`}
             >
@@ -390,7 +390,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
               <div
                 key={log.id}
                 style={{ animationDelay: `${Math.min(idx, 12) * 30}ms` }}
-                className="stagger-fade-up rounded-2xl bg-[var(--surface-subtle)]/65 p-3 flex items-center justify-between gap-3 text-xs"
+                className="stagger-fade-up rounded-2xl bg-[var(--surface-subtle)] p-3 flex items-center justify-between gap-3 text-xs"
               >
                 <div className="min-w-0 space-y-0.5">
                   <p className="font-bold text-[var(--ink)] leading-snug">{log.summary}</p>
@@ -417,13 +417,13 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
           role="dialog"
           aria-modal="true"
           onClick={() => !saving && setShowAddStaff(false)}
-          className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-xs flex items-end justify-center"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 pt-3 space-y-4 pb-safe max-h-[90dvh] overflow-y-auto"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 pt-3 space-y-4 pb-safe max-h-[90dvh] overflow-y-auto"
           >
-            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--ink-muted)]/25" />
+            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--surface-subtle)]" />
 
             <div className="flex items-center justify-between">
               <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
@@ -509,7 +509,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
               type="button"
               disabled={saving}
               onClick={handleSaveStaff}
-              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm shadow-md disabled:opacity-60 active:scale-95 transition"
+              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
             >
               {saving ? 'Saving...' : editingStaff ? 'Update Staff' : 'Save Staff Member'}
             </button>
@@ -523,15 +523,15 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
           role="dialog"
           aria-modal="true"
           onClick={() => setPendingSwitch(null)}
-          className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-xs flex items-end justify-center"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 pt-3 text-center space-y-4 pb-safe"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 pt-3 text-center space-y-4 pb-safe"
           >
-            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--ink-muted)]/25" />
+            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--surface-subtle)]" />
 
-            <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
@@ -556,7 +556,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
               <button
                 type="button"
                 onClick={handleVerifySwitchPin}
-                className="min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold shadow-md active:scale-95 transition"
+                className="min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold tactile-key-primary active:scale-95 transition"
               >
                 Switch Counter
               </button>

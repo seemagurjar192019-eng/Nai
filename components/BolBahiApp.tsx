@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import Image from 'next/image';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   deleteUser,
   onAuthStateChanged,
@@ -23,12 +23,9 @@ import {
   ChevronDown,
   CloudUpload,
   Edit2,
-  Eye,
-  EyeOff,
   KeyRound,
   LayoutGrid,
   MessageCircle,
-  Mic,
   Package,
   Plus,
   Receipt,
@@ -155,6 +152,7 @@ import { CollectionView } from './CollectionView';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GallaCashbookView } from './GallaCashbookView';
 import { LedgerView } from './LedgerView';
+import { MunimOrb } from './MunimOrb';
 import { ParchiScannerModal } from './ParchiScannerModal';
 import { OfflineIndicator } from './PwaControls';
 import {
@@ -167,6 +165,7 @@ import {
   PinLockOverlay,
   SettingsView,
   type SecondaryRoute,
+  type ThemeAccentId,
 } from './SecondaryViews';
 import { StaffAuditView } from './StaffAuditView';
 import { StockView } from './StockView';
@@ -274,6 +273,17 @@ function BolBahiAppInner() {
 
   // Voice, Counter Mode, AI Parchi Scanner & Bill Drafts
   const [hideBalance, setHideBalance] = useState(false);
+  const [accentTheme, setAccentTheme] = useState<ThemeAccentId>(() => {
+    if (typeof window === 'undefined') return 'sapphire';
+    try {
+      const saved = localStorage.getItem('ucred_accent_theme_v1');
+      if (saved === 'rose' || saved === 'onyx' || saved === 'sapphire') return saved;
+    } catch {
+      // Ignore storage read errors
+    }
+    return 'sapphire';
+  });
+  const [recentlyUpdatedAccountId, setRecentlyUpdatedAccountId] = useState<string | null>(null);
   const [dockPlusOpen, setDockPlusOpen] = useState(false);
   const [addPartySignal, setAddPartySignal] = useState(0);
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
@@ -301,6 +311,7 @@ function BolBahiAppInner() {
   >(null);
   const [undoBusy, setUndoBusy] = useState(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recentHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingLaunchRef = useRef<{ action?: string | null; tab?: string | null } | null>(null);
 
   // Determine whether app is currently running in Instant Guest Mode or Cloud Synced Mode
@@ -404,6 +415,7 @@ function BolBahiAppInner() {
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (recentHighlightTimerRef.current) clearTimeout(recentHighlightTimerRef.current);
     };
   }, []);
 
@@ -456,13 +468,17 @@ function BolBahiAppInner() {
     }
   }, []);
 
-  // Apply binary Light / Dark mode on documentElement
+  // Apply Light / Dark mode + Accent Theme on documentElement
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
-    root.removeAttribute('data-accent');
+    if (accentTheme === 'rose') {
+      root.setAttribute('data-accent', 'rose');
+    } else {
+      root.removeAttribute('data-accent');
+    }
     root.classList.toggle('dark', appearance === 'dark');
-  }, [appearance]);
+  }, [appearance, accentTheme]);
 
   // Merge local guest records into Firestore when authenticating
   const mergeGuestVaultIntoFirestore = async (
@@ -800,7 +816,33 @@ function BolBahiAppInner() {
 
   const handleToggleAppearance = async () => {
     const nextMode: AppearanceMode = appearance === 'dark' ? 'light' : 'dark';
+    const nextAccent: ThemeAccentId =
+      nextMode === 'dark' ? 'onyx' : accentTheme === 'onyx' ? 'sapphire' : accentTheme;
+    setAccentTheme(nextAccent);
+    try {
+      localStorage.setItem('ucred_accent_theme_v1', nextAccent);
+    } catch {
+      // Ignore storage write errors
+    }
     await handleSetAppearance(nextMode);
+  };
+
+  const handleSelectAccentTheme = async (next: ThemeAccentId) => {
+    setAccentTheme(next);
+    try {
+      localStorage.setItem('ucred_accent_theme_v1', next);
+    } catch {
+      // Ignore storage write errors
+    }
+    await handleSetAppearance(next === 'onyx' ? 'dark' : 'light');
+  };
+
+  const triggerAccountHighlight = (accountId: string) => {
+    if (recentHighlightTimerRef.current) clearTimeout(recentHighlightTimerRef.current);
+    setRecentlyUpdatedAccountId(accountId);
+    recentHighlightTimerRef.current = setTimeout(() => {
+      setRecentlyUpdatedAccountId(null);
+    }, 1800);
   };
 
   const formatFirebasePhoneError = (err: unknown): string => {
@@ -1433,6 +1475,7 @@ function BolBahiAppInner() {
       });
       guestVaultRef.current = saveGuestVault(finalVault);
       setGuestVault(guestVaultRef.current);
+      triggerAccountHighlight(res.accountId);
       showActionToast({
         kind: 'added',
         tx: res.tx,
@@ -1471,6 +1514,7 @@ function BolBahiAppInner() {
           lastNote: res.tx.note,
           lastActivityAt: res.tx.billDate,
         };
+    triggerAccountHighlight(res.accountId);
     showActionToast({
       kind: 'added',
       tx: res.tx,
@@ -1552,6 +1596,7 @@ function BolBahiAppInner() {
       });
       guestVaultRef.current = saveGuestVault(finalVault);
       setGuestVault(guestVaultRef.current);
+      triggerAccountHighlight(account.id);
       showActionToast({
         kind: 'added',
         tx: res.tx,
@@ -1576,6 +1621,7 @@ function BolBahiAppInner() {
       createdByRole: activeOperator.role,
       syncToGalla: payload.syncToGalla,
     });
+    triggerAccountHighlight(account.id);
     showActionToast({
       kind: 'added',
       tx: res.tx,
@@ -1662,16 +1708,6 @@ function BolBahiAppInner() {
     await restoreBusinessBackup(user.uid, currentBusiness.id, parsed);
     logActivity('account', 'Restored JSON cloud backup');
   };
-
-  const netShopBalance = useMemo(() => {
-    const receivable = activeAccounts
-      .filter((a) => (a.kind === 'customer' && a.balance > 0) || (a.kind === 'supplier' && a.balance < 0))
-      .reduce((s, a) => s + Math.abs(a.balance), 0);
-    const payable = activeAccounts
-      .filter((a) => (a.kind === 'customer' && a.balance < 0) || (a.kind === 'supplier' && a.balance > 0))
-      .reduce((s, a) => s + Math.abs(a.balance), 0);
-    return Math.round((receivable - payable) * 100) / 100;
-  }, [activeAccounts]);
 
   const handleDeleteAccount = async () => {
     if (!user) return;
@@ -1911,17 +1947,20 @@ function BolBahiAppInner() {
     <div className="max-w-[430px] mx-auto h-dvh overflow-hidden relative shadow-2xl flex flex-col select-none spatial-shell-bg native-app-shell text-[var(--ink)]">
       <OfflineIndicator />
 
-      {/* Top Floating Dynamic Island */}
+      {/* Minimal Solid Top Floating Island */}
       {!selectedAccount && (
-        <header className="no-print shrink-0 z-30 px-3 pt-2.5 pb-1">
-          <div className="rounded-full bg-white/85 dark:bg-zinc-900/85 backdrop-blur-xl shadow-[0_8px_24px_-8px_rgba(15,23,42,0.12)] ring-1 ring-black/5 dark:ring-white/10 px-2.5 py-1.5 flex items-center justify-between gap-1.5">
-            {/* Left: Shop Switcher + Compact Net Balance Micro-Pill */}
+        <header className="no-print shrink-0 z-40 px-4 pt-3 pb-1 relative">
+          <div className="rounded-full bg-[var(--surface)] shadow-[var(--spatial-shadow)] px-2.5 py-1.5 flex items-center justify-between gap-2">
+            {/* Left: Shop Switcher Pill + Live Pulsing Sync Dot */}
             <button
               type="button"
-              onClick={() => setBizSwitcherOpen(true)}
-              className="flex items-center gap-2 min-w-0 min-h-[38px] pl-0.5 pr-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 transition text-left"
+              onClick={() => {
+                setDockPlusOpen(false);
+                setBizSwitcherOpen(true);
+              }}
+              className="min-h-[40px] pl-1 pr-2.5 py-1 rounded-full hover:bg-[var(--surface-subtle)] inline-flex items-center gap-2 min-w-0 active:scale-95 transition text-left"
             >
-              <div className="w-7 h-7 rounded-full overflow-hidden shadow-xs ring-1 ring-white/80 dark:ring-white/15 shrink-0">
+              <div className="relative w-7 h-7 rounded-full overflow-hidden shrink-0">
                 <Image
                   src={UCRED_LOGO_PATH}
                   alt="Ucred"
@@ -1931,72 +1970,71 @@ function BolBahiAppInner() {
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="flex items-center gap-1 min-w-0">
-                <span className="font-display text-xs font-extrabold truncate max-w-[92px] text-[var(--ink)]">
-                  {currentBusiness.name}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0" />
-              </div>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold font-tabular shrink-0 ${
-                  netShopBalance >= 0
-                    ? 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
-                    : 'bg-[var(--credit-tint)] text-[var(--credit-red)]'
-                }`}
-              >
-                {hideBalance ? '₹••••' : formatINR(Math.abs(netShopBalance))}
+              <span className="font-display text-xs font-extrabold truncate max-w-[125px] text-[var(--ink)]">
+                {currentBusiness.name}
               </span>
+              <span className="relative flex h-2 w-2 shrink-0" title={isGuestMode ? 'Local Guest Vault' : 'Cloud Synced Live'}>
+                <span
+                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    isGuestMode ? 'bg-[var(--brand)]' : 'bg-[var(--debit-green)]'
+                  }`}
+                />
+                <span
+                  className={`relative inline-flex rounded-full h-2 w-2 ${
+                    isGuestMode ? 'bg-[var(--brand)]' : 'bg-[var(--debit-green)]'
+                  }`}
+                />
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0" />
             </button>
 
-            {/* Right: Optional Sync Pill, Privacy Eye, Search & Bell */}
-            <div className="flex items-center gap-0.5 shrink-0">
-              {isGuestMode ? (
-                <button
-                  type="button"
-                  onClick={openCloudSyncSheet}
-                  aria-label="Backup or Sync via Mobile OTP"
-                  className="min-h-[32px] px-2.5 rounded-full bg-[var(--brand-tint)] text-[var(--brand-accent)] text-[11px] font-extrabold inline-flex items-center gap-1 active:scale-95 transition"
-                >
-                  <CloudUpload className="w-3.5 h-3.5 shrink-0" />
-                  <span>Sync</span>
-                </button>
-              ) : (
-                <span
-                  title="Cloud Synced"
-                  className="px-2 py-1 rounded-full bg-[var(--debit-tint)] text-[var(--debit-green)] text-[10px] font-extrabold inline-flex items-center gap-1"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--debit-green)]" />
-                  <span>Live</span>
-                </span>
-              )}
-
-              <button
+            {/* Right: Rotating + Quick Actions Trigger + Search + Notification Bell */}
+            <div className="flex items-center gap-1 shrink-0">
+              <motion.button
                 type="button"
-                onClick={() => setHideBalance((v) => !v)}
-                aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
-                className="min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition"
+                whileTap={{ scale: 0.9 }}
+                animate={{ rotate: dockPlusOpen ? 45 : 0 }}
+                transition={{ type: 'spring', stiffness: 460, damping: 26 }}
+                onClick={() => setDockPlusOpen((v) => !v)}
+                aria-label={dockPlusOpen ? 'Close quick actions' : 'Open quick actions'}
+                aria-expanded={dockPlusOpen}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                  dockPlusOpen
+                    ? 'bg-[var(--ink)] text-[var(--surface)]'
+                    : 'bg-[var(--brand-tint)] text-[var(--brand-accent)] hover:bg-[var(--brand)] hover:text-white'
+                }`}
               >
-                {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+              </motion.button>
 
               <button
                 type="button"
-                onClick={() => setSearchOpen((v) => !v)}
+                onClick={() => {
+                  setDockPlusOpen(false);
+                  setSearchOpen((v) => !v);
+                }}
                 aria-label="Search accounts"
-                className="min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition"
+                className={`w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition ${
+                  searchOpen
+                    ? 'bg-[var(--brand)] text-[var(--brand-fg)]'
+                    : 'bg-[var(--surface-subtle)] text-[var(--ink-muted)] hover:text-[var(--ink)]'
+                }`}
               >
                 <Search className="w-4 h-4" />
               </button>
 
               <button
                 type="button"
-                onClick={() => setNotifOpen(true)}
+                onClick={() => {
+                  setDockPlusOpen(false);
+                  setNotifOpen(true);
+                }}
                 aria-label="Open notifications"
-                className="relative min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition"
+                className="relative w-10 h-10 rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] active:scale-95 transition"
               >
                 <Bell className="w-4 h-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 min-w-[14px] h-3.5 px-1 rounded-full bg-[var(--credit-red)] text-white text-[9px] font-extrabold font-tabular flex items-center justify-center shadow-xs">
+                  <span className="absolute top-1 right-1 min-w-[15px] h-3.5 px-1 rounded-full bg-[var(--credit-red)] text-white text-[9px] font-extrabold font-tabular flex items-center justify-center">
                     {unreadCount}
                   </span>
                 )}
@@ -2004,20 +2042,95 @@ function BolBahiAppInner() {
             </div>
           </div>
 
+          {/* Solid Quick-Action Fan Menu Dropdown cleanly under Top-Right + */}
+          <AnimatePresence>
+            {dockPlusOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.94 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.94, transition: { duration: 0.16, ease: 'easeOut' } }}
+                transition={{ type: 'spring', stiffness: 460, damping: 28 }}
+                className="absolute right-4 top-[68px] z-50 w-52 rounded-[24px] bg-[var(--surface)] shadow-[var(--spatial-shadow-lg)] p-2 space-y-1"
+              >
+                {[
+                  {
+                    label: 'Add Party',
+                    icon: UserPlus,
+                    gradient: 'from-[#4F46E5] to-[#06B6D4]',
+                    onClick: () => {
+                      setDockPlusOpen(false);
+                      setSecondaryRoute(null);
+                      setSelectedAccountId(null);
+                      setMainTab('ledger');
+                      setAddPartySignal((s) => s + 1);
+                    },
+                  },
+                  {
+                    label: 'Scan Parchi AI',
+                    icon: Camera,
+                    gradient: 'from-indigo-600 to-violet-600',
+                    onClick: () => {
+                      setDockPlusOpen(false);
+                      setParchiScannerOpen(true);
+                    },
+                  },
+                  {
+                    label: 'Quick Galla Entry',
+                    icon: Wallet,
+                    gradient: 'from-emerald-600 to-teal-600',
+                    onClick: () => {
+                      setDockPlusOpen(false);
+                      setSelectedAccountId(null);
+                      setSecondaryRoute('galla');
+                    },
+                  },
+                  {
+                    label: 'Counter Mode',
+                    icon: Repeat,
+                    gradient: 'from-blue-600 to-indigo-600',
+                    onClick: () => {
+                      setDockPlusOpen(false);
+                      setVoicePrefillName('');
+                      setVoiceCounterMode(true);
+                      setVoiceModalOpen(true);
+                    },
+                  },
+                ].map((item) => {
+                  const ActionIcon = item.icon;
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={item.onClick}
+                      className="w-full min-h-[44px] px-2.5 py-1.5 rounded-2xl hover:bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
+                    >
+                      <span
+                        className={`w-8 h-8 rounded-xl bg-gradient-to-br ${item.gradient} text-white flex items-center justify-center shrink-0`}
+                      >
+                        <ActionIcon className="w-4 h-4" />
+                      </span>
+                      <span className="text-xs font-extrabold text-[var(--ink)]">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <AnimatePresence>
             {searchOpen && (
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
-                className="pt-2"
+                className="pt-2.5"
               >
                 <input
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search customer or supplier name / mobile..."
-                  className="w-full min-h-[44px] rounded-2xl bg-[var(--surface)] shadow-[var(--spatial-shadow)] ring-1 ring-black/5 dark:ring-white/10 px-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                  className="w-full min-h-[44px] rounded-2xl bg-[var(--surface)] shadow-[var(--spatial-shadow)] px-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </motion.div>
             )}
@@ -2287,10 +2400,12 @@ function BolBahiAppInner() {
             gallaPulse={gallaPulse}
             trustScoresByAccount={trustScoresByAccount}
             selectedAccountId={selectedAccountId}
+            recentlyUpdatedAccountId={recentlyUpdatedAccountId}
             hideBalance={hideBalance}
             onToggleHideBalance={() => setHideBalance((v) => !v)}
             addPartySignal={addPartySignal}
             onSelectAccount={(acc) => setSelectedAccountId(acc.id)}
+            onSwipeRemind={(acc) => setSelectedAccountId(acc.id)}
             onCreateAccount={async (payload) => {
               if (isGuestMode) {
                 const res = applyCreateAccount(guestVaultRef.current, {
@@ -2311,6 +2426,7 @@ function BolBahiAppInner() {
                 });
                 guestVaultRef.current = saveGuestVault(finalVault);
                 setGuestVault(guestVaultRef.current);
+                triggerAccountHighlight(res.created.id);
                 setSelectedAccountId(res.created.id);
                 return;
               }
@@ -2325,6 +2441,7 @@ function BolBahiAppInner() {
                 creditLimit: payload.creditLimit,
               });
               logActivity('account', `Added ${payload.kind} ${payload.name}`, payload.name);
+              triggerAccountHighlight(created.id);
               setSelectedAccountId(created.id);
             }}
             onQuickTransaction={handleQuickTransaction}
@@ -2602,11 +2719,13 @@ function BolBahiAppInner() {
           <MoreBentoView
             business={currentBusiness}
             appearance={appearance}
+            accentTheme={accentTheme}
             verifiedPhone={verifiedPhoneDisplay}
             activeOperatorName={activeOperator.name}
             isGuestMode={isGuestMode}
             onOpenCloudSync={openCloudSyncSheet}
             onToggleAppearance={() => void handleToggleAppearance()}
+            onSelectAccentTheme={(theme) => void handleSelectAccentTheme(theme)}
             onOpenBusinessSwitcher={() => setBizSwitcherOpen(true)}
             onNavigate={(target) => {
               setSelectedAccountId(null);
@@ -2627,7 +2746,7 @@ function BolBahiAppInner() {
         )}
       </main>
 
-      {/* Floating Glass Capsule Dock (Cockpit | Vasooli | Centered Munim Orb | Bills | More) + Radial + Quick Actions */}
+      {/* 5-Slot Solid Capsule Bottom Pill Dock (Cockpit | Vasooli | [Center Mic Orb] | Bills | More) */}
       {!selectedAccount && (
         <>
           <AnimatePresence>
@@ -2637,123 +2756,16 @@ function BolBahiAppInner() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setDockPlusOpen(false)}
-                className="no-print fixed inset-0 z-30 bg-black/15 backdrop-blur-[1px]"
+                className="no-print fixed inset-0 z-30 bg-black/25"
                 aria-hidden="true"
               />
             )}
           </AnimatePresence>
 
-          <div className="no-print fixed bottom-3 left-1/2 -translate-x-1/2 w-full max-w-[412px] px-3 z-40 pb-safe pointer-events-none">
-            {/* Compact + Radial Quick Actions Trigger & Spring Fan-out above right edge of Capsule */}
-            <div className="relative flex flex-col items-end mb-2.5 pr-1">
-              <AnimatePresence>
-                {dockPlusOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    transition={{ type: 'spring', stiffness: 460, damping: 28 }}
-                    className="pointer-events-auto mb-2.5 flex flex-col items-end gap-2"
-                  >
-                    {[
-                      {
-                        label: 'Counter Mode',
-                        icon: Repeat,
-                        gradient: 'from-blue-600 to-indigo-600',
-                        onClick: () => {
-                          setDockPlusOpen(false);
-                          setVoicePrefillName('');
-                          setVoiceCounterMode(true);
-                          setVoiceModalOpen(true);
-                        },
-                      },
-                      {
-                        label: 'Galla Entry',
-                        icon: Wallet,
-                        gradient: 'from-emerald-600 to-teal-600',
-                        onClick: () => {
-                          setDockPlusOpen(false);
-                          setSelectedAccountId(null);
-                          setSecondaryRoute('galla');
-                        },
-                      },
-                      {
-                        label: 'Scan Parchi AI',
-                        icon: Camera,
-                        gradient: 'from-indigo-600 to-cyan-500',
-                        onClick: () => {
-                          setDockPlusOpen(false);
-                          setParchiScannerOpen(true);
-                        },
-                      },
-                      {
-                        label: 'Add Party',
-                        icon: UserPlus,
-                        gradient: 'from-[#1E3A8A] to-[#2563EB]',
-                        onClick: () => {
-                          setDockPlusOpen(false);
-                          setSecondaryRoute(null);
-                          setSelectedAccountId(null);
-                          setMainTab('ledger');
-                          setAddPartySignal((s) => s + 1);
-                        },
-                      },
-                    ].map((item, i) => {
-                      const ActionIcon = item.icon;
-                      return (
-                        <motion.button
-                          key={item.label}
-                          type="button"
-                          initial={{ opacity: 0, x: 14, scale: 0.9 }}
-                          animate={{ opacity: 1, x: 0, scale: 1 }}
-                          exit={{ opacity: 0, x: 10, scale: 0.9 }}
-                          transition={{
-                            type: 'spring',
-                            stiffness: 460,
-                            damping: 26,
-                            delay: i * 0.035,
-                          }}
-                          whileTap={{ scale: 0.94 }}
-                          onClick={item.onClick}
-                          className="min-h-[44px] pl-3.5 pr-2 py-1.5 rounded-full bg-[var(--surface)]/95 backdrop-blur-xl shadow-[0_10px_28px_rgba(15,23,42,0.16)] ring-1 ring-white/80 dark:ring-white/15 flex items-center gap-2.5 transition"
-                        >
-                          <span className="text-xs font-extrabold text-[var(--ink)] whitespace-nowrap">
-                            {item.label}
-                          </span>
-                          <span
-                            className={`w-8 h-8 rounded-full bg-gradient-to-br ${item.gradient} text-white flex items-center justify-center shadow-inner shrink-0`}
-                          >
-                            <ActionIcon className="w-4 h-4" />
-                          </span>
-                        </motion.button>
-                      );
-                    })}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.9 }}
-                animate={{ rotate: dockPlusOpen ? 45 : 0 }}
-                transition={{ type: 'spring', stiffness: 460, damping: 26 }}
-                onClick={() => setDockPlusOpen((v) => !v)}
-                aria-label={dockPlusOpen ? 'Close quick actions' : 'Open quick actions'}
-                aria-expanded={dockPlusOpen}
-                className={`pointer-events-auto w-12 h-12 rounded-full flex items-center justify-center shadow-[0_10px_28px_rgba(30,58,138,0.28)] ring-1 ring-white/80 dark:ring-white/15 transition-colors ${
-                  dockPlusOpen
-                    ? 'bg-[var(--ink)] text-[var(--surface)]'
-                    : 'bg-[var(--brand)] text-[var(--brand-fg)] hover:bg-[var(--brand-hover)]'
-                }`}
-              >
-                <Plus className="w-5 h-5" />
-              </motion.button>
-            </div>
-
-            {/* Symmetrical Frosted Glass Pill Capsule with Shared layoutId Active Tab */}
+          <div className="no-print fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-40 pb-safe pointer-events-none">
             <nav
               aria-label="Primary navigation"
-              className="pointer-events-auto spatial-dock rounded-full bg-white/90 dark:bg-zinc-900/90 backdrop-blur-2xl ring-1 ring-black/5 dark:ring-white/10 px-2 py-1.5 grid grid-cols-5 items-center"
+              className="pointer-events-auto bg-[#EFEFF4] dark:bg-[#18181B] rounded-full p-1.5 mx-4 mb-3.5 spatial-dock grid grid-cols-5 items-center"
             >
               {(
                 [
@@ -2783,36 +2795,32 @@ function BolBahiAppInner() {
                       <motion.span
                         layoutId="dockActiveTab"
                         transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-                        className="absolute inset-0.5 rounded-full bg-[var(--brand-tint)]/80"
+                        className="absolute inset-0.5 rounded-full bg-white dark:bg-[#27272A] shadow-sm"
                       />
                     )}
-                    <Icon className="w-[18px] h-[18px] relative z-10" />
+                    <motion.span
+                      animate={active ? { rotate: [0, -10, 10, 0] } : { rotate: 0 }}
+                      transition={{ type: 'tween', duration: 0.36, ease: 'easeInOut' }}
+                      className="relative z-10 inline-flex"
+                    >
+                      <Icon className="w-[18px] h-[18px]" />
+                    </motion.span>
                     <span className="leading-none relative z-10">{tab.label}</span>
                   </button>
                 );
               })}
 
-              {/* Center Raised Glossy 3D Indigo-Cyan Munim Voice Orb */}
-              <div className="flex flex-col items-center justify-center -mt-6">
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.88 }}
+              {/* Center Raised Blue-Cyan Gradient Mic Orb with Solid Cutout Border */}
+              <div className="flex items-center justify-center -mt-5 relative z-20">
+                <MunimOrb
+                  size="dock"
                   onClick={() => {
                     setDockPlusOpen(false);
                     setVoicePrefillName('');
                     setVoiceCounterMode(false);
                     setVoiceModalOpen(true);
                   }}
-                  aria-label="Open Bolne Wala Munim Voice Entry"
-                  style={{ background: 'var(--munim-gradient)' }}
-                  className="munim-orb-idle relative w-14 h-14 rounded-full text-white flex items-center justify-center ring-4 ring-[var(--app-bg)] shadow-[0_12px_28px_rgba(79,70,229,0.42)] transition"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-1 rounded-full bg-gradient-to-b from-white/35 to-transparent pointer-events-none"
-                  />
-                  <Mic className="w-6 h-6 relative z-10" />
-                </motion.button>
+                />
               </div>
 
               {(
@@ -2846,10 +2854,16 @@ function BolBahiAppInner() {
                       <motion.span
                         layoutId="dockActiveTab"
                         transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-                        className="absolute inset-0.5 rounded-full bg-[var(--brand-tint)]/80"
+                        className="absolute inset-0.5 rounded-full bg-white dark:bg-[#27272A] shadow-sm"
                       />
                     )}
-                    <Icon className="w-[18px] h-[18px] relative z-10" />
+                    <motion.span
+                      animate={active ? { rotate: [0, -10, 10, 0] } : { rotate: 0 }}
+                      transition={{ type: 'tween', duration: 0.36, ease: 'easeInOut' }}
+                      className="relative z-10 inline-flex"
+                    >
+                      <Icon className="w-[18px] h-[18px]" />
+                    </motion.span>
                     <span className="leading-none relative z-10">{tab.label}</span>
                   </button>
                 );
@@ -2863,13 +2877,16 @@ function BolBahiAppInner() {
       <AnimatePresence>
         {syncSheetOpen && (
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cloud Backup and Sync"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0.18, ease: 'easeOut' } }}
             onClick={() => {
               if (!authBusy) setSyncSheetOpen(false);
             }}
-            className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end justify-center"
+            className="fixed inset-0 z-50 bg-black/55 flex items-end justify-center"
           >
             <motion.div
               initial={{ y: '100%' }}
@@ -2883,7 +2900,7 @@ function BolBahiAppInner() {
                 if (info.offset.y > 90 && !authBusy) setSyncSheetOpen(false);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe"
+              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
             >
               <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
               <div className="flex items-center justify-between gap-2">
@@ -3057,7 +3074,7 @@ function BolBahiAppInner() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setBizSwitcherOpen(false)}
-            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
+            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
           >
             <motion.div
               initial={{ y: '100%' }}
@@ -3071,7 +3088,7 @@ function BolBahiAppInner() {
                 if (info.offset.y > 90) setBizSwitcherOpen(false);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe"
+              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
             >
               <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
               <div className="flex items-center justify-between">
@@ -3096,7 +3113,7 @@ function BolBahiAppInner() {
                       onClick={() => void handleSwitchBusiness(biz.id)}
                       className={`w-full min-h-[54px] px-4 rounded-[20px] flex items-center justify-between gap-3 active:scale-95 transition ${
                         active
-                          ? 'bg-[var(--brand-tint)] ring-1 ring-[var(--brand-accent)]/40'
+                          ? 'bg-[var(--brand-tint)] ring-1 ring-[var(--brand-accent)]'
                           : 'bg-[var(--app-bg)] hover:bg-[var(--surface-subtle)]'
                       }`}
                     >
@@ -3125,7 +3142,7 @@ function BolBahiAppInner() {
                     value={newBizName}
                     onChange={(e) => setNewBizName(e.target.value)}
                     placeholder="e.g. Sharma Wholesale"
-                    className="flex-1 min-h-[46px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                    className="flex-1 min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                   />
                   <button
                     type="button"
@@ -3179,9 +3196,9 @@ function BolBahiAppInner() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 14, scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 440, damping: 28 }}
-            className="no-print fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-[410px] px-3 z-40 pointer-events-none"
+            className="no-print fixed bottom-[104px] left-1/2 -translate-x-1/2 w-full max-w-[410px] px-3 z-40 pointer-events-none"
           >
-            <div className="pointer-events-auto w-full rounded-[22px] bg-[#0F172A] dark:bg-[#27272A] text-white shadow-[0_14px_40px_rgba(0,0,0,0.28)] ring-1 ring-white/10 px-3.5 py-2.5 flex items-center justify-between gap-2">
+            <div className="pointer-events-auto w-full rounded-[22px] bg-[#0F172A] dark:bg-[#27272A] text-white shadow-[0_14px_40px_rgba(0,0,0,0.28)] px-3.5 py-2.5 flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs font-extrabold truncate font-tabular">
                   {actionToast.kind === 'added'
@@ -3257,7 +3274,7 @@ function BolBahiAppInner() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeDailyMunimSummary}
-            className="no-print fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end justify-center"
+            className="no-print fixed inset-0 z-50 bg-black/55 flex items-end justify-center"
           >
             <motion.div
               initial={{ y: '100%' }}
@@ -3271,7 +3288,7 @@ function BolBahiAppInner() {
                 if (info.offset.y > 90) closeDailyMunimSummary();
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe"
+              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
             >
               <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
               <div className="flex items-center justify-between gap-2">
@@ -3300,13 +3317,13 @@ function BolBahiAppInner() {
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-[20px] bg-[var(--credit-tint)]/60 p-3 text-center">
+                <div className="rounded-[20px] bg-[var(--credit-tint)] p-3 text-center">
                   <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase">Given Today</p>
                   <p className="text-base font-extrabold text-[var(--credit-red)] font-tabular mt-0.5">
                     {formatINR(dailyStats.givenToday)}
                   </p>
                 </div>
-                <div className="rounded-[20px] bg-[var(--debit-tint)]/60 p-3 text-center">
+                <div className="rounded-[20px] bg-[var(--debit-tint)] p-3 text-center">
                   <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase">Vasooli Today</p>
                   <p className="text-base font-extrabold text-[var(--debit-green)] font-tabular mt-0.5">
                     {formatINR(dailyStats.receivedToday)}
@@ -3572,9 +3589,9 @@ function BolBahiAppInner() {
           role="dialog"
           aria-modal="true"
           aria-label="Mobile OTP Verification"
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
         >
-          <div className="w-full max-w-sm rounded-[28px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4">
+          <div className="w-full max-w-sm rounded-[28px] spatial-sheet p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center shrink-0">

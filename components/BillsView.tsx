@@ -312,7 +312,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             <button
               type="button"
               onClick={() => setPreviewBill(null)}
-              className="min-h-[44px] px-4 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-bold text-[var(--ink)] active:scale-95 transition"
+              className="min-h-[44px] px-4 rounded-xl spatial-card text-sm font-bold text-[var(--ink)] active:scale-95 transition"
             >
               ← Back
             </button>
@@ -340,7 +340,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
               <button
                 type="button"
                 onClick={handlePrintBill}
-                className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-2 shadow-md active:scale-95 transition"
+                className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-2 tactile-key-primary active:scale-95 transition"
               >
                 <Printer className="w-4 h-4" />
                 <span>Print 58mm</span>
@@ -436,7 +436,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
           <button
             type="button"
             onClick={() => setPreviewBill(null)}
-            className="min-h-[44px] px-4 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-sm font-bold text-[var(--ink)] active:scale-95 transition"
+            className="min-h-[44px] px-4 rounded-xl spatial-card text-sm font-bold text-[var(--ink)] active:scale-95 transition"
           >
             ← Back
           </button>
@@ -466,7 +466,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             <button
               type="button"
               onClick={handlePrintBill}
-              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-2 shadow-md active:scale-95 transition"
+              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold inline-flex items-center gap-2 tactile-key-primary active:scale-95 transition"
             >
               <Printer className="w-4 h-4" />
               <span>Print / PDF</span>
@@ -591,11 +591,11 @@ export const BillsView: React.FC<BillsViewProps> = ({
   return (
     <div className="space-y-4 pb-32">
       {/* AI Voice Bill Hero Card */}
-      <div className="rounded-[28px] spatial-hero ring-1 ring-white/80 dark:ring-white/10 p-4.5 flex items-center justify-between gap-3">
+      <div className="rounded-[28px] spatial-hero p-4.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div
             style={{ background: 'var(--munim-gradient)' }}
-            className="w-12 h-12 rounded-2xl text-white flex items-center justify-center shrink-0 shadow-inner ring-1 ring-white/30"
+            className="w-12 h-12 rounded-2xl text-white flex items-center justify-center shrink-0 tactile-key-primary"
           >
             <Sparkles className="w-6 h-6" />
           </div>
@@ -615,7 +615,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             else setCreating(true);
           }}
           style={{ background: 'var(--munim-gradient)' }}
-          className="min-h-[44px] px-3.5 rounded-xl text-white text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 shadow-md active:scale-95 transition"
+          className="min-h-[44px] px-3.5 rounded-xl text-white text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 tactile-key-primary active:scale-95 transition"
         >
           <Mic className="w-4 h-4 shrink-0" />
           <span>Speak Bill</span>
@@ -654,7 +654,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             setError('');
             setCreating(true);
           }}
-          className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 shadow-md active:scale-95 transition"
+          className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 tactile-key-primary active:scale-95 transition"
         >
           <Plus className="w-4 h-4" />
           <span>New {docTypeFilter === 'bill' ? 'Bill' : 'Quote'}</span>
@@ -670,7 +670,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={`Search ${docTypeFilter === 'bill' ? 'bills' : 'quotes'} by number, customer, or mobile...`}
-            className="w-full min-h-[46px] rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 pl-10 pr-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)] transition"
+            className="w-full min-h-[46px] rounded-2xl spatial-card pl-10 pr-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)] transition"
           />
         </div>
       )}
@@ -705,7 +705,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
 
       {/* Sales & GST Summary Bento */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-[24px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4">
+        <div className="rounded-[24px] spatial-card p-4">
           <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase tracking-wider">
             Total {docTypeFilter === 'bill' ? 'Sales' : 'Quotes'}
           </p>
@@ -713,7 +713,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             {formatINR(totalSales)}
           </p>
         </div>
-        <div className="rounded-[24px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-4">
+        <div className="rounded-[24px] spatial-card p-4">
           <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase tracking-wider">
             Total GST
           </p>
@@ -725,8 +725,8 @@ export const BillsView: React.FC<BillsViewProps> = ({
 
       {/* Itemized GST / Kacha Bill Cards */}
       {filteredBills.length === 0 ? (
-        <div className="rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-8 text-center space-y-3">
-          <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+        <div className="rounded-[28px] spatial-card p-8 text-center space-y-3">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
             <Receipt className="w-7 h-7" />
           </div>
           <p className="font-display text-base font-bold text-[var(--ink)]">
@@ -737,7 +737,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="min-h-[46px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5 shadow-md active:scale-95 transition"
+            className="min-h-[46px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5 tactile-key-primary active:scale-95 transition"
           >
             <Plus className="w-4 h-4" />
             <span>Create {docTypeFilter === 'bill' ? 'Bill' : 'Quote'}</span>
@@ -752,14 +752,14 @@ export const BillsView: React.FC<BillsViewProps> = ({
               <div
                 key={b.id}
                 style={{ animationDelay: `${Math.min(idx, 12) * 35}ms` }}
-                className="stagger-fade-up rounded-[22px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-3.5 flex items-center justify-between gap-2.5"
+                className="stagger-fade-up rounded-[22px] spatial-card p-3.5 flex items-center justify-between gap-2.5"
               >
                 <button
                   type="button"
                   onClick={() => setPreviewBill(b)}
                   className="text-left min-w-0 flex-1 flex items-center gap-3 active:scale-[0.98] transition"
                 >
-                  <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                  <span className="w-10 h-10 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
                     <FileText className="w-4 h-4" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -815,7 +815,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                     className={`min-w-[44px] min-h-[44px] px-2 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
                       armed
                         ? 'bg-[var(--credit-red)] text-white shadow-sm'
-                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]/50'
+                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
                     }`}
                   >
                     {armed ? 'Confirm?' : <Trash2 className="w-4 h-4" />}
@@ -836,13 +836,13 @@ export const BillsView: React.FC<BillsViewProps> = ({
               if (onClearPrefill) onClearPrefill();
             }
           }}
-          className="fixed inset-0 z-50 bg-slate-950/55 flex items-end justify-center backdrop-blur-xs"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-5 pt-3 space-y-4 max-h-[92dvh] overflow-y-auto pb-safe"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-5 pt-3 space-y-4 max-h-[92dvh] overflow-y-auto pb-safe"
           >
-            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--ink-muted)]/25" />
+            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--surface-subtle)]" />
 
             <div className="flex items-center justify-between">
               <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
@@ -1125,7 +1125,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                 type="button"
                 disabled={saving}
                 onClick={handleCreate}
-                className="min-h-[48px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm shadow-md disabled:opacity-60 active:scale-95 transition"
+                className="min-h-[48px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
               >
                 {saving ? 'Saving...' : 'Save & Preview'}
               </button>

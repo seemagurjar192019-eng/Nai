@@ -8,46 +8,51 @@ import './globals.css';
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-sans',
-  display: 'swap',
-});
-
-const plusJakartaDisplay = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['700', '800'],
-  variable: '--font-display',
   display: 'swap',
 });
 
 const notoDevanagari = Noto_Sans_Devanagari({
   subsets: ['devanagari'],
-  weight: ['400', '600', '700'],
   variable: '--font-devanagari',
   display: 'swap',
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
-  weight: ['500', '600', '700'],
   variable: '--font-mono',
   display: 'swap',
 });
 
-const APP_ORIGIN =
-  process.env.NEXT_PUBLIC_APP_URL ||
-  process.env.APP_URL ||
-  'https://ais-dev-b5572c6vlenhbxhdhwmdvx-303612259339.asia-east1.run.app';
+const DEFAULT_APP_ORIGIN = 'https://ais-dev-b5572c6vlenhbxhdhwmdvx-303612259339.asia-east1.run.app';
+
+function resolveMetadataBase(): URL {
+  const candidates = [process.env.NEXT_PUBLIC_APP_URL, process.env.APP_URL, DEFAULT_APP_ORIGIN];
+  for (const raw of candidates) {
+    if (!raw || typeof raw !== 'string') continue;
+    const trimmed = raw.trim();
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) continue;
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return parsed;
+      }
+    } catch {
+      // Ignore malformed env values such as auth tokens and fall back safely
+    }
+  }
+  return new URL(DEFAULT_APP_ORIGIN);
+}
 
 export const viewport: Viewport = {
-  themeColor: '#1E3A8A',
+  themeColor: '#4F46E5',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(APP_ORIGIN),
+  metadataBase: resolveMetadataBase(),
   applicationName: 'Ucred',
   title: {
     default: 'Ucred — Smart Voice Khata, AI Parchi & Galla OS',
@@ -114,7 +119,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${plusJakartaDisplay.variable} ${plusJakarta.variable} ${notoDevanagari.variable} ${jetbrainsMono.variable}`}
+      className={`${plusJakarta.variable} ${notoDevanagari.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-[var(--outer-frame)] text-[var(--ink)]" suppressHydrationWarning>

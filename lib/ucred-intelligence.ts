@@ -310,3 +310,134 @@ export function computeNetCashflowSummary(accounts: LedgerAccount[]): NetCashflo
     payableSharePct,
   };
 }
+
+export interface DuePartySpotlight {
+  account: LedgerAccount;
+  trustScore: number;
+  urgencyLabel: string;
+  isDueTodayOrOverdue: boolean;
+}
+
+/**
+ * Selects top N due parties for the expandable Net Receivable Hero drawer,
+ * ranking due-today and overdue parties ahead of general pending balances.
+ */
+export function getTopDuePartiesToday(
+  accounts: LedgerAccount[],
+  trustScoresByAccount: Record<string, CustomerTrustScore>,
+  todayStr: string = getLocalDateKey(),
+  limit: number = 3
+): DuePartySpotlight[] {
+  const candidates = accounts
+    .filter((a) => a.balance > 0)
+    .map((account) => {
+      const trust = trustScoresByAccount[account.id];
+      const trustScore = trust?.score ?? 100;
+      const due = account.dueDate ? account.dueDate.slice(0, 10) : '';
+      const diff = due ? daysBetweenLocal(due, todayStr) : null;
+      const isOverdue = diff !== null && diff > 0;
+      const isDueToday = diff === 0;
+      const promiseToday = account.promiseDate?.slice(0, 10) === todayStr;
+
+      let urgencyLabel = 'Pending due';
+      let rankWeight = 0;
+
+      if (promiseToday) {
+        urgencyLabel = 'Promised today';
+        rankWeight = 4000;
+      } else if (isDueToday) {
+        urgencyLabel = 'Due today';
+        rankWeight = 3500;
+      } else if (isOverdue && diff !== null) {
+        urgencyLabel = `Overdue ${diff}d`;
+        rankWeight = 3000 + Math.min(500, diff * 10);
+      } else if (due) {
+        urgencyLabel = `Due ${due}`;
+        rankWeight = 1000;
+      }
+
+      const priority = trust?.priorityScore ?? 0;
+      const sortMetric = rankWeight + priority * 5 + Math.min(999, Math.round(account.balance / 10));
+
+      return {
+        account,
+        trustScore,
+        urgencyLabel,
+        isDueTodayOrOverdue: isOverdue || isDueToday || promiseToday,
+        sortMetric,
+      };
+    });
+
+  candidates.sort((a, b) => b.sortMetric - a.sortMetric || b.account.balance - a.account.balance);
+
+  return candidates.slice(0, Math.max(0, limit)).map((item) => ({
+    account: item.account,
+    trustScore: item.trustScore,
+    urgencyLabel: item.urgencyLabel,
+    isDueTodayOrOverdue: item.isDueTodayOrOverdue,
+  }));
+}
+
+export type KeypadKey =
+  | '0'
+  | '1'
+  | '2'
+  | '3'
+  | '4'
+  | '5'
+  | '6'
+  | '7'
+  | '8'
+  | '9'
+  | '.'
+  | 'backspace'
+  | 'clear'
+  | '+100'
+  | '+500'
+  | '+2000';
+
+/**
+ * Pure tactile numeric keypad state transition for Quick Entry without popping OS soft keyboard.
+ */
+export function applyKeypadKey(current: string, key: KeypadKey, maxIntegerDigits: number = 7): string {
+  if (key === 'clear') return '';
+
+  if (key === 'backspace') {
+    return current.length > 0 ? current.slice(0, -1) : '';
+  }
+
+  if (key === '+100' || key === '+500' || key === '+2000') {
+    const add = Number(key.slice(1));
+    const base = Number(current);
+    const safeBase = Number.isFinite(base) && base > 0 ? base : 0;
+    const next = Math.round((safeBase + add) * 100) / 100;
+    const cap = Math.pow(10, maxIntegerDigits) - 0.01;
+    const clamped = Math.min(cap, next);
+    return Number.isInteger(clamped) ? String(clamped) : String(clamped);
+  }
+
+  if (key === '.') {
+    if (current.includes('.')) return current;
+    return current === '' ? '0.' : `${current}.`;
+  }
+
+  // Digit '0'..'9'
+  const dotIdx = current.indexOf('.');
+  if (dotIdx !== -1) {
+    // Allow at most 2 decimal places
+    const decimals = current.slice(dotIdx + 1);
+    if (decimals.length >= 2) return current;
+    return `${current}${key}`;
+  }
+
+  if (current === '0') {
+    return key === '0' ? '0' : key;
+  }
+
+  if (current.length >= maxIntegerDigits) {
+    return current;
+  }
+
+  return `${current}${key}`;
+}
+

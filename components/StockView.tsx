@@ -148,7 +148,7 @@ export const StockView: React.FC<StockViewProps> = ({
         <button
           type="button"
           onClick={openAddModal}
-          className="min-h-[44px] px-3.5 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 shadow-md active:scale-95 transition"
+          className="min-h-[44px] px-3.5 rounded-xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 tactile-key-primary active:scale-95 transition"
         >
           <Plus className="w-4 h-4" />
           <span>Add Item</span>
@@ -189,7 +189,7 @@ export const StockView: React.FC<StockViewProps> = ({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search inventory item..."
-          className="w-full min-h-[46px] rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 px-4 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)] transition"
+          className="w-full min-h-[46px] rounded-2xl spatial-card px-4 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)] transition"
         />
       </div>
 
@@ -211,8 +211,8 @@ export const StockView: React.FC<StockViewProps> = ({
       )}
 
       {filtered.length === 0 ? (
-        <div className="rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-8 text-center space-y-3">
-          <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center">
+        <div className="rounded-[28px] spatial-card p-8 text-center space-y-3">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
             <Package className="w-7 h-7" />
           </div>
           <p className="font-display text-base font-bold text-[var(--ink)]">
@@ -224,7 +224,7 @@ export const StockView: React.FC<StockViewProps> = ({
             <button
               type="button"
               onClick={openAddModal}
-              className="min-h-[46px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5 shadow-md active:scale-95 transition"
+              className="min-h-[46px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5 tactile-key-primary active:scale-95 transition"
             >
               <Plus className="w-4 h-4" />
               <span>Add New Item</span>
@@ -240,7 +240,7 @@ export const StockView: React.FC<StockViewProps> = ({
               <div
                 key={item.id}
                 style={{ animationDelay: `${Math.min(idx, 12) * 35}ms` }}
-                className="stagger-fade-up rounded-[22px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-3.5 flex items-center justify-between gap-2.5"
+                className="stagger-fade-up rounded-[22px] spatial-card p-3.5 flex items-center justify-between gap-2.5"
               >
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <p className="font-extrabold text-sm text-[var(--ink)] leading-snug truncate">
@@ -282,7 +282,7 @@ export const StockView: React.FC<StockViewProps> = ({
                     type="button"
                     onClick={() => openEditModal(item)}
                     aria-label={`Edit ${item.name}`}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--brand-accent)] hover:bg-[var(--brand-tint)]/60 active:scale-95 transition"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--brand-accent)] hover:bg-[var(--brand-tint)] active:scale-95 transition"
                   >
                     <Edit3 className="w-4 h-4" />
                   </button>
@@ -296,7 +296,7 @@ export const StockView: React.FC<StockViewProps> = ({
                     className={`min-w-[40px] min-h-[40px] px-2 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
                       armed
                         ? 'bg-[var(--credit-red)] text-white shadow-sm'
-                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]/50'
+                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
                     }`}
                   >
                     {armed ? 'Delete?' : <Trash2 className="w-4 h-4" />}
@@ -313,13 +313,13 @@ export const StockView: React.FC<StockViewProps> = ({
           role="dialog"
           aria-modal="true"
           onClick={() => setModalOpen(false)}
-          className="fixed inset-0 z-50 bg-slate-950/55 flex items-end justify-center backdrop-blur-xs"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 pt-3 space-y-4 pb-safe max-h-[90dvh] overflow-y-auto"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 pt-3 space-y-4 pb-safe max-h-[90dvh] overflow-y-auto"
           >
-            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--ink-muted)]/25" />
+            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--surface-subtle)]" />
 
             <div className="flex items-center justify-between">
               <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
@@ -423,7 +423,7 @@ export const StockView: React.FC<StockViewProps> = ({
               type="button"
               disabled={saving}
               onClick={handleSave}
-              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold shadow-md disabled:opacity-60 active:scale-95 transition"
+              className="w-full min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold tactile-key-primary disabled:opacity-60 active:scale-95 transition"
             >
               {saving ? 'Saving...' : editingItemId ? 'Update Stock Item' : 'Save Stock Item'}
             </button>

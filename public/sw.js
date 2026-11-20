@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ucred-nextjs-v7';
+const CACHE_NAME = 'ucred-nextjs-v8';
 const SHELL_ASSETS = [
   '/pwa-192x192.png',
   '/pwa-512x512.png',
@@ -73,7 +73,7 @@ self.addEventListener('fetch', (event) => {
               (home) =>
                 home ||
                 new Response(
-                  '<!doctype html><html><body style="font-family:sans-serif;padding:24px;text-align:center;background:#F8FAFC;color:#0F172A;"><h2>Ucred is Offline</h2><p>Please check your internet connection and reload.</p></body></html>',
+                  '<!doctype html><html><body style="font-family:sans-serif;padding:24px;text-align:center;background:#F6F7FB;color:#0F172A;"><h2>Ucred is Offline</h2><p>Please check your internet connection and reload.</p></body></html>',
                   { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
                 )
             );

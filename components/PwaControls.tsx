@@ -18,8 +18,8 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
         onClick={install}
         className={
           compact
-            ? 'inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold whitespace-nowrap shrink-0 shadow-sm hover:bg-[var(--brand-hover)] active:scale-95 transition'
-            : 'inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold whitespace-nowrap shrink-0 shadow-md hover:bg-[var(--brand-hover)] active:scale-95 transition'
+            ? 'inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold whitespace-nowrap shrink-0 tactile-key-primary hover:bg-[var(--brand-hover)] active:scale-95 transition'
+            : 'inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-bold whitespace-nowrap shrink-0 tactile-key-primary hover:bg-[var(--brand-hover)] active:scale-95 transition'
         }
       >
         <Download className="w-4 h-4" />
@@ -34,15 +34,15 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
         <button
           type="button"
           onClick={() => setShowIOSGuide(true)}
-          className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 rounded-xl spatial-card ring-1 ring-white/80 dark:ring-white/10 text-xs font-semibold text-[var(--ink)] whitespace-nowrap shrink-0 active:scale-95 transition"
+          className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 rounded-xl spatial-card text-xs font-semibold text-[var(--ink)] whitespace-nowrap shrink-0 active:scale-95 transition"
         >
           <Share className="w-3.5 h-3.5" />
           <span>Install</span>
         </button>
 
         {showIOSGuide && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-xs">
-            <div className="w-full max-w-[380px] rounded-[28px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 sheet-slide-up">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-[380px] rounded-[28px] spatial-sheet p-6 space-y-4 sheet-slide-up">
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
                   Install Ucred on iPhone
@@ -67,7 +67,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
               <button
                 type="button"
                 onClick={() => setShowIOSGuide(false)}
-                className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold shadow-md active:scale-95 transition"
+                className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold tactile-key-primary active:scale-95 transition"
               >
                 Got It
               </button>

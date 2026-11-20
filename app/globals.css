@@ -2,25 +2,26 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* Ucred v2.0 — Airy Slate Light Mode (60% Slate Canvas · 30% White Surface · 10% Royal Indigo & Hisaab Semantics) */
-  --app-bg: #F8FAFC;
-  --outer-frame: #E2E8F0;
+  /* Ucred Solid Spatial Light Mode (Tenmin-Inspired: Solid #F6F7FB Canvas · Pure White Cards · Zero Glass) */
+  --app-bg: #F6F7FB;
+  --outer-frame: #EAECEF;
   --surface: #FFFFFF;
-  --surface-subtle: #F1F5F9;
-  --surface-border: #E2E8F0;
+  --surface-subtle: #EFEFF4;
+  --surface-border: #E5E7EB;
   --ink: #0F172A;
   --ink-muted: #475569;
 
-  --brand: #1E3A8A;
-  --brand-hover: #1E40AF;
+  /* Default Sapphire Indigo Accent */
+  --brand: #4F46E5;
+  --brand-hover: #4338CA;
   --brand-fg: #FFFFFF;
 
-  --brand-accent: #1E3A8A;
+  --brand-accent: #4F46E5;
   --brand-accent-fg: #FFFFFF;
-  --brand-tint: #EFF6FF;
-  --brand-soft: rgba(79, 70, 229, 0.2);
+  --brand-tint: #EEF2FF;
+  --brand-soft: #E0E7FF;
 
-  /* Strict Hisaab-Kitaab Semantics */
+  /* Strict Hisaab-Kitaab Semantics (100% Solid Matte) */
   --credit-red: #DC2626;
   --credit-tint: #FEE2E2;
   --debit-green: #15803D;
@@ -28,36 +29,47 @@
   --alert-amber: #D97706;
   --alert-tint: #FEF3C7;
 
-  /* Exclusive AI Munim Gradient (Bolne Wala Munim Orb & Parchi Laser) */
-  --munim-gradient: linear-gradient(135deg, #4F46E5, #06B6D4);
+  /* 3D Blue-Cyan Munim Gradient */
+  --munim-gradient: linear-gradient(135deg, #4F46E5 0%, #06B6D4 100%);
 
-  /* Spatial Depth & Spring Motion Tokens (Tenmin-Inspired) */
-  --spatial-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.08);
-  --spatial-shadow-lg: 0 18px 44px -14px rgba(15, 23, 42, 0.14);
-  --spatial-dock-shadow: 0 14px 40px -8px rgba(15, 23, 42, 0.18);
-  --spatial-sheet-shadow: 0 -18px 50px -12px rgba(15, 23, 42, 0.22);
+  /* Tenmin Multi-Layered Ambient Shadows (Zero Harsh Borders) */
+  --spatial-shadow: 0 10px 26px -8px rgba(79, 70, 229, 0.1), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  --spatial-shadow-lg: 0 14px 34px -10px rgba(79, 70, 229, 0.14), 0 4px 14px -2px rgba(15, 23, 42, 0.05);
+  --spatial-dock-shadow: 0 14px 34px -8px rgba(79, 70, 229, 0.18), 0 6px 18px rgba(15, 23, 42, 0.08);
+  --spatial-sheet-shadow: 0 -18px 44px rgba(15, 23, 42, 0.14);
+  --spatial-key-shadow: 0 10px 24px -4px rgba(79, 70, 229, 0.42), inset 0 2px 2px rgba(255, 255, 255, 0.32);
   --spring-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
   --smooth-ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+[data-accent="rose"] {
+  --brand: #E11D48;
+  --brand-hover: #BE123C;
+  --brand-accent: #E11D48;
+  --brand-tint: #FFF1F2;
+  --brand-soft: #FFE4E6;
+  --munim-gradient: linear-gradient(135deg, #E11D48 0%, #F97316 100%);
+  --spatial-key-shadow: 0 10px 24px -4px rgba(225, 29, 72, 0.4), inset 0 2px 2px rgba(255, 255, 255, 0.32);
+}
+
 .dark {
-  /* Ucred v2.0 — Obsidian Dark Mode */
+  /* Ucred Solid Onyx Dark Mode */
   --app-bg: #09090B;
   --outer-frame: #000000;
   --surface: #18181B;
   --surface-subtle: #27272A;
   --surface-border: #27272A;
   --ink: #FAFAFA;
-  --ink-muted: #94A3B8;
+  --ink-muted: #A1A1AA;
 
-  --brand: #2563EB;
-  --brand-hover: #1D4ED8;
+  --brand: #6366F1;
+  --brand-hover: #4F46E5;
   --brand-fg: #FFFFFF;
 
-  --brand-accent: #3B82F6;
+  --brand-accent: #818CF8;
   --brand-accent-fg: #09090B;
-  --brand-tint: rgba(59, 130, 246, 0.16);
-  --brand-soft: rgba(59, 130, 246, 0.28);
+  --brand-tint: #1E1B4B;
+  --brand-soft: #312E81;
 
   --credit-red: #F87171;
   --credit-tint: #450A0A;
@@ -66,12 +78,23 @@
   --alert-amber: #FBBF24;
   --alert-tint: #451A03;
 
-  --munim-gradient: linear-gradient(135deg, #6366F1, #22D3EE);
+  --munim-gradient: linear-gradient(135deg, #4F46E5 0%, #06B6D4 100%);
 
-  --spatial-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.55);
-  --spatial-shadow-lg: 0 20px 48px -12px rgba(0, 0, 0, 0.72);
-  --spatial-dock-shadow: 0 16px 46px -8px rgba(0, 0, 0, 0.78);
-  --spatial-sheet-shadow: 0 -18px 52px -10px rgba(0, 0, 0, 0.75);
+  --spatial-shadow: 0 10px 28px rgba(0, 0, 0, 0.48);
+  --spatial-shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.62);
+  --spatial-dock-shadow: 0 14px 34px rgba(0, 0, 0, 0.72);
+  --spatial-sheet-shadow: 0 -18px 46px rgba(0, 0, 0, 0.78);
+  --spatial-key-shadow: 0 10px 24px -4px rgba(79, 70, 229, 0.55), inset 0 2px 2px rgba(255, 255, 255, 0.25);
+}
+
+.dark[data-accent="rose"] {
+  --brand: #F43F5E;
+  --brand-hover: #E11D48;
+  --brand-accent: #FB7185;
+  --brand-tint: #4C0519;
+  --brand-soft: #881337;
+  --munim-gradient: linear-gradient(135deg, #E11D48 0%, #F97316 100%);
+  --spatial-key-shadow: 0 10px 24px -4px rgba(244, 63, 94, 0.52), inset 0 2px 2px rgba(255, 255, 255, 0.25);
 }
 
 body {
@@ -83,7 +106,7 @@ body {
 }
 
 .font-display {
-  font-family: var(--font-display), var(--font-devanagari), var(--font-sans), sans-serif;
+  font-family: var(--font-sans), var(--font-devanagari), system-ui, sans-serif;
   letter-spacing: -0.02em;
 }
 
@@ -93,14 +116,9 @@ body {
   font-feature-settings: "tnum";
 }
 
-/* Spatial Surface Helpers (Zero Harsh Box Borders) */
+/* 100% Solid Tenmin-Style Surfaces (Zero Glass / Zero Blur) */
 .spatial-shell-bg {
   background-color: var(--app-bg);
-  background-image: radial-gradient(ellipse at top, rgba(79, 70, 229, 0.12), transparent 60%);
-}
-
-.dark .spatial-shell-bg {
-  background-image: radial-gradient(ellipse at top, rgba(59, 130, 246, 0.11), transparent 55%);
 }
 
 .spatial-card {
@@ -122,7 +140,11 @@ body {
   box-shadow: var(--spatial-dock-shadow);
 }
 
-/* Hide scrollbars cleanly on horizontal chip scrollers */
+.tactile-key-primary {
+  box-shadow: var(--spatial-key-shadow);
+}
+
+/* Hide scrollbars cleanly */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -131,26 +153,73 @@ body {
   scrollbar-width: none;
 }
 
-/* Tenmin-Inspired Pure CSS Spring Keyframes */
-@keyframes floatOrb {
+/* Continuous Ambient Motion Keyframes */
+@keyframes waveHand {
   0%, 100% {
-    transform: translateY(0px) scale(1);
-    box-shadow: 0 12px 28px rgba(79, 70, 229, 0.34), 0 0 0 0 rgba(6, 182, 212, 0.28);
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(16deg);
+  }
+  30% {
+    transform: rotate(-10deg);
+  }
+  45% {
+    transform: rotate(14deg);
+  }
+  60% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes sproutGrow {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
   }
   50% {
-    transform: translateY(-3.5px) scale(1.035);
-    box-shadow: 0 16px 34px rgba(79, 70, 229, 0.42), 0 0 0 9px rgba(6, 182, 212, 0);
+    transform: scale(1.06) rotate(-2deg);
+  }
+}
+
+@keyframes twinkleStar {
+  0%, 100% {
+    opacity: 0.28;
+    transform: scale(0.82) rotate(0deg);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.16) rotate(12deg);
+  }
+}
+
+@keyframes barShimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(220%);
   }
 }
 
 @keyframes rippleWave {
   0% {
-    transform: scale(0.88);
-    opacity: 0.72;
+    transform: scale(0.92);
+    opacity: 0.55;
   }
   100% {
     transform: scale(1.62);
     opacity: 0;
+  }
+}
+
+@keyframes orbAuraPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.25;
   }
 }
 
@@ -194,12 +263,6 @@ body {
   }
 }
 
-@keyframes ringDraw {
-  0% {
-    stroke-dashoffset: 132;
-  }
-}
-
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -224,16 +287,49 @@ body {
   }
 }
 
-.munim-orb-idle {
-  animation: floatOrb 3.2s ease-in-out infinite;
+@keyframes sparkleBurst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.4);
+  }
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx, 18px), var(--ty, -18px)) scale(1.1);
+  }
+}
+
+.wave-hand {
+  display: inline-block;
+  transform-origin: 70% 70%;
+  animation: waveHand 2.4s ease-in-out infinite;
+}
+
+.sprout-grow {
+  transform-origin: bottom center;
+  animation: sproutGrow 3.2s ease-in-out infinite;
+}
+
+.twinkle-star {
+  animation: twinkleStar 3.2s ease-in-out infinite;
+}
+
+.bar-shimmer-sweep {
+  animation: barShimmer 2.8s var(--smooth-ease) infinite;
+}
+
+.orb-aura-pulse {
+  animation: orbAuraPulse 2.8s ease-in-out infinite;
 }
 
 .munim-ripple-1 {
-  animation: rippleWave 1.5s var(--smooth-ease) infinite;
+  animation: rippleWave 2.5s var(--smooth-ease) infinite;
 }
 
 .munim-ripple-2 {
-  animation: rippleWave 1.5s var(--smooth-ease) 0.52s infinite;
+  animation: rippleWave 2.5s var(--smooth-ease) 1.25s infinite;
 }
 
 .eq-bar {
@@ -253,15 +349,11 @@ body {
   animation: laserSweep 1.7s ease-in-out infinite;
 }
 
-.trust-ring-draw {
-  animation: ringDraw 0.6s var(--smooth-ease) both;
-}
-
 .spatial-shimmer {
   background: linear-gradient(
     90deg,
     var(--surface-subtle) 25%,
-    rgba(79, 70, 229, 0.12) 50%,
+    var(--brand-tint) 50%,
     var(--surface-subtle) 75%
   );
   background-size: 200% 100%;
@@ -272,17 +364,25 @@ body {
   animation: checkPop 0.34s var(--spring-ease) both;
 }
 
+.sparkle-particle {
+  animation: sparkleBurst 0.65s var(--smooth-ease) forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .munim-orb-idle,
+  .wave-hand,
+  .sprout-grow,
+  .twinkle-star,
+  .bar-shimmer-sweep,
+  .orb-aura-pulse,
   .munim-ripple-1,
   .munim-ripple-2,
   .eq-bar,
   .stagger-fade-up,
   .sheet-slide-up,
   .parchi-laser,
-  .trust-ring-draw,
   .spatial-shimmer,
-  .check-pop {
+  .check-pop,
+  .sparkle-particle {
     animation: none !important;
   }
 }

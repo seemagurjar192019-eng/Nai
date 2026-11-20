@@ -235,7 +235,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
               className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 active:scale-95 transition ${
                 filterChip === c.id
                   ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-xs'
-                  : 'spatial-card ring-1 ring-white/80 dark:ring-white/10 text-[var(--ink-muted)]'
+                  : 'spatial-card text-[var(--ink-muted)]'
               }`}
             >
               {c.label}
@@ -247,7 +247,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
           type="button"
           onClick={() => setShowSort(true)}
           aria-label="Sort collection accounts"
-          className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card ring-1 ring-white/80 dark:ring-white/10 flex items-center justify-center shrink-0 active:scale-95 transition"
+          className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card flex items-center justify-center shrink-0 active:scale-95 transition"
         >
           <SlidersHorizontal className="w-4 h-4 text-[var(--ink)]" />
         </button>
@@ -270,7 +270,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
 
       {/* Compact Due Cards List (tap card for QR Bottom Sheet; 1-tap Remind on WhatsApp per row) */}
       {dueAccounts.length === 0 ? (
-        <div className="rounded-[28px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-8 text-center space-y-3">
+        <div className="rounded-[28px] spatial-card p-8 text-center space-y-3">
           <p className="font-display text-base font-bold text-[var(--ink)]">
             No pending {partyKind === 'customer' ? 'customer dues' : 'supplier payables'} in this
             filter.
@@ -316,7 +316,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                   }
                 }}
                 style={{ animationDelay: `${Math.min(idx, 12) * 35}ms` }}
-                className="stagger-fade-up rounded-[22px] spatial-card ring-1 ring-white/80 dark:ring-white/10 p-3.5 flex items-center justify-between gap-2.5 active:scale-[0.985] transition cursor-pointer"
+                className="stagger-fade-up rounded-[22px] spatial-card p-3.5 flex items-center justify-between gap-2.5 active:scale-[0.985] transition cursor-pointer"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <TrustAvatarRing
@@ -379,7 +379,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
         <button
           type="button"
           onClick={() => setShowBulkModal(true)}
-          className="w-full min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition"
+          className="w-full min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
         >
           <Users className="w-5 h-5" />
           <span>Bulk WhatsApp &amp; SMS Reminder ({dueAccounts.length})</span>
@@ -392,11 +392,11 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
           role="dialog"
           aria-modal="true"
           onClick={() => setSelectedIndex(null)}
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end justify-center"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 max-h-[90dvh] overflow-y-auto pb-safe"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 max-h-[90dvh] overflow-y-auto pb-safe"
           >
             <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-start justify-between gap-3">
@@ -496,7 +496,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                           setActionError('');
                           setShowUpiSetup(true);
                         }}
-                        className="absolute inset-0 bg-white/85 backdrop-blur-[2px] rounded-3xl flex flex-col items-center justify-center gap-1.5 active:scale-95 transition"
+                        className="absolute inset-0 bg-white rounded-3xl flex flex-col items-center justify-center gap-1.5 active:scale-95 transition"
                       >
                         <span className="px-3.5 py-2 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shadow">
                           <QrCode className="w-4 h-4" />
@@ -571,7 +571,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                   setSelectedIndex(null);
                   onOpenAccount(current);
                 }}
-                className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+                className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
               >
                 <span>Open Supplier Ledger to Record Payment</span>
               </button>
@@ -590,11 +590,11 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
           role="dialog"
           aria-modal="true"
           onClick={() => setShowUpiSetup(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
           >
             <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
@@ -612,7 +612,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                 setActionError('');
               }}
               placeholder="yourshop@upi"
-              className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] px-3.5 font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
             {actionError && (
               <p className="text-xs font-bold text-[var(--credit-red)]">{actionError}</p>
@@ -622,7 +622,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                 type="button"
                 disabled={upiBusy}
                 onClick={handleSaveUpi}
-                className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60 active:scale-95 transition"
+                className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold tactile-key-primary disabled:opacity-60 active:scale-95 transition"
               >
                 {upiBusy ? 'Saving...' : 'Save UPI ID'}
               </button>
@@ -644,11 +644,11 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
           role="dialog"
           aria-modal="true"
           onClick={() => setDueEditAccount(null)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 pb-safe"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
           >
             <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
@@ -658,7 +658,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
               type="date"
               value={dueInput}
               onChange={(e) => setDueInput(e.target.value)}
-              className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] ring-1 ring-black/5 dark:ring-white/10 px-3.5 font-tabular text-[var(--ink)]"
+              className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] px-3.5 font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
             {actionError && (
               <p className="text-xs font-bold text-[var(--credit-red)]">{actionError}</p>
@@ -668,7 +668,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                 type="button"
                 disabled={dueBusy}
                 onClick={handleSaveDue}
-                className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60 active:scale-95 transition"
+                className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold tactile-key-primary disabled:opacity-60 active:scale-95 transition"
               >
                 {dueBusy ? 'Saving...' : 'Save'}
               </button>
@@ -690,11 +690,11 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
           role="dialog"
           aria-modal="true"
           onClick={() => setShowSort(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-2.5 pb-safe"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-2.5 pb-safe"
           >
             <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-center justify-between pb-1">
@@ -727,7 +727,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                 className={`w-full min-h-[46px] px-4 rounded-2xl flex items-center justify-between text-sm font-bold active:scale-[0.98] transition ${
                   sortBy === opt.id
                     ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
-                    : 'bg-[var(--app-bg)]/70 hover:bg-[var(--surface-subtle)] text-[var(--ink)]'
+                    : 'bg-[var(--app-bg)] hover:bg-[var(--surface-subtle)] text-[var(--ink)]'
                 }`}
               >
                 <span>{opt.label}</span>
@@ -744,11 +744,11 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
           role="dialog"
           aria-modal="true"
           onClick={() => setShowBulkModal(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet ring-1 ring-white/80 dark:ring-white/10 p-6 space-y-4 max-h-[85dvh] overflow-y-auto pb-safe"
+            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 max-h-[85dvh] overflow-y-auto pb-safe"
           >
             <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
             <div className="flex items-center justify-between">
