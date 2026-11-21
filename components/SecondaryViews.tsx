@@ -57,6 +57,8 @@ import type {
   LedgerTransaction,
 } from '@/lib/types';
 
+import type { PersonaCapabilities } from '@/lib/persona';
+
 import { PWAInstallButton } from './PwaControls';
 
 export type SecondaryRoute =
@@ -84,6 +86,7 @@ interface MoreBentoViewProps {
   verifiedPhone: string;
   activeOperatorName: string;
   isGuestMode?: boolean;
+  capabilities?: PersonaCapabilities;
   onOpenCloudSync?: () => void;
   onToggleAppearance: () => void;
   onSelectAccentTheme?: (theme: ThemeAccentId) => void;
@@ -100,6 +103,7 @@ export const MoreBentoView: React.FC<MoreBentoViewProps> = ({
   verifiedPhone,
   activeOperatorName,
   isGuestMode = false,
+  capabilities,
   onOpenCloudSync,
   onToggleAppearance,
   onSelectAccentTheme,
@@ -108,6 +112,9 @@ export const MoreBentoView: React.FC<MoreBentoViewProps> = ({
   onExportCsv,
   onExportJson,
 }) => {
+  const showGalla = capabilities ? capabilities.showGalla : true;
+  const showStock = capabilities ? capabilities.showStock : true;
+  const showParchi = capabilities ? capabilities.focus !== 'personal' : true;
   const activeTheme: ThemeAccentId = appearance === 'dark' ? 'onyx' : accentTheme === 'rose' ? 'rose' : 'sapphire';
   return (
     <div className="space-y-4 pb-32 stagger-fade-up">
@@ -222,50 +229,58 @@ export const MoreBentoView: React.FC<MoreBentoViewProps> = ({
             </div>
           </button>
 
-          <button
-            type="button"
-            onClick={() => onNavigate('galla')}
-            className="min-h-[60px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
-          >
-            <span className="w-10 h-10 rounded-2xl bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
-              <Wallet className="w-5 h-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-extrabold text-[var(--ink)]">Galla Cashbook</p>
-              <p className="text-[11px] text-[var(--ink-muted)] truncate">Cash &amp; Profit</p>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate('stock')}
-            className="min-h-[60px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
-          >
-            <span className="w-10 h-10 rounded-2xl bg-[var(--alert-tint)] text-[var(--alert-amber)] flex items-center justify-center shrink-0">
-              <Package className="w-5 h-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-extrabold text-[var(--ink)]">Stock Inventory</p>
-              <p className="text-[11px] text-[var(--ink-muted)] truncate">Rates &amp; Alerts</p>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate('scan-parchi')}
-            className="min-h-[60px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
-          >
-            <span
-              style={{ background: 'var(--munim-gradient)' }}
-              className="w-10 h-10 rounded-2xl text-white flex items-center justify-center shrink-0 tactile-key-primary"
+          {showGalla && (
+            <button
+              type="button"
+              onClick={() => onNavigate('galla')}
+              className="min-h-[60px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
             >
-              <Camera className="w-4 h-4" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-extrabold text-[var(--ink)]">AI Parchi Scan</p>
-              <p className="text-[11px] text-[var(--ink-muted)] truncate">Photo to Khata</p>
-            </div>
-          </button>
+              <span className="w-10 h-10 rounded-2xl bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
+                <Wallet className="w-5 h-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-[var(--ink)]">
+                  {capabilities?.gallaSegmentLabel || 'Galla'} Cashbook
+                </p>
+                <p className="text-[11px] text-[var(--ink-muted)] truncate">Cash &amp; Profit</p>
+              </div>
+            </button>
+          )}
+
+          {showStock && (
+            <button
+              type="button"
+              onClick={() => onNavigate('stock')}
+              className="min-h-[60px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
+            >
+              <span className="w-10 h-10 rounded-2xl bg-[var(--alert-tint)] text-[var(--alert-amber)] flex items-center justify-center shrink-0">
+                <Package className="w-5 h-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-[var(--ink)]">Stock Inventory</p>
+                <p className="text-[11px] text-[var(--ink-muted)] truncate">Rates &amp; Alerts</p>
+              </div>
+            </button>
+          )}
+
+          {showParchi && (
+            <button
+              type="button"
+              onClick={() => onNavigate('scan-parchi')}
+              className="min-h-[60px] px-3.5 rounded-[20px] bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
+            >
+              <span
+                style={{ backgroundColor: 'var(--brand)' }}
+                className="w-10 h-10 rounded-2xl text-white flex items-center justify-center shrink-0 tactile-key-primary"
+              >
+                <Camera className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-[var(--ink)]">AI Parchi Scan</p>
+                <p className="text-[11px] text-[var(--ink-muted)] truncate">Photo to Khata</p>
+              </div>
+            </button>
+          )}
         </div>
       </section>
 

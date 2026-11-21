@@ -181,4 +181,32 @@ describe('Guest Mode Vault & Atomic Ledger Logic', () => {
     vault = cb.vault;
     assert.equal(vault.cashbookEntries.length, 1);
   });
+
+  it('tags created accounts and transactions with personaContext without losing unified shop storage', () => {
+    let vault = createInitialGuestVault();
+    const bizId = vault.businesses[0].id;
+
+    const mandiAcc = applyCreateAccount(vault, {
+      businessId: bizId,
+      kind: 'customer',
+      personaContext: 'mandi',
+      name: 'Kisan Ramu',
+    });
+    vault = mandiAcc.vault;
+    assert.equal(mandiAcc.created.personaContext, 'mandi');
+
+    const txRes = applyAddTransactionAtomic(vault, {
+      businessId: bizId,
+      customerName: 'Rahul Roommate',
+      personaContext: 'personal',
+      direction: 'given',
+      amount: 450,
+      note: 'Dinner split',
+    });
+    vault = txRes.vault;
+    assert.equal(txRes.account.personaContext, 'personal');
+    assert.equal(txRes.tx.personaContext, 'personal');
+    assert.equal(vault.accounts.length, 2);
+  });
 });
+

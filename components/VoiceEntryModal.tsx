@@ -32,6 +32,8 @@ import {
   speakHinglish,
   stopSpeaking,
 } from '@/lib/i18n';
+import { haptic } from '@/lib/haptic';
+import { getPersonaAdaptation, type PersonaAdaptation } from '@/lib/persona';
 import type {
   AccountKind,
   BillLineItem,
@@ -86,6 +88,8 @@ interface VoiceEntryModalProps {
   prefillCustomerName?: string;
   defaultKind?: AccountKind;
   initialCounterMode?: boolean;
+  personaAdaptation?: PersonaAdaptation;
+  allowBills?: boolean;
   onClose: () => void;
   onOpenAccount: (account: LedgerAccount) => void;
   onOpenDailySummary: () => void;
@@ -172,6 +176,8 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   prefillCustomerName = '',
   defaultKind = 'customer',
   initialCounterMode = false,
+  personaAdaptation,
+  allowBills = true,
   onClose,
   onOpenAccount,
   onOpenDailySummary,
@@ -180,6 +186,10 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   onCreateBillFromVoice,
 }) => {
   const t = getUIStrings(language);
+  const activeAdaptation = useMemo(
+    () => personaAdaptation || getPersonaAdaptation(['kirana'], 'kirana'),
+    [personaAdaptation]
+  );
   const [stage, setStage] = useState<'listen' | 'confirm' | 'batch' | 'bill' | 'balance' | 'saved'>('listen');
   const [continuousMode, setContinuousMode] = useState(initialCounterMode);
   const [sessionQueue, setSessionQueue] = useState<SessionQueueSavedItem[]>([]);
@@ -202,6 +212,13 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [undoingId, setUndoingId] = useState<string | null>(null);
+  const [savedSnapshot, setSavedSnapshot] = useState<{
+    partyName: string;
+    previousBalance: number;
+    newBalance: number;
+    amount: number;
+    direction: TxDirection;
+  } | null>(null);
 
   // Multi-entry batch fields
   const [batchItems, setBatchItems] = useState<BatchItemState[]>([]);
@@ -321,7 +338,13 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         return;
       }
 
-      if (json.intent === 'bill' && Array.isArray(json.billItems) && json.billItems.length > 0) {
+      if (
+        allowBills &&
+        onCreateBillFromVoice &&
+        json.intent === 'bill' &&
+        Array.isArray(json.billItems) &&
+        json.billItems.length > 0
+      ) {
         setVoiceBillCustomer(json.customerName || prefillCustomerName || 'Walk-in Customer');
         setVoiceBillStatus(json.paymentStatus === 'paid' ? 'paid' : 'unpaid');
         setVoiceBillItems(json.billItems);
@@ -396,7 +419,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       /\b(bill|invoice|parchi|bana\s*do|banao|ka\s+bill)\b/i.test(phrase) &&
       (phrase.match(/\d+/g)?.length || 0) >= 2;
 
-    if (looksLikeSpokenBill && onCreateBillFromVoice) {
+    if (allowBills && looksLikeSpokenBill && onCreateBillFromVoice) {
       void applyAiFallback(phrase);
       return;
     }
@@ -611,6 +634,16 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       return;
     }
 
+    const prevBal = matchedAccount?.balance ?? 0;
+    const signedDelta = direction === 'given' ? amount : -amount;
+    setSavedSnapshot({
+      partyName: name.trim(),
+      previousBalance: prevBal,
+      newBalance: prevBal + signedDelta,
+      amount,
+      direction,
+    });
+
     setSaving(true);
     try {
       const savedMeta = await onSaveEntry({
@@ -622,9 +655,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         kind: defaultKind,
       });
       lastSavedSigRef.current = { sig, at: Date.now() };
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(50);
-      }
+      haptic.success();
       setSaving(false);
 
       const qItem: SessionQueueSavedItem = {
@@ -664,6 +695,18 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       setConfirmError('Select at least one valid entry.');
       return;
     }
+    const batchTotal = valid.reduce((s, it) => s + it.amount, 0);
+    const batchNetDelta = valid.reduce(
+      (s, it) => s + (it.direction === 'given' ? it.amount : -it.amount),
+      0
+    );
+    setSavedSnapshot({
+      partyName: `${valid.length} Parties`,
+      previousBalance: 0,
+      newBalance: batchNetDelta,
+      amount: batchTotal,
+      direction: batchNetDelta >= 0 ? 'given' : 'received',
+    });
     setSaving(true);
     setConfirmError('');
     try {
@@ -744,8 +787,16 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         >
           <motion.div
             key="voice-modal-sheet"
-            initial={stage === 'confirm' ? { opacity: 0, scale: 0.94, y: 16 } : { y: '100%' }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
+            initial={
+              stage === 'confirm'
+                ? { opacity: 0, scale: 0.94, y: 16 }
+                : { clipPath: 'circle(24px at 50% 92%)', opacity: 0.72, scale: 0.96 }
+            }
+            animate={
+              stage === 'confirm'
+                ? { opacity: 1, scale: 1, y: 0 }
+                : { clipPath: 'circle(150% at 50% 50%)', opacity: 1, scale: 1 }
+            }
             exit={
               stage === 'saved'
                 ? {
@@ -755,7 +806,9 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
                   }
                 : {
-                    y: '100%',
+                    clipPath: 'circle(24px at 50% 92%)',
+                    opacity: 0,
+                    scale: 0.96,
                     transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
                   }
             }
@@ -767,13 +820,6 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 : 'px-6 pt-4 pb-6 max-w-[430px] rounded-t-[32px] spatial-sheet pb-safe'
             }`}
           >
-            {/* Subtle Solid-Safe Radial Indigo Bottom Glow in Listen Stage */}
-            {stage === 'listen' && (
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-[radial-gradient(ellipse_at_bottom,_rgba(79,70,229,0.14),_transparent_70%)]"
-              />
-            )}
 
             <div className="w-10 h-1.5 rounded-full bg-[var(--surface-subtle)] mx-auto" />
 
@@ -888,7 +934,9 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     <div className="rounded-[22px] bg-[var(--app-bg)] p-4 min-h-[68px] flex items-center justify-center text-center">
                       <p className="text-sm font-bold text-[var(--ink)] leading-relaxed">
                         {transcript ||
-                          'Speak entry, multi-item bill, balance check, or "Aaj ka hisaab"...'}
+                          (allowBills
+                            ? 'Speak entry, multi-item bill, balance check, or "Aaj ka hisaab"...'
+                            : 'Speak entry, friend balance check, or "Aaj ka hisaab"...')}
                       </p>
                     </div>
                   )}
@@ -978,7 +1026,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       placeholder={
                         prefillCustomerName
                           ? `${prefillCustomerName} paanch sau udhaar`
-                          : 'Ramesh 500 udhaar aur Suresh 300 mila'
+                          : activeAdaptation.voicePlaceholder
                       }
                       className="flex-1 min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-medium text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                     />
@@ -986,6 +1034,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       type="button"
                       disabled={aiParsing || !manualText.trim()}
                       onClick={() => {
+                        haptic.tap();
                         if (manualText.trim()) applyTranscriptToConfirm(manualText.trim());
                       }}
                       className="min-h-[46px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-50 text-[var(--brand-fg)] font-extrabold text-sm whitespace-nowrap shadow-sm active:scale-95 transition"
@@ -995,16 +1044,14 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                    {[
-                      'Ramesh 500 udhaar',
-                      'Ramesh ka hisaab batao',
-                      'Aaj ka hisaab',
-                      'Verma ka 2 atta 480 aur 1 oil 175 bill banao',
-                    ].map((sample) => (
+                    {activeAdaptation.voiceSamples.map((sample) => (
                       <button
                         key={sample}
                         type="button"
-                        onClick={() => applyTranscriptToConfirm(sample)}
+                        onClick={() => {
+                          haptic.tap();
+                          applyTranscriptToConfirm(sample);
+                        }}
                         className="min-h-[36px] px-3 rounded-xl bg-[var(--app-bg)] text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--brand-accent)] whitespace-nowrap shrink-0 active:scale-95 transition"
                       >
                         {sample}
@@ -1020,7 +1067,11 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     transition={SPRING_FAST}
                     type="button"
                     disabled={aiParsing}
-                    onClick={() => (listening ? stopMic() : startMic())}
+                    onClick={() => {
+                      haptic.tap();
+                      if (listening) stopMic();
+                      else startMic();
+                    }}
                     aria-label={listening ? 'Pause voice capture' : 'Resume voice capture'}
                     className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition ${
                       listening
@@ -1038,7 +1089,10 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     transition={SPRING_FAST}
                     type="button"
                     disabled={aiParsing}
-                    onClick={handleBottomSaveAction}
+                    onClick={() => {
+                      haptic.tap();
+                      handleBottomSaveAction();
+                    }}
                     aria-label="Parse and save voice entry"
                     style={{ background: 'var(--munim-gradient)' }}
                     className="tactile-key-primary w-12 h-12 rounded-full text-white flex items-center justify-center shrink-0 disabled:opacity-60"
@@ -1563,27 +1617,18 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
             {stage === 'saved' && (
               <SmartEntrySavedStage
                 partyName={
-                  batchItems.length > 1
+                  savedSnapshot?.partyName ||
+                  (batchItems.length > 1
                     ? `${batchItems.filter((i) => i.selected).length} Parties`
-                    : name
+                    : name)
                 }
-                previousBalance={matchedAccount?.balance ?? 0}
+                previousBalance={savedSnapshot?.previousBalance ?? 0}
                 newBalance={
-                  batchItems.length > 1
-                    ? batchItems
-                        .filter((i) => i.selected)
-                        .reduce((s, it) => s + (it.direction === 'given' ? it.amount : -it.amount), 0)
-                    : (matchedAccount?.balance ?? 0) +
-                      (direction === 'given' ? amount : -amount)
+                  savedSnapshot?.newBalance ??
+                  (direction === 'given' ? amount : -amount)
                 }
-                amount={
-                  batchItems.length > 1
-                    ? batchItems
-                        .filter((i) => i.selected)
-                        .reduce((s, it) => s + it.amount, 0)
-                    : amount
-                }
-                direction={direction}
+                amount={savedSnapshot?.amount ?? amount}
+                direction={savedSnapshot?.direction ?? direction}
               />
             )}
           </motion.div>

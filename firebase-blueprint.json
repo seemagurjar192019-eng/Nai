@@ -57,6 +57,11 @@
         "balance": { "type": "number" },
         "lastNote": { "type": "string", "minLength": 0, "maxLength": 160 },
         "lastActivityAt": { "type": "string", "minLength": 0, "maxLength": 40 },
+        "personaContext": {
+          "type": "string",
+          "enum": ["personal", "kirana", "mandi", "wholesale"],
+          "description": "Persona context tag for unified database filtering across Personal, Kirana, Mandi, and Wholesale modes."
+        },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -79,6 +84,11 @@
         "createdByName": { "type": "string", "minLength": 0, "maxLength": 80 },
         "createdByRole": { "type": "string", "enum": ["owner", "munim", "cashier"] },
         "gallaSynced": { "type": "boolean" },
+        "personaContext": {
+          "type": "string",
+          "enum": ["personal", "kirana", "mandi", "wholesale"],
+          "description": "Persona context tag inherited from the active mode at transaction creation."
+        },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },

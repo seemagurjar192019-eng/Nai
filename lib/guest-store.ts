@@ -15,6 +15,7 @@ import type {
   LanguageCode,
   LedgerAccount,
   LedgerTransaction,
+  PersonaContext,
   StaffMember,
   StaffRole,
   StockItem,
@@ -303,6 +304,7 @@ export function applyCreateAccount(
   params: {
     businessId: string;
     kind: AccountKind;
+    personaContext?: PersonaContext;
     name: string;
     phone?: string;
     dueDate?: string;
@@ -320,6 +322,7 @@ export function applyCreateAccount(
     ownerId: GUEST_OWNER_ID,
     businessId: params.businessId,
     kind: params.kind,
+    ...(params.personaContext ? { personaContext: params.personaContext } : {}),
     name: cleanName,
     phone: clampStr(params.phone, 20),
     dueDate: clampStr(params.dueDate, 24),
@@ -380,6 +383,7 @@ export function applyAddTransactionAtomic(
     existingAccount?: LedgerAccount | null;
     customerName: string;
     kind?: AccountKind;
+    personaContext?: PersonaContext;
     direction: TxDirection;
     amount: number;
     note?: string;
@@ -438,6 +442,7 @@ export function applyAddTransactionAtomic(
       ownerId: GUEST_OWNER_ID,
       businessId: params.businessId,
       kind: params.kind || 'customer',
+      ...(params.personaContext ? { personaContext: params.personaContext } : {}),
       name: clampStr(params.customerName, 100) || 'Customer',
       phone: '',
       dueDate: '',
@@ -448,11 +453,14 @@ export function applyAddTransactionAtomic(
     nextAccounts = [resolvedAccount, ...vault.accounts];
   }
 
+  const resolvedContext = params.personaContext || resolvedAccount.personaContext;
+
   const tx: LedgerTransaction = {
     id: txId,
     ownerId: GUEST_OWNER_ID,
     businessId: params.businessId,
     accountId: resolvedAccount.id,
+    ...(resolvedContext ? { personaContext: resolvedContext } : {}),
     direction: params.direction,
     amount: cleanAmount,
     note: clampStr(params.note, 240),
@@ -1100,11 +1108,19 @@ export function applyRestoreBusinessBackup(
         100000000,
         Math.max(0, Math.round(Number(a.creditLimit) || 0))
       );
+      const validCtx =
+        a.personaContext === 'personal' ||
+        a.personaContext === 'kirana' ||
+        a.personaContext === 'mandi' ||
+        a.personaContext === 'wholesale'
+          ? a.personaContext
+          : undefined;
       addedAccs.push({
         id: newId,
         ownerId: GUEST_OWNER_ID,
         businessId,
         kind,
+        ...(validCtx ? { personaContext: validCtx } : {}),
         name,
         phone: clampStr(String(a.phone || ''), 20),
         dueDate: clampStr(String(a.dueDate || ''), 24),
@@ -1125,11 +1141,19 @@ export function applyRestoreBusinessBackup(
       const mappedAcc = accIdMap.get(String(t.accountId || ''));
       const amount = Math.round((Number(t.amount) || 0) * 100) / 100;
       if (!mappedAcc || amount <= 0 || amount > 100000000) continue;
+      const validTxCtx =
+        t.personaContext === 'personal' ||
+        t.personaContext === 'kirana' ||
+        t.personaContext === 'mandi' ||
+        t.personaContext === 'wholesale'
+          ? t.personaContext
+          : undefined;
       addedTxs.push({
         id: makeGuestId('tx'),
         ownerId: GUEST_OWNER_ID,
         businessId,
         accountId: mappedAcc,
+        ...(validTxCtx ? { personaContext: validTxCtx } : {}),
         direction: t.direction === 'received' ? 'received' : 'given',
         amount,
         note: clampStr(String(t.note || ''), 240),

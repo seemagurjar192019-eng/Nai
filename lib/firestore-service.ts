@@ -35,6 +35,7 @@ import type {
   LanguageCode,
   LedgerAccount,
   LedgerTransaction,
+  PersonaContext,
   StaffMember,
   StaffRole,
   StockItem,
@@ -421,6 +422,7 @@ export async function createAccount(params: {
   ownerId: string;
   businessId: string;
   kind: AccountKind;
+  personaContext?: PersonaContext;
   name: string;
   phone?: string;
   dueDate?: string;
@@ -446,6 +448,7 @@ export async function createAccount(params: {
     ownerId: params.ownerId,
     businessId: params.businessId,
     kind: parsed.data.kind,
+    ...(params.personaContext ? { personaContext: params.personaContext } : {}),
     name: parsed.data.name,
     phone: parsed.data.phone,
     dueDate: parsed.data.dueDate,
@@ -496,6 +499,7 @@ export async function addTransactionAtomic(params: {
   existingAccount?: LedgerAccount | null;
   customerName: string;
   kind?: AccountKind;
+  personaContext?: PersonaContext;
   direction: TxDirection;
   amount: number;
   note?: string;
@@ -523,6 +527,7 @@ export async function addTransactionAtomic(params: {
     `${params.direction === 'given' ? 'Credit' : 'Payment'} ₹${cleanAmount.toLocaleString('en-IN')}`;
 
   const shouldSyncGalla = Boolean(params.syncToGalla);
+  const resolvedContext = params.personaContext || params.existingAccount?.personaContext;
 
   try {
     const batch = writeBatch(db);
@@ -547,6 +552,7 @@ export async function addTransactionAtomic(params: {
         ownerId: params.ownerId,
         businessId: params.businessId,
         kind: params.kind || 'customer',
+        ...(resolvedContext ? { personaContext: resolvedContext } : {}),
         name: clampStr(params.customerName, 100) || 'Customer',
         phone: '',
         dueDate: '',
@@ -562,6 +568,7 @@ export async function addTransactionAtomic(params: {
       ownerId: params.ownerId,
       businessId: params.businessId,
       accountId,
+      ...(resolvedContext ? { personaContext: resolvedContext } : {}),
       direction: params.direction,
       amount: cleanAmount,
       note: clampStr(params.note, 240),
@@ -705,6 +712,7 @@ export async function restoreTransactionAtomic(params: {
       ownerId: restored.ownerId,
       businessId: restored.businessId,
       accountId: restored.accountId,
+      ...(restored.personaContext ? { personaContext: restored.personaContext } : {}),
       direction: restored.direction,
       amount: restored.amount,
       note: clampStr(restored.note, 240),
@@ -1287,10 +1295,18 @@ export async function restoreBusinessBackup(
       const kind: AccountKind = a.kind === 'supplier' ? 'supplier' : 'customer';
       const creditLimit = Math.min(100000000, Math.max(0, Math.round(Number(a.creditLimit) || 0)));
       const balance = Math.round((Number(a.balance) || 0) * 100) / 100;
+      const validAccCtx =
+        a.personaContext === 'personal' ||
+        a.personaContext === 'kirana' ||
+        a.personaContext === 'mandi' ||
+        a.personaContext === 'wholesale'
+          ? a.personaContext
+          : undefined;
       const docData = {
         ownerId,
         businessId,
         kind,
+        ...(validAccCtx ? { personaContext: validAccCtx } : {}),
         name,
         phone: clampStr(String(a.phone || ''), 20),
         dueDate: clampStr(String(a.dueDate || ''), 24),
@@ -1316,10 +1332,18 @@ export async function restoreBusinessBackup(
       const amount = Math.round((Number(t.amount) || 0) * 100) / 100;
       if (!mappedAcc || amount <= 0 || amount > 100000000) continue;
       const newTxId = makeSafeId('tx');
+      const validTxCtx =
+        t.personaContext === 'personal' ||
+        t.personaContext === 'kirana' ||
+        t.personaContext === 'mandi' ||
+        t.personaContext === 'wholesale'
+          ? t.personaContext
+          : undefined;
       const txData = {
         ownerId,
         businessId,
         accountId: mappedAcc,
+        ...(validTxCtx ? { personaContext: validTxCtx } : {}),
         direction: t.direction === 'received' ? 'received' : 'given',
         amount,
         note: clampStr(String(t.note || ''), 240),

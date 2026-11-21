@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   deleteUser,
@@ -16,30 +15,21 @@ import {
 } from 'firebase/auth';
 import {
   AlertTriangle,
-  Bell,
-  BookOpen,
-  Camera,
+  ArrowLeft,
   Check,
-  ChevronDown,
   CloudUpload,
   Edit2,
   KeyRound,
-  LayoutGrid,
   MessageCircle,
   Package,
   Plus,
-  Receipt,
   RefreshCw,
-  Repeat,
-  Search,
   ShieldCheck,
+  SlidersHorizontal,
   Smartphone,
   Undo2,
-  UserPlus,
-  Users,
   Volume2,
   VolumeX,
-  Wallet,
   X,
 } from 'lucide-react';
 import { indianMobileSchema, otpCodeSchema } from '@/lib/design-system';
@@ -110,7 +100,6 @@ import {
   type GuestVaultState,
 } from '@/lib/guest-store';
 import {
-  UCRED_LOGO_PATH,
   buildDailyMunimScript,
   buildTransactionSlipMessage,
   buildWhatsAppUrl,
@@ -122,7 +111,11 @@ import {
   speakHinglish,
   stopSpeaking,
 } from '@/lib/i18n';
-import { computeCustomerTrustScore, computeDailyGallaPulse } from '@/lib/ucred-intelligence';
+import {
+  computeCustomerTrustScore,
+  computeDailyGallaPulse,
+  computeNetCashflowSummary,
+} from '@/lib/ucred-intelligence';
 import type {
   AccountKind,
   ActiveOperator,
@@ -146,14 +139,27 @@ import type {
   TxDirection,
   UserProfile,
 } from '@/lib/types';
-import { AccountChatLedger } from './AccountChatLedger';
+import type { MainTab } from '@/types';
+import { usePersonaGate } from '@/hooks/usePersonaGate';
+import { useSpatialMotion } from '@/hooks/useSpatialMotion';
+import { haptics } from '@/utils/haptics';
+import {
+  getPersonaCapabilities,
+  loadPersonaPrefs,
+  savePersonaPrefs,
+  type PersonaCategoryId,
+  type PersonaPrefs,
+} from '@/lib/persona';
 import { BillsView, getNextSequenceNumber, type BillExternalDraft } from './BillsView';
+import { CashKhataFeed } from './cockpit/CashKhataFeed';
 import { CollectionView } from './CollectionView';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GallaCashbookView } from './GallaCashbookView';
-import { LedgerView } from './LedgerView';
-import { MunimOrb } from './MunimOrb';
+import { BottomSpatialDock } from './layout/BottomSpatialDock';
+import { DynamicIslandHeader } from './layout/DynamicIslandHeader';
+import { PartyStatementView } from './ledger/PartyStatementView';
 import { ParchiScannerModal } from './ParchiScannerModal';
+import { PersonaOnboardingSheet } from './PersonaOnboardingSheet';
 import { OfflineIndicator } from './PwaControls';
 import {
   AccountSummaryView,
@@ -169,9 +175,8 @@ import {
 } from './SecondaryViews';
 import { StaffAuditView } from './StaffAuditView';
 import { StockView } from './StockView';
-import { VoiceEntryModal } from './VoiceEntryModal';
+import { VoiceMunimSheet } from './voice/VoiceMunimSheet';
 
-type MainTab = 'ledger' | 'collection' | 'bills' | 'stock' | 'more';
 type NotifPrefsMap = Record<string, { read?: boolean; fav?: boolean }>;
 
 function readPreloginPrefs(): {
@@ -271,6 +276,14 @@ function BolBahiAppInner() {
   const [newBizName, setNewBizName] = useState('');
   const [creatingBiz, setCreatingBiz] = useState(false);
 
+  // Multi-Select Persona Mode & First-Launch Onboarding (Zero Forced Login)
+  const [personaPrefs, setPersonaPrefs] = useState<PersonaPrefs>(() => loadPersonaPrefs());
+  const [personaOnboardingOpen, setPersonaOnboardingOpen] = useState<boolean>(
+    () => !loadPersonaPrefs().onboarded
+  );
+  const [personaOnboardingStep, setPersonaOnboardingStep] = useState<1 | 2>(1);
+  const [showAllModes, setShowAllModes] = useState(false);
+
   // Voice, Counter Mode, AI Parchi Scanner & Bill Drafts
   const [hideBalance, setHideBalance] = useState(false);
   const [accentTheme, setAccentTheme] = useState<ThemeAccentId>(() => {
@@ -284,8 +297,6 @@ function BolBahiAppInner() {
     return 'sapphire';
   });
   const [recentlyUpdatedAccountId, setRecentlyUpdatedAccountId] = useState<string | null>(null);
-  const [dockPlusOpen, setDockPlusOpen] = useState(false);
-  const [addPartySignal, setAddPartySignal] = useState(0);
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [voiceCounterMode, setVoiceCounterMode] = useState(false);
   const [voicePrefillName, setVoicePrefillName] = useState('');
@@ -293,6 +304,7 @@ function BolBahiAppInner() {
   const [billPrefill, setBillPrefill] = useState<{ name: string; phone: string } | null>(null);
   const [billDraft, setBillDraft] = useState<BillExternalDraft | null>(null);
   const [dailySummaryOpen, setDailySummaryOpen] = useState(false);
+  const mainScrollRef = useRef<HTMLElement | null>(null);
 
   const [actionToast, setActionToast] = useState<
     | {
@@ -400,6 +412,17 @@ function BolBahiAppInner() {
         : activityLogs,
     [isGuestMode, guestVault.activityLogs, currentBusiness.id, activityLogs]
   );
+
+  // Strict Persona Feature Gating + Unified Mode-Scoped Records + 60fps Spatial Scroll Physics
+  const {
+    adaptation: personaAdaptation,
+    capabilities,
+    scopedAccounts,
+    scopedTransactions,
+  } = usePersonaGate(personaPrefs, activeAccounts, activeTransactions, showAllModes);
+
+  const spatialMotion = useSpatialMotion(mainScrollRef);
+  const scopedCashflow = useMemo(() => computeNetCashflowSummary(scopedAccounts), [scopedAccounts]);
 
   useEffect(() => {
     guestVaultRef.current = guestVault;
@@ -1189,18 +1212,18 @@ function BolBahiAppInner() {
     const todayKey = getLocalDateKey();
     let givenToday = 0;
     let receivedToday = 0;
-    for (const tx of activeTransactions) {
+    for (const tx of scopedTransactions) {
       if ((tx.billDate || '').startsWith(todayKey)) {
         if (tx.direction === 'given') givenToday += tx.amount;
         else receivedToday += tx.amount;
       }
     }
-    const overdueCount = activeAccounts.filter(
+    const overdueCount = scopedAccounts.filter(
       (a) => a.kind === 'customer' && a.balance > 0 && a.dueDate && a.dueDate <= todayKey
     ).length;
-    const lowStockCount = activeStockItems.filter(
-      (s) => s.quantity <= (s.lowStockThreshold ?? 5)
-    ).length;
+    const lowStockCount = capabilities.showStock
+      ? activeStockItems.filter((s) => s.quantity <= (s.lowStockThreshold ?? 5)).length
+      : 0;
     return {
       todayKey,
       givenToday,
@@ -1209,11 +1232,11 @@ function BolBahiAppInner() {
       overdueCount,
       lowStockCount,
     };
-  }, [activeAccounts, activeTransactions, activeStockItems]);
+  }, [scopedAccounts, scopedTransactions, activeStockItems, capabilities.showStock]);
 
   const notifications: AppNotificationItem[] = useMemo(() => {
     const items: AppNotificationItem[] = [];
-    const overdueAccs = activeAccounts.filter(
+    const overdueAccs = scopedAccounts.filter(
       (a) =>
         a.kind === 'customer' &&
         a.balance > 0 &&
@@ -1230,9 +1253,9 @@ function BolBahiAppInner() {
             .slice(0, 2)
             .map((a) => a.name)
             .join(', ')}${overdueAccs.length > 2 ? '...' : ''}.`,
-          'Send a 1-Click WhatsApp Vasooli reminder now.',
+          'Send a 1-Click WhatsApp reminder now.',
         ],
-        actionLabel: 'Open Collection',
+        actionLabel: capabilities.focus === 'personal' ? 'Open Notes' : 'Open Collection',
         targetAction: 'collection',
         read: Boolean(notifPrefs['live-overdue']?.read),
         fav: Boolean(notifPrefs['live-overdue']?.fav),
@@ -1240,7 +1263,7 @@ function BolBahiAppInner() {
       });
     }
 
-    const highRiskAccs = activeAccounts.filter(
+    const highRiskAccs = scopedAccounts.filter(
       (a) =>
         a.kind === 'customer' &&
         a.balance > 0 &&
@@ -1269,7 +1292,7 @@ function BolBahiAppInner() {
         id: 'live-upi-setup',
         title: 'Add Shop UPI ID for Instant QR',
         bullets: [
-          'Embed live UPI payment QR codes in WhatsApp reminders and printed GST bills.',
+          'Embed live UPI payment QR codes in WhatsApp reminders and payment slips.',
         ],
         actionLabel: 'Set UPI ID',
         targetAction: 'upi',
@@ -1279,24 +1302,31 @@ function BolBahiAppInner() {
       });
     }
 
-    items.push({
-      id: 'tip-parchi-scanner',
-      title: 'Scan Handwritten Parchi with AI',
-      bullets: [
-        'Snap any handwritten kacha slip or supplier bill to auto-extract party, items & ₹ total.',
-      ],
-      actionLabel: 'Open Scanner',
-      targetAction: 'parchi',
-      read: Boolean(notifPrefs['tip-parchi-scanner']?.read),
-      fav: Boolean(notifPrefs['tip-parchi-scanner']?.fav),
-      timeLabel: 'Ucred AI',
-    });
+    if (capabilities.focus !== 'personal') {
+      items.push({
+        id: 'tip-parchi-scanner',
+        title: 'Scan Handwritten Parchi with AI',
+        bullets: [
+          'Snap any handwritten kacha slip or supplier bill to auto-extract party, items & ₹ total.',
+        ],
+        actionLabel: 'Open Scanner',
+        targetAction: 'parchi',
+        read: Boolean(notifPrefs['tip-parchi-scanner']?.read),
+        fav: Boolean(notifPrefs['tip-parchi-scanner']?.fav),
+        timeLabel: 'Ucred AI',
+      });
+    }
 
     items.push({
       id: 'tip-voice-entry',
-      title: 'Hands-Free Counter Mode & AI Voice Bills',
+      title:
+        capabilities.focus === 'personal'
+          ? 'Bolne Wala Munim · Hands-Free Voice'
+          : 'Hands-Free Counter Mode & AI Voice Bills',
       bullets: [
-        'Say "Ramesh 500 udhaar aur Suresh 300 mila" or "Ramesh ka bill 2kg chini 90".',
+        capabilities.focus === 'personal'
+          ? 'Say "Rahul 500 udhaar aur Amit 300 mila" to record instantly.'
+          : 'Say "Ramesh 500 udhaar aur Suresh 300 mila" or "Ramesh ka bill 2kg chini 90".',
       ],
       actionLabel: 'Try Voice Entry',
       targetAction: 'voice',
@@ -1306,7 +1336,14 @@ function BolBahiAppInner() {
     });
 
     return items;
-  }, [activeAccounts, currentBusiness?.upiId, dailyStats.todayKey, notifPrefs, trustScoresByAccount]);
+  }, [
+    scopedAccounts,
+    currentBusiness?.upiId,
+    dailyStats.todayKey,
+    notifPrefs,
+    trustScoresByAccount,
+    capabilities.focus,
+  ]);
 
   const updateNotifPref = (id: string, patch: { read?: boolean; fav?: boolean }) => {
     setNotifPrefs((prev) => {
@@ -1331,10 +1368,15 @@ function BolBahiAppInner() {
     const { action, tab } = pendingLaunchRef.current;
     pendingLaunchRef.current = null;
     const timer = setTimeout(() => {
-      if (tab === 'galla') {
+      if (tab === 'galla' && capabilities.showGalla) {
         setSelectedAccountId(null);
         setSecondaryRoute('galla');
-      } else if (tab === 'bills' || tab === 'collection' || tab === 'stock' || tab === 'ledger') {
+      } else if (
+        (tab === 'bills' && capabilities.showGstBills) ||
+        (tab === 'stock' && capabilities.showStock) ||
+        tab === 'collection' ||
+        tab === 'ledger'
+      ) {
         setSecondaryRoute(null);
         setSelectedAccountId(null);
         setMainTab(tab);
@@ -1347,7 +1389,7 @@ function BolBahiAppInner() {
         setVoicePrefillName('');
         setVoiceCounterMode(true);
         setVoiceModalOpen(true);
-      } else if (action === 'parchi') {
+      } else if (action === 'parchi' && capabilities.focus !== 'personal') {
         setParchiScannerOpen(true);
       }
       if (typeof window !== 'undefined' && window.location.search) {
@@ -1355,7 +1397,7 @@ function BolBahiAppInner() {
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [shellReady]);
+  }, [shellReady, capabilities.showGalla, capabilities.showGstBills, capabilities.showStock, capabilities.focus]);
 
   const openDailyMunimSummary = () => {
     const shopName = currentBusiness?.name || 'My Store';
@@ -1386,11 +1428,10 @@ function BolBahiAppInner() {
       else if (dailySummaryOpen) closeDailyMunimSummary();
       else if (bizSwitcherOpen) setBizSwitcherOpen(false);
       else if (notifOpen) setNotifOpen(false);
-      else if (dockPlusOpen) setDockPlusOpen(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [syncSheetOpen, authBusy, dailySummaryOpen, bizSwitcherOpen, notifOpen, dockPlusOpen]);
+  }, [syncSheetOpen, authBusy, dailySummaryOpen, bizSwitcherOpen, notifOpen]);
 
   // Android hardware Back / browser popstate handling for nested views
   const hasNestedLayer = Boolean(
@@ -1442,9 +1483,18 @@ function BolBahiAppInner() {
     voiceRaw: string;
     kind: AccountKind;
   }) => {
-    const match = activeAccounts.find(
-      (a) => a.name.toLowerCase() === entry.customerName.trim().toLowerCase()
-    );
+    const match =
+      scopedAccounts.find(
+        (a) => a.name.toLowerCase() === entry.customerName.trim().toLowerCase()
+      ) ||
+      activeAccounts.find(
+        (a) =>
+          (!a.personaContext || a.personaContext === personaAdaptation.activeFocus) &&
+          a.name.toLowerCase() === entry.customerName.trim().toLowerCase()
+      );
+    const resolvedKind: AccountKind = capabilities.showSuppliers
+      ? match?.kind || entry.kind
+      : 'customer';
     const composedNote = entry.note
       ? entry.note
       : entry.voiceRaw
@@ -1456,7 +1506,8 @@ function BolBahiAppInner() {
         businessId: currentBusiness.id,
         existingAccount: match || null,
         customerName: entry.customerName,
-        kind: match?.kind || entry.kind,
+        kind: resolvedKind,
+        personaContext: personaAdaptation.activeFocus,
         direction: entry.direction,
         amount: entry.amount,
         note: composedNote,
@@ -1475,6 +1526,7 @@ function BolBahiAppInner() {
       });
       guestVaultRef.current = saveGuestVault(finalVault);
       setGuestVault(guestVaultRef.current);
+      haptics.success();
       triggerAccountHighlight(res.accountId);
       showActionToast({
         kind: 'added',
@@ -1492,7 +1544,8 @@ function BolBahiAppInner() {
       businessId: currentBusiness.id,
       existingAccount: match || null,
       customerName: entry.customerName,
-      kind: match?.kind || entry.kind,
+      kind: resolvedKind,
+      personaContext: personaAdaptation.activeFocus,
       direction: entry.direction,
       amount: entry.amount,
       note: composedNote,
@@ -1506,7 +1559,8 @@ function BolBahiAppInner() {
           id: res.accountId,
           ownerId: user.uid,
           businessId: currentBusiness.id,
-          kind: entry.kind,
+          kind: resolvedKind,
+          personaContext: personaAdaptation.activeFocus,
           name: entry.customerName,
           phone: '',
           dueDate: '',
@@ -1514,6 +1568,7 @@ function BolBahiAppInner() {
           lastNote: res.tx.note,
           lastActivityAt: res.tx.billDate,
         };
+    haptics.success();
     triggerAccountHighlight(res.accountId);
     showActionToast({
       kind: 'added',
@@ -1578,12 +1633,13 @@ function BolBahiAppInner() {
         existingAccount: account,
         customerName: account.name,
         kind: account.kind,
+        personaContext: account.personaContext || personaAdaptation.activeFocus,
         direction: payload.direction,
         amount: payload.amount,
         note: payload.note,
         createdByName: activeOperator.name,
         createdByRole: activeOperator.role,
-        syncToGalla: payload.syncToGalla,
+        syncToGalla: capabilities.showGalla ? payload.syncToGalla : null,
       });
       const finalVault = applyRecordActivityLog(res.vault, {
         businessId: currentBusiness.id,
@@ -1596,6 +1652,7 @@ function BolBahiAppInner() {
       });
       guestVaultRef.current = saveGuestVault(finalVault);
       setGuestVault(guestVaultRef.current);
+      haptics.success();
       triggerAccountHighlight(account.id);
       showActionToast({
         kind: 'added',
@@ -1614,13 +1671,15 @@ function BolBahiAppInner() {
       existingAccount: account,
       customerName: account.name,
       kind: account.kind,
+      personaContext: account.personaContext || personaAdaptation.activeFocus,
       direction: payload.direction,
       amount: payload.amount,
       note: payload.note,
       createdByName: activeOperator.name,
       createdByRole: activeOperator.role,
-      syncToGalla: payload.syncToGalla,
+      syncToGalla: capabilities.showGalla ? payload.syncToGalla : null,
     });
+    haptics.success();
     triggerAccountHighlight(account.id);
     showActionToast({
       kind: 'added',
@@ -1740,6 +1799,15 @@ function BolBahiAppInner() {
   const t = getUIStrings(language);
   const activeOwnerUid = isGuestMode ? GUEST_OWNER_ID : user!.uid;
 
+  const subNavigationTabs = useMemo(() => {
+    const tabs: Array<{ id: 'bills' | 'stock' | 'activity' | 'more'; label: string }> = [];
+    if (capabilities.showGstBills) tabs.push({ id: 'bills', label: 'Bills' });
+    if (capabilities.showStock) tabs.push({ id: 'stock', label: 'Stock' });
+    if (capabilities.focus === 'personal') tabs.push({ id: 'activity', label: 'Activity' });
+    tabs.push({ id: 'more', label: 'Tools' });
+    return tabs;
+  }, [capabilities.showGstBills, capabilities.showStock, capabilities.focus]);
+
   // Optional 4-Digit PIN Lock Gate (when configured)
   if (appLockPin && !pinUnlocked) {
     return (
@@ -1770,6 +1838,15 @@ function BolBahiAppInner() {
   }
 
   const selectedAccount = activeAccounts.find((a) => a.id === selectedAccountId) || null;
+  const effectiveMainTab: MainTab =
+    mainTab === 'bills' && !capabilities.showGstBills
+      ? 'ledger'
+      : mainTab === 'stock' && !capabilities.showStock
+        ? 'ledger'
+        : mainTab;
+  const effectiveSecondaryRoute: SecondaryRoute | null =
+    secondaryRoute === 'galla' && !capabilities.showGalla ? null : secondaryRoute;
+
   const unreadCount = notifications.filter((n) => !n.read).length;
   const verifiedPhoneDisplay = isGuestMode
     ? 'Guest Mode'
@@ -1782,371 +1859,135 @@ function BolBahiAppInner() {
     setSyncSheetOpen(true);
   };
 
-  const activeAccountThread = selectedAccount ? (
-    <AccountChatLedger
-      key={selectedAccount.id}
-      account={selectedAccount}
-      business={currentBusiness}
-      language={language}
-      hideBalance={hideBalance}
-      onToggleHideBalance={() => setHideBalance((v) => !v)}
-      transactions={activeTransactions.filter((tx) => tx.accountId === selectedAccount.id)}
-      trustScore={trustScoresByAccount[selectedAccount.id]}
-      onBack={() => setSelectedAccountId(null)}
-      onOpenParchiScanner={() => setParchiScannerOpen(true)}
-      onAddTransaction={async (payload) => {
-        if (isGuestMode) {
-          const res = applyAddTransactionAtomic(guestVaultRef.current, {
-            businessId: currentBusiness.id,
-            existingAccount: selectedAccount,
-            customerName: selectedAccount.name,
-            kind: selectedAccount.kind,
-            direction: payload.direction,
-            amount: payload.amount,
-            note: payload.note,
-            billDate: payload.billDate,
-            billImage: payload.billImage,
-            createdByName: activeOperator.name,
-            createdByRole: activeOperator.role,
-            syncToGalla: payload.syncToGalla,
-          });
-          const finalVault = applyRecordActivityLog(res.vault, {
-            businessId: currentBusiness.id,
-            actorName: activeOperator.name,
-            actorRole: activeOperator.role,
-            actionType: 'ledger',
-            summary: `${payload.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${payload.amount} for ${selectedAccount.name}`,
-            targetName: selectedAccount.name,
-            amount: payload.amount,
-          });
-          guestVaultRef.current = saveGuestVault(finalVault);
-          setGuestVault(guestVaultRef.current);
-          showActionToast({
-            kind: 'added',
-            tx: res.tx,
-            account: res.account,
-            newBalance: res.newBalance,
-            accountCreated: false,
-          });
-          return;
-        }
-        if (!user) return;
-        const res = await addTransactionAtomic({
-          ownerId: user.uid,
-          businessId: currentBusiness.id,
-          existingAccount: selectedAccount,
-          customerName: selectedAccount.name,
-          kind: selectedAccount.kind,
-          direction: payload.direction,
-          amount: payload.amount,
-          note: payload.note,
-          billDate: payload.billDate,
-          billImage: payload.billImage,
-          createdByName: activeOperator.name,
-          createdByRole: activeOperator.role,
-          syncToGalla: payload.syncToGalla,
-        });
-        showActionToast({
-          kind: 'added',
-          tx: res.tx,
-          account: { ...selectedAccount, balance: res.newBalance },
-          newBalance: res.newBalance,
-          accountCreated: false,
-        });
-        logActivity(
-          'ledger',
-          `${payload.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${payload.amount} for ${selectedAccount.name}`,
-          selectedAccount.name,
-          payload.amount
-        );
-      }}
-      onUpdateTransaction={async (tx, patch) => {
-        if (isGuestMode) {
-          updateGuestVault((prev) =>
-            applyUpdateTransactionAtomic(prev, { tx, account: selectedAccount, patch })
-          );
-        } else {
-          await updateTransactionAtomic({
-            tx,
-            account: selectedAccount,
-            allForAccount: activeTransactions.filter((item) => item.accountId === selectedAccount.id),
-            patch,
-          });
-        }
-        logActivity(
-          'ledger',
-          `Edited ₹${patch.amount} entry for ${selectedAccount.name}`,
-          selectedAccount.name,
-          patch.amount
-        );
-      }}
-      onDeleteTransaction={async (tx) => {
-        if (isGuestMode) {
-          updateGuestVault((prev) =>
-            applyDeleteTransactionAtomic(prev, { tx, account: selectedAccount })
-          );
-        } else {
-          const remaining = activeTransactions.filter(
-            (item) => item.accountId === selectedAccount.id && item.id !== tx.id
-          );
-          await deleteTransactionAtomic({
-            tx,
-            account: selectedAccount,
-            remainingForAccount: remaining,
-          });
-        }
-        showActionToast({
-          kind: 'deleted',
-          tx,
-          account: selectedAccount,
-        });
-        logActivity(
-          'ledger',
-          `Deleted ₹${tx.amount} entry for ${selectedAccount.name}`,
-          selectedAccount.name,
-          tx.amount
-        );
-      }}
-      onUpdateAccount={async (patch) => {
-        if (isGuestMode) {
-          updateGuestVault((prev) => applyUpdateAccountMeta(prev, selectedAccount.id, patch));
-        } else {
-          await updateAccountMeta(selectedAccount.id, patch);
-        }
-        logActivity(
-          'account',
-          `Updated party details for ${selectedAccount.name}`,
-          selectedAccount.name
-        );
-      }}
-      onDeleteAccount={async () => {
-        if (isGuestMode) {
-          updateGuestVault((prev) => applyDeleteAccountWithTransactions(prev, selectedAccount.id));
-        } else {
-          const accTxs = activeTransactions.filter((tx) => tx.accountId === selectedAccount.id);
-          await deleteAccountWithTransactions(selectedAccount.id, accTxs);
-        }
-        logActivity('account', `Deleted party ${selectedAccount.name}`, selectedAccount.name);
-        setSelectedAccountId(null);
-      }}
-      onOpenVoiceForCustomer={(name) => {
-        setVoicePrefillName(name);
-        setVoiceCounterMode(false);
-        setVoiceModalOpen(true);
-      }}
-      onOpenCreateBill={(customerName, customerPhone) => {
-        setBillDraft(null);
-        setBillPrefill({ name: customerName, phone: customerPhone });
-        setSelectedAccountId(null);
-        setMainTab('bills');
-      }}
-    />
-  ) : null;
+  const handleSwitchPersonaFocus = (catId: PersonaCategoryId) => {
+    const updated = savePersonaPrefs({
+      ...personaPrefs,
+      activeFocus: catId,
+    });
+    setPersonaPrefs(updated);
+    const nextCaps = getPersonaCapabilities(updated.activeFocus);
+    if (!nextCaps.showGstBills && mainTab === 'bills') setMainTab('ledger');
+    if (!nextCaps.showStock && mainTab === 'stock') setMainTab('ledger');
+    if (!nextCaps.showGalla && secondaryRoute === 'galla') setSecondaryRoute(null);
+    setSelectedAccountId(null);
+  };
+
+  const handleBackToTop = () => {
+    mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const showSubNavStrip =
+    !selectedAccount &&
+    ((!effectiveSecondaryRoute && effectiveMainTab !== 'ledger') ||
+      (capabilities.focus === 'personal' && effectiveSecondaryRoute === 'account-summary'));
 
   return (
     <div className="max-w-[430px] mx-auto h-dvh overflow-hidden relative shadow-2xl flex flex-col select-none spatial-shell-bg native-app-shell text-[var(--ink)]">
       <OfflineIndicator />
 
-      {/* Minimal Solid Top Floating Island */}
-      {!selectedAccount && (
-        <header className="no-print shrink-0 z-40 px-4 pt-3 pb-1 relative">
-          <div className="rounded-full bg-[var(--surface)] shadow-[var(--spatial-shadow)] px-2.5 py-1.5 flex items-center justify-between gap-2">
-            {/* Left: Shop Switcher Pill + Live Pulsing Sync Dot */}
-            <button
+      {/* Scroll-Linked Matte Dynamic Island Header */}
+      {!selectedAccount && !personaOnboardingOpen && (
+        <DynamicIslandHeader
+          business={currentBusiness}
+          isGuestMode={isGuestMode}
+          hideBalance={hideBalance}
+          searchOpen={searchOpen}
+          searchQuery={searchQuery}
+          unreadCount={unreadCount}
+          netBalance={scopedCashflow.netCashflow}
+          totalReceivable={scopedCashflow.totalReceivable}
+          totalPayable={scopedCashflow.totalPayable}
+          gallaBalance={gallaPulse.cashDrawerBalance}
+          capabilities={capabilities}
+          personaPrefs={personaPrefs}
+          isHeroDocked={spatialMotion.isHeroDocked}
+          dockedPillOpacity={spatialMotion.dockedPillOpacity}
+          dockedPillScale={spatialMotion.dockedPillScale}
+          dockedPillY={spatialMotion.dockedPillY}
+          onOpenBusinessSwitcher={() => setBizSwitcherOpen(true)}
+          onToggleSearch={() => setSearchOpen((v) => !v)}
+          onChangeSearch={setSearchQuery}
+          onOpenNotifications={() => setNotifOpen(true)}
+          onOpenProfileTools={() => {
+            setSecondaryRoute(null);
+            setSelectedAccountId(null);
+            setMainTab('more');
+          }}
+          onSwitchPersonaFocus={handleSwitchPersonaFocus}
+          onEditPersonaModes={() => {
+            setPersonaOnboardingStep(2);
+            setPersonaOnboardingOpen(true);
+          }}
+          onBackToTop={handleBackToTop}
+        />
+      )}
+
+      {/* Cockpit Main Canvas (Recesses Smoothly along Z-Axis when Party Statement Opens) */}
+      <main
+        ref={mainScrollRef}
+        className={`flex-1 min-h-0 w-full overflow-y-auto no-scrollbar px-4 py-3 pb-32 origin-top transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          selectedAccount
+            ? 'scale-[0.94] -translate-y-2 opacity-55 pointer-events-none will-change-transform'
+            : ''
+        }`}
+      >
+        {/* Crisp Home Return + Persona-Gated Sub-Tool Switcher Bar */}
+        {showSubNavStrip && (
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <motion.button
+              whileTap={{ scale: 0.94, y: 1 }}
+              transition={{ type: 'spring', stiffness: 460, damping: 24 }}
               type="button"
               onClick={() => {
-                setDockPlusOpen(false);
-                setBizSwitcherOpen(true);
+                haptics.tap();
+                setSecondaryRoute(null);
+                setMainTab('ledger');
               }}
-              className="min-h-[40px] pl-1 pr-2.5 py-1 rounded-full hover:bg-[var(--surface-subtle)] inline-flex items-center gap-2 min-w-0 active:scale-95 transition text-left"
+              className="min-h-[38px] px-3 rounded-full bg-[var(--surface)] shadow-[var(--spatial-shadow)] text-xs font-extrabold text-[var(--ink)] inline-flex items-center gap-1.5 shrink-0"
             >
-              <div className="relative w-7 h-7 rounded-full overflow-hidden shrink-0">
-                <Image
-                  src={UCRED_LOGO_PATH}
-                  alt="Ucred"
-                  width={28}
-                  height={28}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <span className="font-display text-xs font-extrabold truncate max-w-[125px] text-[var(--ink)]">
-                {currentBusiness.name}
-              </span>
-              <span className="relative flex h-2 w-2 shrink-0" title={isGuestMode ? 'Local Guest Vault' : 'Cloud Synced Live'}>
-                <span
-                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                    isGuestMode ? 'bg-[var(--brand)]' : 'bg-[var(--debit-green)]'
-                  }`}
-                />
-                <span
-                  className={`relative inline-flex rounded-full h-2 w-2 ${
-                    isGuestMode ? 'bg-[var(--brand)]' : 'bg-[var(--debit-green)]'
-                  }`}
-                />
-              </span>
-              <ChevronDown className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0" />
-            </button>
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>{capabilities.feedTitle}</span>
+            </motion.button>
 
-            {/* Right: Rotating + Quick Actions Trigger + Search + Notification Bell */}
-            <div className="flex items-center gap-1 shrink-0">
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.9 }}
-                animate={{ rotate: dockPlusOpen ? 45 : 0 }}
-                transition={{ type: 'spring', stiffness: 460, damping: 26 }}
-                onClick={() => setDockPlusOpen((v) => !v)}
-                aria-label={dockPlusOpen ? 'Close quick actions' : 'Open quick actions'}
-                aria-expanded={dockPlusOpen}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                  dockPlusOpen
-                    ? 'bg-[var(--ink)] text-[var(--surface)]'
-                    : 'bg-[var(--brand-tint)] text-[var(--brand-accent)] hover:bg-[var(--brand)] hover:text-white'
-                }`}
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-              </motion.button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setDockPlusOpen(false);
-                  setSearchOpen((v) => !v);
-                }}
-                aria-label="Search accounts"
-                className={`w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition ${
-                  searchOpen
-                    ? 'bg-[var(--brand)] text-[var(--brand-fg)]'
-                    : 'bg-[var(--surface-subtle)] text-[var(--ink-muted)] hover:text-[var(--ink)]'
-                }`}
-              >
-                <Search className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setDockPlusOpen(false);
-                  setNotifOpen(true);
-                }}
-                aria-label="Open notifications"
-                className="relative w-10 h-10 rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] active:scale-95 transition"
-              >
-                <Bell className="w-4 h-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 min-w-[15px] h-3.5 px-1 rounded-full bg-[var(--credit-red)] text-white text-[9px] font-extrabold font-tabular flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Solid Quick-Action Fan Menu Dropdown cleanly under Top-Right + */}
-          <AnimatePresence>
-            {dockPlusOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -8, scale: 0.94 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.94, transition: { duration: 0.16, ease: 'easeOut' } }}
-                transition={{ type: 'spring', stiffness: 460, damping: 28 }}
-                className="absolute right-4 top-[68px] z-50 w-52 rounded-[24px] bg-[var(--surface)] shadow-[var(--spatial-shadow-lg)] p-2 space-y-1"
-              >
-                {[
-                  {
-                    label: 'Add Party',
-                    icon: UserPlus,
-                    gradient: 'from-[#4F46E5] to-[#06B6D4]',
-                    onClick: () => {
-                      setDockPlusOpen(false);
-                      setSecondaryRoute(null);
-                      setSelectedAccountId(null);
-                      setMainTab('ledger');
-                      setAddPartySignal((s) => s + 1);
-                    },
-                  },
-                  {
-                    label: 'Scan Parchi AI',
-                    icon: Camera,
-                    gradient: 'from-indigo-600 to-violet-600',
-                    onClick: () => {
-                      setDockPlusOpen(false);
-                      setParchiScannerOpen(true);
-                    },
-                  },
-                  {
-                    label: 'Quick Galla Entry',
-                    icon: Wallet,
-                    gradient: 'from-emerald-600 to-teal-600',
-                    onClick: () => {
-                      setDockPlusOpen(false);
-                      setSelectedAccountId(null);
-                      setSecondaryRoute('galla');
-                    },
-                  },
-                  {
-                    label: 'Counter Mode',
-                    icon: Repeat,
-                    gradient: 'from-blue-600 to-indigo-600',
-                    onClick: () => {
-                      setDockPlusOpen(false);
-                      setVoicePrefillName('');
-                      setVoiceCounterMode(true);
-                      setVoiceModalOpen(true);
-                    },
-                  },
-                ].map((item) => {
-                  const ActionIcon = item.icon;
+            {(effectiveMainTab === 'bills' ||
+              effectiveMainTab === 'stock' ||
+              effectiveMainTab === 'more' ||
+              effectiveSecondaryRoute === 'account-summary') && (
+              <div className="flex items-center gap-1 rounded-full bg-[var(--surface-subtle)] p-1">
+                {subNavigationTabs.map((sub) => {
+                  const subActive =
+                    sub.id === 'activity'
+                      ? effectiveSecondaryRoute === 'account-summary'
+                      : !effectiveSecondaryRoute && effectiveMainTab === sub.id;
                   return (
                     <button
-                      key={item.label}
+                      key={sub.id}
                       type="button"
-                      onClick={item.onClick}
-                      className="w-full min-h-[44px] px-2.5 py-1.5 rounded-2xl hover:bg-[var(--surface-subtle)] flex items-center gap-2.5 text-left active:scale-95 transition"
+                      onClick={() => {
+                        haptics.tap();
+                        if (sub.id === 'activity') {
+                          setSecondaryRoute('account-summary');
+                        } else {
+                          setSecondaryRoute(null);
+                          setMainTab(sub.id);
+                        }
+                      }}
+                      className={`min-h-[30px] px-2.5 rounded-full text-[11px] font-extrabold transition ${
+                        subActive
+                          ? 'bg-[var(--surface)] text-[var(--brand-accent)] shadow-xs'
+                          : 'text-[var(--ink-muted)]'
+                      }`}
                     >
-                      <span
-                        className={`w-8 h-8 rounded-xl bg-gradient-to-br ${item.gradient} text-white flex items-center justify-center shrink-0`}
-                      >
-                        <ActionIcon className="w-4 h-4" />
-                      </span>
-                      <span className="text-xs font-extrabold text-[var(--ink)]">{item.label}</span>
+                      {sub.label}
                     </button>
                   );
                 })}
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
+          </div>
+        )}
 
-          <AnimatePresence>
-            {searchOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                className="pt-2.5"
-              >
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search customer or supplier name / mobile..."
-                  className="w-full min-h-[44px] rounded-2xl bg-[var(--surface)] shadow-[var(--spatial-shadow)] px-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </header>
-      )}
-
-      {/* Active View Body inside Locked Native App Shell */}
-      <main
-        className={`flex-1 min-h-0 w-full ${
-          activeAccountThread
-            ? 'overflow-hidden px-3 py-2.5'
-            : 'overflow-y-auto no-scrollbar px-4 py-3 pb-32'
-        }`}
-      >
-        {secondaryRoute === 'galla' && (
+        {effectiveSecondaryRoute === 'galla' && capabilities.showGalla && (
           <GallaCashbookView
             cashbookEntries={activeCashbookEntries}
             transactions={activeTransactions}
@@ -2202,7 +2043,7 @@ function BolBahiAppInner() {
           />
         )}
 
-        {secondaryRoute === 'staff-audit' && (
+        {effectiveSecondaryRoute === 'staff-audit' && (
           <StaffAuditView
             uid={activeOwnerUid}
             staffMembers={activeStaffMembers}
@@ -2250,7 +2091,7 @@ function BolBahiAppInner() {
           />
         )}
 
-        {secondaryRoute === 'settings' && (
+        {effectiveSecondaryRoute === 'settings' && (
           <SettingsView
             key={currentBusiness.id}
             language={language}
@@ -2326,7 +2167,7 @@ function BolBahiAppInner() {
           />
         )}
 
-        {secondaryRoute === 'business-profile' && (
+        {effectiveSecondaryRoute === 'business-profile' && (
           <BusinessProfileView
             key={currentBusiness.id}
             business={currentBusiness}
@@ -2362,17 +2203,17 @@ function BolBahiAppInner() {
           />
         )}
 
-        {secondaryRoute === 'account-summary' && (
+        {effectiveSecondaryRoute === 'account-summary' && (
           <AccountSummaryView
-            accounts={activeAccounts}
-            transactions={activeTransactions}
+            accounts={scopedAccounts}
+            transactions={scopedTransactions}
             onBack={() => setSecondaryRoute(null)}
             onExportJson={handleExportJson}
             onExportCsv={handleExportCsv}
           />
         )}
 
-        {secondaryRoute === 'multi-device' && (
+        {effectiveSecondaryRoute === 'multi-device' && (
           <MultiDeviceView
             verifiedPhone={verifiedPhoneDisplay}
             mobileNumber={mobileNumber}
@@ -2382,19 +2223,17 @@ function BolBahiAppInner() {
           />
         )}
 
-        {secondaryRoute === 'help-support' && (
+        {effectiveSecondaryRoute === 'help-support' && (
           <HelpSupportView onBack={() => setSecondaryRoute(null)} />
         )}
 
-        {/* Selected Party Ledger Thread */}
-        {!secondaryRoute && activeAccountThread}
-
-        {/* Home Ledger Bento Grid */}
-        {!secondaryRoute && !activeAccountThread && mainTab === 'ledger' && (
-          <LedgerView
-            accounts={activeAccounts}
-            transactions={activeTransactions}
+        {/* Home Cockpit: Cash & Khata Feed */}
+        {!effectiveSecondaryRoute && effectiveMainTab === 'ledger' && (
+          <CashKhataFeed
+            accounts={scopedAccounts}
+            transactions={scopedTransactions}
             stockItems={activeStockItems}
+            cashbookEntries={capabilities.showGalla ? activeCashbookEntries : []}
             language={language}
             searchQuery={searchQuery}
             gallaPulse={gallaPulse}
@@ -2402,15 +2241,25 @@ function BolBahiAppInner() {
             selectedAccountId={selectedAccountId}
             recentlyUpdatedAccountId={recentlyUpdatedAccountId}
             hideBalance={hideBalance}
+            personaAdaptation={personaAdaptation}
+            capabilities={capabilities}
+            showAllModes={showAllModes}
+            scrollContainerRef={mainScrollRef}
+            heroOpacity={spatialMotion.heroOpacity}
+            heroScale={spatialMotion.heroScale}
+            heroY={spatialMotion.heroY}
+            jellySkew={spatialMotion.jellySkew}
             onToggleHideBalance={() => setHideBalance((v) => !v)}
-            addPartySignal={addPartySignal}
+            onToggleShowAllModes={() => setShowAllModes((v) => !v)}
             onSelectAccount={(acc) => setSelectedAccountId(acc.id)}
             onSwipeRemind={(acc) => setSelectedAccountId(acc.id)}
             onCreateAccount={async (payload) => {
+              const safeKind: AccountKind = capabilities.showSuppliers ? payload.kind : 'customer';
               if (isGuestMode) {
                 const res = applyCreateAccount(guestVaultRef.current, {
                   businessId: currentBusiness.id,
-                  kind: payload.kind,
+                  kind: safeKind,
+                  personaContext: personaAdaptation.activeFocus,
                   name: payload.name,
                   phone: payload.phone,
                   dueDate: payload.dueDate,
@@ -2421,7 +2270,7 @@ function BolBahiAppInner() {
                   actorName: activeOperator.name,
                   actorRole: activeOperator.role,
                   actionType: 'account',
-                  summary: `Added ${payload.kind} ${payload.name}`,
+                  summary: `Added ${safeKind} ${payload.name}`,
                   targetName: payload.name,
                 });
                 guestVaultRef.current = saveGuestVault(finalVault);
@@ -2434,13 +2283,14 @@ function BolBahiAppInner() {
               const created = await createAccount({
                 ownerId: user.uid,
                 businessId: currentBusiness.id,
-                kind: payload.kind,
+                kind: safeKind,
+                personaContext: personaAdaptation.activeFocus,
                 name: payload.name,
                 phone: payload.phone,
                 dueDate: payload.dueDate,
                 creditLimit: payload.creditLimit,
               });
-              logActivity('account', `Added ${payload.kind} ${payload.name}`, payload.name);
+              logActivity('account', `Added ${safeKind} ${payload.name}`, payload.name);
               triggerAccountHighlight(created.id);
               setSelectedAccountId(created.id);
             }}
@@ -2458,6 +2308,7 @@ function BolBahiAppInner() {
             }}
             onOpenParchiScanner={() => setParchiScannerOpen(true)}
             onOpenGalla={() => {
+              if (!capabilities.showGalla) return;
               setSelectedAccountId(null);
               setSecondaryRoute('galla');
             }}
@@ -2465,13 +2316,14 @@ function BolBahiAppInner() {
           />
         )}
 
-        {!secondaryRoute && !selectedAccount && mainTab === 'collection' && (
+        {!effectiveSecondaryRoute && effectiveMainTab === 'collection' && (
           <CollectionView
             key={`${currentBusiness.id}_${currentBusiness.upiId || ''}`}
-            accounts={activeAccounts}
+            accounts={scopedAccounts}
             business={currentBusiness}
             language={language}
             trustScoresByAccount={trustScoresByAccount}
+            capabilities={capabilities}
             onUpdateAccountDue={async (accountId, dueDate) => {
               if (isGuestMode) {
                 updateGuestVault((prev) => applyUpdateAccountMeta(prev, accountId, { dueDate }));
@@ -2499,7 +2351,7 @@ function BolBahiAppInner() {
           />
         )}
 
-        {!secondaryRoute && !selectedAccount && mainTab === 'bills' && (
+        {!effectiveSecondaryRoute && effectiveMainTab === 'bills' && capabilities.showGstBills && (
           <BillsView
             key={`${currentBusiness.id}_${billDraft?.customerName || billPrefill?.name || 'none'}_${
               billDraft ? billDraft.items?.length || 0 : 0
@@ -2550,16 +2402,23 @@ function BolBahiAppInner() {
               if (isGuestMode) {
                 let nextVault = guestVaultRef.current;
                 if (payload.docType === 'bill' && payload.paymentStatus === 'unpaid' && netBill > 0) {
-                  const matched = activeAccounts.find(
-                    (a) =>
-                      a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
-                      (payload.customerPhone && a.phone === payload.customerPhone)
-                  );
+                  const matched =
+                    scopedAccounts.find(
+                      (a) =>
+                        a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
+                        (payload.customerPhone && a.phone === payload.customerPhone)
+                    ) ||
+                    activeAccounts.find(
+                      (a) =>
+                        a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
+                        (payload.customerPhone && a.phone === payload.customerPhone)
+                    );
                   const txRes = applyAddTransactionAtomic(nextVault, {
                     businessId: currentBusiness.id,
                     existingAccount: matched || null,
                     customerName: payload.customerName,
                     kind: matched?.kind || 'customer',
+                    personaContext: matched?.personaContext || personaAdaptation.activeFocus,
                     direction: 'given',
                     amount: netBill,
                     note: `Bill ${payload.billNumber}`,
@@ -2592,17 +2451,24 @@ function BolBahiAppInner() {
 
               if (!user) return { deductedCount: 0 };
               if (payload.docType === 'bill' && payload.paymentStatus === 'unpaid' && netBill > 0) {
-                const matched = activeAccounts.find(
-                  (a) =>
-                    a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
-                    (payload.customerPhone && a.phone === payload.customerPhone)
-                );
+                const matched =
+                  scopedAccounts.find(
+                    (a) =>
+                      a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
+                      (payload.customerPhone && a.phone === payload.customerPhone)
+                  ) ||
+                  activeAccounts.find(
+                    (a) =>
+                      a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
+                      (payload.customerPhone && a.phone === payload.customerPhone)
+                  );
                 const txRes = await addTransactionAtomic({
                   ownerId: user.uid,
                   businessId: currentBusiness.id,
                   existingAccount: matched || null,
                   customerName: payload.customerName,
                   kind: matched?.kind || 'customer',
+                  personaContext: matched?.personaContext || personaAdaptation.activeFocus,
                   direction: 'given',
                   amount: netBill,
                   note: `Bill ${payload.billNumber}`,
@@ -2678,7 +2544,7 @@ function BolBahiAppInner() {
           />
         )}
 
-        {!secondaryRoute && !selectedAccount && mainTab === 'stock' && (
+        {!effectiveSecondaryRoute && effectiveMainTab === 'stock' && capabilities.showStock && (
           <StockView
             items={activeStockItems}
             onSaveItem={async (payload) => {
@@ -2715,7 +2581,7 @@ function BolBahiAppInner() {
           />
         )}
 
-        {!secondaryRoute && !selectedAccount && mainTab === 'more' && (
+        {!effectiveSecondaryRoute && effectiveMainTab === 'more' && (
           <MoreBentoView
             business={currentBusiness}
             appearance={appearance}
@@ -2723,6 +2589,7 @@ function BolBahiAppInner() {
             verifiedPhone={verifiedPhoneDisplay}
             activeOperatorName={activeOperator.name}
             isGuestMode={isGuestMode}
+            capabilities={capabilities}
             onOpenCloudSync={openCloudSyncSheet}
             onToggleAppearance={() => void handleToggleAppearance()}
             onSelectAccentTheme={(theme) => void handleSelectAccentTheme(theme)}
@@ -2730,12 +2597,27 @@ function BolBahiAppInner() {
             onNavigate={(target) => {
               setSelectedAccountId(null);
               if (target === 'scan-parchi') {
-                setParchiScannerOpen(true);
+                if (capabilities.focus !== 'personal') setParchiScannerOpen(true);
                 return;
               }
-              if (target === 'bills' || target === 'stock' || target === 'collection') {
+              if (target === 'bills') {
+                if (!capabilities.showGstBills) return;
                 setSecondaryRoute(null);
-                setMainTab(target);
+                setMainTab('bills');
+                return;
+              }
+              if (target === 'stock') {
+                if (!capabilities.showStock) return;
+                setSecondaryRoute(null);
+                setMainTab('stock');
+                return;
+              }
+              if (target === 'collection') {
+                setSecondaryRoute(null);
+                setMainTab('collection');
+              } else if (target === 'galla') {
+                if (!capabilities.showGalla) return;
+                setSecondaryRoute('galla');
               } else {
                 setSecondaryRoute(target);
               }
@@ -2746,131 +2628,222 @@ function BolBahiAppInner() {
         )}
       </main>
 
-      {/* 5-Slot Solid Capsule Bottom Pill Dock (Cockpit | Vasooli | [Center Mic Orb] | Bills | More) */}
-      {!selectedAccount && (
-        <>
-          <AnimatePresence>
-            {dockPlusOpen && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setDockPlusOpen(false)}
-                className="no-print fixed inset-0 z-30 bg-black/25"
-                aria-hidden="true"
-              />
-            )}
-          </AnimatePresence>
-
-          <div className="no-print fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-40 pb-safe pointer-events-none">
-            <nav
-              aria-label="Primary navigation"
-              className="pointer-events-auto bg-[#EFEFF4] dark:bg-[#18181B] rounded-full p-1.5 mx-4 mb-3.5 spatial-dock grid grid-cols-5 items-center"
-            >
-              {(
-                [
-                  { id: 'ledger', label: 'Cockpit', icon: BookOpen },
-                  { id: 'collection', label: 'Vasooli', icon: Users },
-                ] as const
-              ).map((tab) => {
-                const Icon = tab.icon;
-                const active = !secondaryRoute && mainTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => {
-                      setDockPlusOpen(false);
-                      setSecondaryRoute(null);
-                      setSelectedAccountId(null);
-                      setMainTab(tab.id);
-                    }}
-                    className={`relative min-h-[48px] rounded-full flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold active:scale-95 transition-colors ${
-                      active
-                        ? 'text-[var(--brand-accent)]'
-                        : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
-                    }`}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="dockActiveTab"
-                        transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-                        className="absolute inset-0.5 rounded-full bg-white dark:bg-[#27272A] shadow-sm"
-                      />
-                    )}
-                    <motion.span
-                      animate={active ? { rotate: [0, -10, 10, 0] } : { rotate: 0 }}
-                      transition={{ type: 'tween', duration: 0.36, ease: 'easeInOut' }}
-                      className="relative z-10 inline-flex"
-                    >
-                      <Icon className="w-[18px] h-[18px]" />
-                    </motion.span>
-                    <span className="leading-none relative z-10">{tab.label}</span>
-                  </button>
+      {/* Z-Axis Foreground Party Statement Sheet (Shared layoutId Morph from PartyLedgerCard) */}
+      <AnimatePresence>
+        {selectedAccount && (
+          <div className="absolute inset-0 z-30 p-3 pt-4 pb-3 flex flex-col">
+            <PartyStatementView
+              key={selectedAccount.id}
+              account={selectedAccount}
+              business={currentBusiness}
+              language={language}
+              capabilities={capabilities}
+              hideBalance={hideBalance}
+              onToggleHideBalance={() => setHideBalance((v) => !v)}
+              transactions={activeTransactions.filter((tx) => tx.accountId === selectedAccount.id)}
+              trustScore={trustScoresByAccount[selectedAccount.id]}
+              onBack={() => setSelectedAccountId(null)}
+              onOpenParchiScanner={
+                capabilities.focus === 'personal' ? undefined : () => setParchiScannerOpen(true)
+              }
+              onAddTransaction={async (payload) => {
+                if (isGuestMode) {
+                  const res = applyAddTransactionAtomic(guestVaultRef.current, {
+                    businessId: currentBusiness.id,
+                    existingAccount: selectedAccount,
+                    customerName: selectedAccount.name,
+                    kind: selectedAccount.kind,
+                    personaContext: selectedAccount.personaContext || personaAdaptation.activeFocus,
+                    direction: payload.direction,
+                    amount: payload.amount,
+                    note: payload.note,
+                    billDate: payload.billDate,
+                    billImage: payload.billImage,
+                    createdByName: activeOperator.name,
+                    createdByRole: activeOperator.role,
+                    syncToGalla: capabilities.showGalla ? payload.syncToGalla : null,
+                  });
+                  const finalVault = applyRecordActivityLog(res.vault, {
+                    businessId: currentBusiness.id,
+                    actorName: activeOperator.name,
+                    actorRole: activeOperator.role,
+                    actionType: 'ledger',
+                    summary: `${payload.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${payload.amount} for ${selectedAccount.name}`,
+                    targetName: selectedAccount.name,
+                    amount: payload.amount,
+                  });
+                  guestVaultRef.current = saveGuestVault(finalVault);
+                  setGuestVault(guestVaultRef.current);
+                  showActionToast({
+                    kind: 'added',
+                    tx: res.tx,
+                    account: res.account,
+                    newBalance: res.newBalance,
+                    accountCreated: false,
+                  });
+                  return;
+                }
+                if (!user) return;
+                const res = await addTransactionAtomic({
+                  ownerId: user.uid,
+                  businessId: currentBusiness.id,
+                  existingAccount: selectedAccount,
+                  customerName: selectedAccount.name,
+                  kind: selectedAccount.kind,
+                  personaContext: selectedAccount.personaContext || personaAdaptation.activeFocus,
+                  direction: payload.direction,
+                  amount: payload.amount,
+                  note: payload.note,
+                  billDate: payload.billDate,
+                  billImage: payload.billImage,
+                  createdByName: activeOperator.name,
+                  createdByRole: activeOperator.role,
+                  syncToGalla: capabilities.showGalla ? payload.syncToGalla : null,
+                });
+                showActionToast({
+                  kind: 'added',
+                  tx: res.tx,
+                  account: { ...selectedAccount, balance: res.newBalance },
+                  newBalance: res.newBalance,
+                  accountCreated: false,
+                });
+                logActivity(
+                  'ledger',
+                  `${payload.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${payload.amount} for ${selectedAccount.name}`,
+                  selectedAccount.name,
+                  payload.amount
                 );
-              })}
-
-              {/* Center Raised Blue-Cyan Gradient Mic Orb with Solid Cutout Border */}
-              <div className="flex items-center justify-center -mt-5 relative z-20">
-                <MunimOrb
-                  size="dock"
-                  onClick={() => {
-                    setDockPlusOpen(false);
-                    setVoicePrefillName('');
-                    setVoiceCounterMode(false);
-                    setVoiceModalOpen(true);
-                  }}
-                />
-              </div>
-
-              {(
-                [
-                  { id: 'bills', label: t.tabBills, icon: Receipt },
-                  { id: 'more', label: t.tabMore, icon: LayoutGrid },
-                ] as const
-              ).map((tab) => {
-                const Icon = tab.icon;
-                const active =
-                  tab.id === 'more'
-                    ? mainTab === 'more' || mainTab === 'stock' || Boolean(secondaryRoute)
-                    : !secondaryRoute && mainTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => {
-                      setDockPlusOpen(false);
-                      setSecondaryRoute(null);
-                      setSelectedAccountId(null);
-                      setMainTab(tab.id);
-                    }}
-                    className={`relative min-h-[48px] rounded-full flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold active:scale-95 transition-colors ${
-                      active
-                        ? 'text-[var(--brand-accent)]'
-                        : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
-                    }`}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="dockActiveTab"
-                        transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-                        className="absolute inset-0.5 rounded-full bg-white dark:bg-[#27272A] shadow-sm"
-                      />
-                    )}
-                    <motion.span
-                      animate={active ? { rotate: [0, -10, 10, 0] } : { rotate: 0 }}
-                      transition={{ type: 'tween', duration: 0.36, ease: 'easeInOut' }}
-                      className="relative z-10 inline-flex"
-                    >
-                      <Icon className="w-[18px] h-[18px]" />
-                    </motion.span>
-                    <span className="leading-none relative z-10">{tab.label}</span>
-                  </button>
+              }}
+              onUpdateTransaction={async (tx, patch) => {
+                if (isGuestMode) {
+                  updateGuestVault((prev) =>
+                    applyUpdateTransactionAtomic(prev, { tx, account: selectedAccount, patch })
+                  );
+                } else {
+                  await updateTransactionAtomic({
+                    tx,
+                    account: selectedAccount,
+                    allForAccount: activeTransactions.filter(
+                      (item) => item.accountId === selectedAccount.id
+                    ),
+                    patch,
+                  });
+                }
+                logActivity(
+                  'ledger',
+                  `Edited ₹${patch.amount} entry for ${selectedAccount.name}`,
+                  selectedAccount.name,
+                  patch.amount
                 );
-              })}
-            </nav>
+              }}
+              onDeleteTransaction={async (tx) => {
+                if (isGuestMode) {
+                  updateGuestVault((prev) =>
+                    applyDeleteTransactionAtomic(prev, { tx, account: selectedAccount })
+                  );
+                } else {
+                  const remaining = activeTransactions.filter(
+                    (item) => item.accountId === selectedAccount.id && item.id !== tx.id
+                  );
+                  await deleteTransactionAtomic({
+                    tx,
+                    account: selectedAccount,
+                    remainingForAccount: remaining,
+                  });
+                }
+                showActionToast({
+                  kind: 'deleted',
+                  tx,
+                  account: selectedAccount,
+                });
+                logActivity(
+                  'ledger',
+                  `Deleted ₹${tx.amount} entry for ${selectedAccount.name}`,
+                  selectedAccount.name,
+                  tx.amount
+                );
+              }}
+              onUpdateAccount={async (patch) => {
+                if (isGuestMode) {
+                  updateGuestVault((prev) => applyUpdateAccountMeta(prev, selectedAccount.id, patch));
+                } else {
+                  await updateAccountMeta(selectedAccount.id, patch);
+                }
+                logActivity(
+                  'account',
+                  `Updated party details for ${selectedAccount.name}`,
+                  selectedAccount.name
+                );
+              }}
+              onDeleteAccount={async () => {
+                if (isGuestMode) {
+                  updateGuestVault((prev) =>
+                    applyDeleteAccountWithTransactions(prev, selectedAccount.id)
+                  );
+                } else {
+                  const accTxs = activeTransactions.filter(
+                    (tx) => tx.accountId === selectedAccount.id
+                  );
+                  await deleteAccountWithTransactions(selectedAccount.id, accTxs);
+                }
+                logActivity('account', `Deleted party ${selectedAccount.name}`, selectedAccount.name);
+                setSelectedAccountId(null);
+              }}
+              onOpenVoiceForCustomer={(name) => {
+                setVoicePrefillName(name);
+                setVoiceCounterMode(false);
+                setVoiceModalOpen(true);
+              }}
+              onOpenCreateBill={(customerName, customerPhone) => {
+                if (!capabilities.showGstBills) return;
+                setBillDraft(null);
+                setBillPrefill({ name: customerName, phone: customerPhone });
+                setSelectedAccountId(null);
+                setMainTab('bills');
+              }}
+            />
           </div>
-        </>
+        )}
+      </AnimatePresence>
+
+      {/* Solid Matte Spatial Bottom Dock: Separated Left Pill + Center Matte Indigo Mic Orb + Right Pill */}
+      {!selectedAccount && !personaOnboardingOpen && (
+        <BottomSpatialDock
+          mainTab={effectiveMainTab}
+          hasSecondaryRoute={Boolean(effectiveSecondaryRoute)}
+          voiceModalOpen={voiceModalOpen}
+          capabilities={capabilities}
+          onSelectLeftTab={() => {
+            setSecondaryRoute(null);
+            setSelectedAccountId(null);
+            setMainTab((prev) => (prev === 'collection' ? 'ledger' : 'collection'));
+          }}
+          onOpenVoice={() => {
+            setVoicePrefillName('');
+            setVoiceCounterMode(false);
+            setVoiceModalOpen(true);
+          }}
+          onSelectRightTab={() => {
+            setSelectedAccountId(null);
+            if (!capabilities.showGstBills) {
+              if (effectiveSecondaryRoute === 'account-summary' || effectiveMainTab === 'more') {
+                setSecondaryRoute(null);
+                setMainTab('ledger');
+              } else {
+                setSecondaryRoute('account-summary');
+              }
+              return;
+            }
+            if (effectiveSecondaryRoute) {
+              setSecondaryRoute(null);
+              setMainTab('bills');
+              return;
+            }
+            setMainTab((prev) =>
+              prev === 'bills' || prev === 'stock' || prev === 'more' ? 'ledger' : 'bills'
+            );
+          }}
+        />
       )}
 
       {/* Optional Cloud Sync & Backup Phone OTP Spring Bottom Sheet */}
@@ -3155,6 +3128,22 @@ function BolBahiAppInner() {
                   </button>
                 </div>
               </div>
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.tap();
+                    setBizSwitcherOpen(false);
+                    setPersonaOnboardingStep(2);
+                    setPersonaOnboardingOpen(true);
+                  }}
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center justify-center gap-2 active:scale-95 transition"
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                  <span>Change Business Mode ({personaAdaptation.focusBadge})</span>
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -3172,10 +3161,10 @@ function BolBahiAppInner() {
             setSecondaryRoute(null);
             setSelectedAccountId(null);
             setMainTab('collection');
-          } else if (target === 'galla') {
+          } else if (target === 'galla' && capabilities.showGalla) {
             setSelectedAccountId(null);
             setSecondaryRoute('galla');
-          } else if (target === 'parchi') {
+          } else if (target === 'parchi' && capabilities.focus !== 'personal') {
             setParchiScannerOpen(true);
           } else if (target === 'theme' || target === 'upi') {
             setSelectedAccountId(null);
@@ -3418,15 +3407,17 @@ function BolBahiAppInner() {
         )}
       </AnimatePresence>
 
-      {/* Voice & Hands-Free Counter Modal */}
-      <VoiceEntryModal
+      {/* Aperture Iris Spatial Voice & Hands-Free Counter Modal */}
+      <VoiceMunimSheet
         open={voiceModalOpen}
         language={language}
-        accounts={activeAccounts}
-        stockNames={activeStockItems.map((s) => s.name)}
+        accounts={scopedAccounts}
+        stockNames={capabilities.showStock ? activeStockItems.map((s) => s.name) : []}
         business={currentBusiness}
         prefillCustomerName={voicePrefillName}
         initialCounterMode={voiceCounterMode}
+        personaAdaptation={personaAdaptation}
+        allowBills={capabilities.showGstBills}
         onClose={() => {
           setVoiceModalOpen(false);
           setVoiceCounterMode(false);
@@ -3440,6 +3431,7 @@ function BolBahiAppInner() {
         onSaveEntry={handleVoiceSave}
         onUndoQueueItem={handleUndoVoiceQueueItem}
         onCreateBillFromVoice={(draft) => {
+          if (!capabilities.showGstBills) return;
           setVoiceModalOpen(false);
           setVoiceCounterMode(false);
           setBillPrefill(null);
@@ -3454,23 +3446,48 @@ function BolBahiAppInner() {
         }}
       />
 
+      {/* First-Time Greeting & Multi-Select Persona Onboarding (Zero Forced Login) */}
+      {personaOnboardingOpen && (
+        <PersonaOnboardingSheet
+          initialPrefs={personaPrefs}
+          initialStep={personaOnboardingStep}
+          onComplete={(nextPrefs) => {
+            const saved = savePersonaPrefs(nextPrefs);
+            setPersonaPrefs(saved);
+            setPersonaOnboardingOpen(false);
+            const nextCaps = getPersonaCapabilities(saved.activeFocus);
+            if (!nextCaps.showGstBills && mainTab === 'bills') setMainTab('ledger');
+            if (!nextCaps.showStock && mainTab === 'stock') setMainTab('ledger');
+            if (!nextCaps.showGalla && secondaryRoute === 'galla') setSecondaryRoute(null);
+            setSelectedAccountId(null);
+          }}
+        />
+      )}
+
       {/* AI Parchi & Receipt Scanner Modal */}
       <ParchiScannerModal
         open={parchiScannerOpen}
         onClose={() => setParchiScannerOpen(false)}
-        accounts={activeAccounts}
+        accounts={scopedAccounts}
         onPostToKhata={async (payload) => {
-          const match = activeAccounts.find(
-            (a) =>
-              a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
-              (payload.phone && a.phone === payload.phone)
-          );
+          const match =
+            scopedAccounts.find(
+              (a) =>
+                a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
+                (payload.phone && a.phone === payload.phone)
+            ) ||
+            activeAccounts.find(
+              (a) =>
+                a.name.trim().toLowerCase() === payload.customerName.trim().toLowerCase() ||
+                (payload.phone && a.phone === payload.phone)
+            );
           if (isGuestMode) {
             const res = applyAddTransactionAtomic(guestVaultRef.current, {
               businessId: currentBusiness.id,
               existingAccount: match || null,
               customerName: payload.customerName,
               kind: match?.kind || 'customer',
+              personaContext: match?.personaContext || personaAdaptation.activeFocus,
               direction: payload.direction,
               amount: payload.amount,
               note: payload.note || 'AI Parchi Scan',
@@ -3517,6 +3534,7 @@ function BolBahiAppInner() {
             existingAccount: match || null,
             customerName: payload.customerName,
             kind: match?.kind || 'customer',
+            personaContext: match?.personaContext || personaAdaptation.activeFocus,
             direction: payload.direction,
             amount: payload.amount,
             note: payload.note || 'AI Parchi Scan',
@@ -3535,6 +3553,7 @@ function BolBahiAppInner() {
                 ownerId: user.uid,
                 businessId: currentBusiness.id,
                 kind: 'customer',
+                personaContext: personaAdaptation.activeFocus,
                 name: payload.customerName,
                 phone: payload.phone || '',
                 dueDate: '',
@@ -3561,6 +3580,7 @@ function BolBahiAppInner() {
           setSelectedAccountId(res.accountId);
         }}
         onCreateBillFromScan={(draft) => {
+          if (!capabilities.showGstBills) return;
           setParchiScannerOpen(false);
           setBillPrefill(null);
           setBillDraft({

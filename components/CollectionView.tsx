@@ -35,11 +35,14 @@ import type {
   SortByOption,
 } from '@/lib/types';
 
+import type { PersonaCapabilities } from '@/lib/persona';
+
 interface CollectionViewProps {
   accounts: LedgerAccount[];
   business: Business;
   language: LanguageCode;
   trustScoresByAccount: Record<string, CustomerTrustScore>;
+  capabilities?: PersonaCapabilities;
   onUpdateAccountDue: (accountId: string, dueDate: string) => Promise<void>;
   onSaveUpiId: (upiId: string) => Promise<void>;
   onOpenAccount: (account: LedgerAccount) => void;
@@ -107,12 +110,15 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
   business,
   language,
   trustScoresByAccount,
+  capabilities,
   onUpdateAccountDue,
   onSaveUpiId,
   onOpenAccount,
 }) => {
   const t = getUIStrings(language);
-  const [partyKind, setPartyKind] = useState<AccountKind>('customer');
+  const [rawPartyKind, setRawPartyKind] = useState<AccountKind>('customer');
+  const allowSuppliers = capabilities ? capabilities.showSuppliers : true;
+  const partyKind: AccountKind = allowSuppliers ? rawPartyKind : 'customer';
   const [filterChip, setFilterChip] = useState<CollectionFilterChip>('all');
   const [sortBy, setSortBy] = useState<SortByOption>('recovery-priority');
   const [showSort, setShowSort] = useState(false);
@@ -189,37 +195,39 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
 
   return (
     <div className="space-y-4 pb-32">
-      {/* Sliding Pill Customer Receivables vs Supplier Payables Switch */}
-      <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 shadow-inner">
-        <span
-          aria-hidden="true"
-          className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl bg-[var(--surface)] shadow-sm transition-transform duration-200 ease-out ${
-            partyKind === 'supplier' ? 'translate-x-full' : 'translate-x-0'
-          }`}
-        />
-        {(
-          [
-            { id: 'customer', label: 'Customers (Collect)' },
-            { id: 'supplier', label: 'Suppliers (Pay)' },
-          ] as const
-        ).map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => {
-              setPartyKind(tab.id);
-              setSelectedIndex(null);
-            }}
-            className={`relative z-10 min-h-[44px] px-3 rounded-xl text-xs font-extrabold transition-colors active:scale-95 ${
-              partyKind === tab.id
-                ? 'text-[var(--brand)] dark:text-[var(--brand-accent)]'
-                : 'text-[var(--ink-muted)]'
+      {/* Sliding Pill Customer Receivables vs Supplier Payables Switch (hidden in Personal mode) */}
+      {allowSuppliers && (
+        <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 shadow-inner">
+          <span
+            aria-hidden="true"
+            className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl bg-[var(--surface)] shadow-sm transition-transform duration-200 ease-out ${
+              partyKind === 'supplier' ? 'translate-x-full' : 'translate-x-0'
             }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+          />
+          {(
+            [
+              { id: 'customer', label: `${capabilities?.primarySegmentLabel || 'Customers'} (Collect)` },
+              { id: 'supplier', label: `${capabilities?.secondarySegmentLabel || 'Suppliers'} (Pay)` },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setRawPartyKind(tab.id);
+                setSelectedIndex(null);
+              }}
+              className={`relative z-10 min-h-[44px] px-3 rounded-xl text-xs font-extrabold transition-colors active:scale-95 ${
+                partyKind === tab.id
+                  ? 'text-[var(--brand)] dark:text-[var(--brand-accent)]'
+                  : 'text-[var(--ink-muted)]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Filter Chips + Sort */}
       <div className="flex items-center justify-between gap-2">

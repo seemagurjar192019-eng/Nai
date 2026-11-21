@@ -7,7 +7,7 @@
    - `accounts/{accountId}`, `bills/{billId}`, `stockItems/{itemId}`, `cashbookEntries/{entryId}`, `staffMembers/{staffId}`, and `activityLogs/{logId}` cannot be created unless `businesses/{businessId}` exists and belongs to `request.auth.uid`.
    - `transactions/{txId}` cannot be created unless `accounts/{accountId}` exists, belongs to `request.auth.uid`, and matches `incoming().businessId`.
 4. **Immutable Lineage & Timestamps**: `ownerId`, `businessId`, `accountId`, and `createdAt` cannot change after creation; `createdAt` (on create) and `updatedAt` (on create/update) must equal `request.time`.
-5. **Bounded Types & Strict Keys**: Every collection enforces `keys().hasAll(...)` + `keys().hasOnly(...)` on create, `affectedKeys().hasOnly(...)` on update, numeric bounds (`amount > 0`), and explicit string length caps.
+5. **Bounded Types & Strict Keys**: Every collection enforces `keys().hasAll(...)` + `keys().hasOnly(...)` on create, `affectedKeys().hasOnly(...)` on update, numeric bounds (`amount > 0`), optional enum validation (`personaContext in ['personal', 'kirana', 'mandi', 'wholesale']`), and explicit string length caps.
 6. **Zero Query Delegation**: Every `allow list` rule explicitly requires `resource.data.ownerId == request.auth.uid` (no `get()`/`exists()` inside `allow list`).
 
 ## Dirty Dozen Adversarial Payloads (Must Return PERMISSION_DENIED)

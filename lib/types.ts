@@ -14,6 +14,7 @@ export type LanguageCode =
 export type AppearanceMode = 'light' | 'dark';
 
 export type AccountKind = 'customer' | 'supplier';
+export type PersonaContext = 'personal' | 'kirana' | 'mandi' | 'wholesale';
 export type TxDirection = 'given' | 'received';
 export type BillDocType = 'bill' | 'quote';
 export type BillTemplateId = 'classic' | 'modern' | 'gst-color' | 'thermal-58';
@@ -80,6 +81,7 @@ export interface LedgerAccount {
   ownerId: string;
   businessId: string;
   kind: AccountKind;
+  personaContext?: PersonaContext;
   name: string;
   phone: string;
   dueDate: string;
@@ -98,6 +100,7 @@ export interface LedgerTransaction {
   ownerId: string;
   businessId: string;
   accountId: string;
+  personaContext?: PersonaContext;
   direction: TxDirection;
   amount: number;
   note: string;

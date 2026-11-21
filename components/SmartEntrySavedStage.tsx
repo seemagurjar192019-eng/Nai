@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { haptic } from '@/lib/haptic';
 import { AnimatedRupeeNumber } from './AnimatedRupeeNumber';
 
 interface SmartEntrySavedStageProps {
@@ -34,12 +35,13 @@ export const SmartEntrySavedStage: React.FC<SmartEntrySavedStageProps> = ({
   const isGiven = direction === 'given';
 
   useEffect(() => {
+    haptic.success();
     if (typeof window === 'undefined') return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     try {
       void confetti({
-        particleCount: 28,
-        spread: 62,
+        particleCount: 30,
+        spread: 64,
         startVelocity: 24,
         scalar: 0.78,
         ticks: 110,
