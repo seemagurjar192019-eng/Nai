@@ -2,7 +2,6 @@
 
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import confetti from 'canvas-confetti';
 import { haptic } from '@/lib/haptic';
 import { AnimatedRupeeNumber } from './AnimatedRupeeNumber';
 
@@ -13,17 +12,6 @@ interface SmartEntrySavedStageProps {
   amount: number;
   direction: 'given' | 'received';
 }
-
-const SPARKLES = [
-  { tx: '-38px', ty: '-36px', color: 'bg-emerald-400', delay: '0.02s', size: 'w-2 h-2' },
-  { tx: '38px', ty: '-34px', color: 'bg-amber-400', delay: '0.05s', size: 'w-2.5 h-2.5' },
-  { tx: '-48px', ty: '6px', color: 'bg-indigo-400', delay: '0.08s', size: 'w-1.5 h-1.5' },
-  { tx: '48px', ty: '8px', color: 'bg-emerald-500', delay: '0.04s', size: 'w-2 h-2' },
-  { tx: '-26px', ty: '36px', color: 'bg-cyan-400', delay: '0.1s', size: 'w-2 h-2' },
-  { tx: '28px', ty: '34px', color: 'bg-amber-300', delay: '0.06s', size: 'w-1.5 h-1.5' },
-  { tx: '0px', ty: '-48px', color: 'bg-emerald-300', delay: '0.03s', size: 'w-2 h-2' },
-  { tx: '0px', ty: '46px', color: 'bg-indigo-300', delay: '0.09s', size: 'w-1.5 h-1.5' },
-];
 
 export const SmartEntrySavedStage: React.FC<SmartEntrySavedStageProps> = ({
   partyName,
@@ -36,22 +24,6 @@ export const SmartEntrySavedStage: React.FC<SmartEntrySavedStageProps> = ({
 
   useEffect(() => {
     haptic.success();
-    if (typeof window === 'undefined') return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    try {
-      void confetti({
-        particleCount: 30,
-        spread: 64,
-        startVelocity: 24,
-        scalar: 0.78,
-        ticks: 110,
-        origin: { y: 0.62 },
-        colors: ['#4F46E5', '#06B6D4', '#16A34A', '#F59E0B'],
-        disableForReducedMotion: true,
-      });
-    } catch {
-      // Ignore canvas-confetti errors in restricted environments
-    }
   }, []);
 
   return (
@@ -59,25 +31,18 @@ export const SmartEntrySavedStage: React.FC<SmartEntrySavedStageProps> = ({
       initial={{ opacity: 0.7, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.35, y: 120 }}
-      transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
       className="py-6 px-3 flex flex-col items-center justify-center text-center space-y-4"
     >
-      {/* Emerald Checkmark SVG PathLength Draw + Confetti Sparkle Burst */}
+      {/* Clean iOS Apple Pay-Style SVG PathLength Checkmark Ring (Zero Confetti Clutter) */}
       <div className="relative flex items-center justify-center w-20 h-20">
-        {SPARKLES.map((sp, i) => (
-          <span
-            key={i}
-            aria-hidden="true"
-            style={
-              {
-                '--tx': sp.tx,
-                '--ty': sp.ty,
-                animationDelay: sp.delay,
-              } as React.CSSProperties
-            }
-            className={`sparkle-particle absolute rounded-full ${sp.color} ${sp.size}`}
-          />
-        ))}
+        <motion.span
+          aria-hidden="true"
+          initial={{ scale: 0.85, opacity: 0.5 }}
+          animate={{ scale: 1.4, opacity: 0 }}
+          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute inset-1 rounded-full border-2 border-[var(--debit-green)] pointer-events-none"
+        />
 
         <motion.div
           initial={{ scale: 0.6, opacity: 0 }}
@@ -116,7 +81,7 @@ export const SmartEntrySavedStage: React.FC<SmartEntrySavedStageProps> = ({
           />
         </p>
         <p className="text-[11px] font-semibold text-[var(--ink-muted)] font-tabular">
-          {isGiven ? 'Given +' : 'Received -'}₹{amount.toLocaleString('en-IN')} · Prev ₹
+          {isGiven ? 'Credit +' : 'Received -'}₹{amount.toLocaleString('en-IN')} · Prev ₹
           {Math.abs(previousBalance).toLocaleString('en-IN')}
         </p>
       </div>

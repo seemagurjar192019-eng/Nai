@@ -5,6 +5,7 @@ import {
   generateContentWithFallback,
   getGeminiServerClient,
 } from '@/lib/gemini-server';
+import { checkRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -17,6 +18,34 @@ interface VoiceParseRequestBody {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIpFromHeaders(req.headers);
+    const minuteLimit = checkRateLimit(`voice:min:${clientIp}`, {
+      windowMs: 60_000,
+      maxRequests: 25,
+    });
+    if (!minuteLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many voice AI requests. Please wait a moment and try again.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(minuteLimit.retryAfterSeconds) },
+        }
+      );
+    }
+    const hourLimit = checkRateLimit(`voice:hr:${clientIp}`, {
+      windowMs: 3_600_000,
+      maxRequests: 200,
+    });
+    if (!hourLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Hourly AI parsing quota reached. Offline voice parsing still works seamlessly.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(hourLimit.retryAfterSeconds) },
+        }
+      );
+    }
+
     const body = (await req.json()) as VoiceParseRequestBody;
     const transcript = String(body.transcript || '').trim();
     if (!transcript) {

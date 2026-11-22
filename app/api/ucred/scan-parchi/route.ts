@@ -5,6 +5,7 @@ import {
   generateContentWithFallback,
   getGeminiServerClient,
 } from '@/lib/gemini-server';
+import { checkRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -14,6 +15,34 @@ interface ScanParchiBody {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIpFromHeaders(req.headers);
+    const minuteLimit = checkRateLimit(`parchi:min:${clientIp}`, {
+      windowMs: 60_000,
+      maxRequests: 12,
+    });
+    if (!minuteLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many receipt scan requests. Please wait a moment and try again.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(minuteLimit.retryAfterSeconds) },
+        }
+      );
+    }
+    const hourLimit = checkRateLimit(`parchi:hr:${clientIp}`, {
+      windowMs: 3_600_000,
+      maxRequests: 80,
+    });
+    if (!hourLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Hourly AI receipt scan limit reached. You can still attach receipt photos manually.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(hourLimit.retryAfterSeconds) },
+        }
+      );
+    }
+
     const body = (await req.json()) as ScanParchiBody;
     const rawUrl = String(body.imageDataUrl || '').trim();
     if (!rawUrl) {

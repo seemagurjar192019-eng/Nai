@@ -466,7 +466,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
   if (calcDirection) {
     return (
       <div className="fixed inset-0 z-50 bg-black/50 flex justify-center">
-        <div className="w-full max-w-[430px] spatial-shell-bg flex-1 flex flex-col justify-between p-4 pb-safe shadow-2xl">
+        <div className="w-full max-w-[460px] spatial-shell-bg flex-1 flex flex-col justify-between p-4 pb-safe shadow-2xl">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <button
@@ -497,7 +497,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                       : 'text-[var(--debit-green)]'
                   }`}
                 >
-                  {calcDirection === 'given' ? 'Credit Given (Udhaar)' : 'Payment Received (Jama)'} ·{' '}
+                  {calcDirection === 'given' ? 'Credit (Given)' : 'Payment Received'} ·{' '}
                   {hideBalance ? '₹••••' : formatINR(absBal)} {balLabel}
                 </p>
               </div>
@@ -719,7 +719,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
         x: prefersReducedMotion ? 0 : swipeBackX,
         touchAction: 'pan-y',
       }}
-      className="flex flex-col h-full rounded-[28px] spatial-card overflow-hidden bg-[var(--surface)] will-change-transform"
+      className="flex flex-col h-full rounded-[34px] spatial-card overflow-hidden bg-[var(--surface)] will-change-transform"
     >
       {/* Drag-Down Pull Bar for Z-Axis Sheet Dismiss */}
       <div
@@ -776,7 +776,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
             </h2>
             <p className="text-[11px] font-semibold text-[var(--brand-accent)] truncate">
               {trustScore && account.kind === 'customer'
-                ? `Trust ${trustScore.score}/100 · ${trustScore.recoveryTimingHint}`
+                ? `Trust ${trustScore.score}%`
                 : 'View Profile'}
               {account.creditLimit ? ` · Limit ₹${account.creditLimit.toLocaleString('en-IN')}` : ''}
               {account.promiseDate ? ` · Promise ${account.promiseDate}` : ''}
@@ -805,8 +805,8 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                 haptics.tap();
                 onOpenParchiScanner();
               }}
-              aria-label="Scan Parchi"
-              title="Scan Parchi (AI)"
+              aria-label="Scan Receipt"
+              title="Scan Receipt (AI)"
               className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
             >
               <Camera className="w-4 h-4" />
@@ -856,8 +856,8 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
           {(
             [
               { id: 'all', label: 'All' },
-              { id: 'given', label: 'Udhaar' },
-              { id: 'received', label: 'Jama' },
+              { id: 'given', label: 'Credit' },
+              { id: 'received', label: 'Received' },
               { id: 'photos', label: 'Photos' },
             ] as const
           ).map((f) => (
@@ -989,7 +989,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                                 isGiven ? 'text-[var(--credit-red)]' : 'text-[var(--debit-green)]'
                               }`}
                             >
-                              {isGiven ? 'Udhaar Given' : 'Jama Received'}
+                              {isGiven ? 'Credit Given' : 'Payment Received'}
                             </span>
                             <ChevronDown
                               className={`w-3.5 h-3.5 text-[var(--ink-muted)] transition-transform ${
@@ -1221,7 +1221,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
             className="flex-1 min-h-[48px] rounded-2xl bg-[var(--debit-tint)] text-[var(--debit-green)] font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-xs transition"
           >
             <ArrowDown className="w-4 h-4" />
-            <span>+ Jama / Mila</span>
+            <span>+ Received</span>
           </motion.button>
 
           <motion.button
@@ -1245,7 +1245,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
             className="flex-1 min-h-[48px] rounded-2xl bg-[var(--credit-tint)] text-[var(--credit-red)] font-extrabold text-sm flex items-center justify-center gap-1.5 shadow-xs transition"
           >
             <ArrowUp className="w-4 h-4" />
-            <span>+ Udhaar / Diye</span>
+            <span>+ Credit</span>
           </motion.button>
         </div>
       </div>

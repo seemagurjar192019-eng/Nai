@@ -24,6 +24,7 @@ import {
   type ParsedHinglishEntry,
 } from '@/lib/bolbahi-parser';
 import { SmartEntrySavedStage } from './SmartEntrySavedStage';
+import { VoiceWaveform } from './voice/VoiceWaveform';
 import {
   buildReminderMessage,
   buildWhatsAppUrl,
@@ -116,56 +117,6 @@ interface BatchItemState extends ParsedHinglishEntry {
 
 const SPRING_FAST = { type: 'spring' as const, stiffness: 420, damping: 28 };
 const SPRING_SHEET = { type: 'spring' as const, stiffness: 360, damping: 32 };
-
-// Deterministic 22-bar vertical waveform profile (zero Math.random during render)
-const WAVEFORM_HEIGHTS = [
-  10, 16, 24, 14, 28, 34, 20, 38, 26, 42, 30, 44, 28, 36, 22, 34, 18, 28, 24, 16, 20, 12,
-] as const;
-
-function Waveform22Bars({
-  active,
-  aiParsing,
-}: {
-  active: boolean;
-  aiParsing: boolean;
-}) {
-  return (
-    <div
-      aria-label={active ? 'Live audio waveform' : 'Paused waveform'}
-      className="flex items-center justify-center gap-[3px] h-11 px-2 flex-1"
-    >
-      {WAVEFORM_HEIGHTS.map((peak, i) => (
-        <motion.span
-          key={i}
-          animate={
-            active || aiParsing
-              ? {
-                  height: [6, peak, Math.max(8, Math.round(peak * 0.45)), peak * 0.85, 6],
-                  opacity: [0.65, 1, 0.75, 0.95, 0.65],
-                }
-              : {
-                  height: 6,
-                  opacity: 0.35,
-                }
-          }
-          transition={
-            active || aiParsing
-              ? {
-                  duration: aiParsing ? 0.65 : 0.95 + (i % 4) * 0.14,
-                  repeat: Infinity,
-                  repeatType: 'mirror',
-                  ease: 'easeInOut',
-                  delay: (i % 7) * 0.07,
-                }
-              : { duration: 0.25 }
-          }
-          style={{ background: 'var(--munim-gradient)' }}
-          className="w-[3px] rounded-full block"
-        />
-      ))}
-    </div>
-  );
-}
 
 export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   open,
@@ -836,7 +787,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     </span>
                     <div className="min-w-0">
                       <h2 className="font-display text-lg font-extrabold text-[var(--ink)] truncate">
-                        {continuousMode ? 'Hands-Free Counter Mode' : 'Bolne Wala Munim'}
+                        {continuousMode ? 'Hands-Free Counter Mode' : 'Speak to Save'}
                       </h2>
                       <p className="text-[11px] font-semibold text-[var(--ink-muted)] truncate">
                         {aiParsing ? 'Smart AI parsing your speech...' : statusText}
@@ -924,7 +875,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                               {entry.amount > 0 ? formatINR(entry.amount) : '₹...'}
                             </p>
                             <p className="text-[10px] font-bold uppercase text-[var(--ink-muted)]">
-                              {entry.type === 'debit' ? 'Received (Mila)' : 'Given (Udhaar)'}
+                              {entry.type === 'debit' ? 'Received' : 'Credit (Given)'}
                             </p>
                           </div>
                         </div>
@@ -935,8 +886,8 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       <p className="text-sm font-bold text-[var(--ink)] leading-relaxed">
                         {transcript ||
                           (allowBills
-                            ? 'Speak entry, multi-item bill, balance check, or "Aaj ka hisaab"...'
-                            : 'Speak entry, friend balance check, or "Aaj ka hisaab"...')}
+                            ? 'Speak entry, multi-item bill, balance check, or "Today summary"...'
+                            : 'Speak entry, balance check, or "Today summary"...')}
                       </p>
                     </div>
                   )}
@@ -951,7 +902,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       className="flex items-center justify-between gap-2 text-xs bg-[var(--surface)] shadow-[var(--spatial-shadow)] rounded-[20px] px-3.5 py-2.5"
                     >
                       <span className="font-extrabold text-[var(--ink)] truncate">
-                        {item.customerName} · {item.direction === 'given' ? 'Udhaar' : 'Mila'}
+                        {item.customerName} · {item.direction === 'given' ? 'Credit' : 'Received'}
                       </span>
                       <div className="flex items-center gap-2 shrink-0">
                         <span
@@ -1082,7 +1033,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     {listening ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
                   </motion.button>
 
-                  <Waveform22Bars active={listening} aiParsing={aiParsing} />
+                  <VoiceWaveform active={listening} aiParsing={aiParsing} />
 
                   <motion.button
                     whileTap={{ scale: 0.9 }}
@@ -1258,7 +1209,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                             : 'bg-[var(--surface)] text-[var(--ink-muted)]'
                         }`}
                       >
-                        Given (Udhaar)
+                        Given (Credit)
                       </button>
                       <button
                         type="button"
@@ -1269,7 +1220,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                             : 'bg-[var(--surface)] text-[var(--ink-muted)]'
                         }`}
                       >
-                        Received (Mila)
+                        Received
                       </button>
                     </div>
                   </div>
@@ -1387,7 +1338,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                             {item.name || 'Customer'}
                           </p>
                           <p className="text-xs text-[var(--ink-muted)] truncate">
-                            {item.direction === 'given' ? 'Given (Udhaar)' : 'Received (Mila)'}
+                            {item.direction === 'given' ? 'Credit (Given)' : 'Received'}
                             {item.note ? ` · ${item.note}` : ''}
                           </p>
                         </div>
@@ -1442,7 +1393,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     </h2>
                     <p className="text-xs text-[var(--ink-muted)]">
                       Party: <strong>{voiceBillCustomer}</strong> ·{' '}
-                      {voiceBillStatus === 'paid' ? 'Paid Cash/UPI' : 'Post as Udhaar'}
+                      {voiceBillStatus === 'paid' ? 'Paid Cash/UPI' : 'Post as Credit'}
                     </p>
                   </div>
                   <button
@@ -1596,7 +1547,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       No party found matching &quot;{queriedName || 'Customer'}&quot;
                     </p>
                     <p className="text-xs text-[var(--ink-muted)]">
-                      Try speaking their saved name or record a new Udhaar entry.
+                      Try speaking their saved name or record a new Credit entry.
                     </p>
                   </div>
                 )}

@@ -193,7 +193,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
           )}
           <div className="min-w-0">
             <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
-              Staff &amp; Munim Logs
+              Staff &amp; Counter Logs
             </h2>
             <p className="text-xs text-[var(--ink-muted)] leading-snug">
               Multi-operator accountability stamped automatically
@@ -427,7 +427,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
 
             <div className="flex items-center justify-between">
               <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                {editingStaff ? `Edit ${editingStaff.name}` : 'Add Staff / Munim'}
+                {editingStaff ? `Edit ${editingStaff.name}` : 'Add Counter Staff'}
               </h3>
               <button
                 type="button"
@@ -448,7 +448,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ramu Munim"
+                  placeholder="Ramesh Kumar"
                   className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                 />
               </div>

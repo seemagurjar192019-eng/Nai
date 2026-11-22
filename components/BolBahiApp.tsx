@@ -4,11 +4,17 @@ import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } fro
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   deleteUser,
+  GoogleAuthProvider,
+  isSignInWithEmailLink,
   onAuthStateChanged,
   PhoneAuthProvider,
   reauthenticateWithCredential,
+  reauthenticateWithPopup,
   RecaptchaVerifier,
+  sendSignInLinkToEmail,
+  signInWithEmailLink,
   signInWithPhoneNumber,
+  signInWithPopup,
   signOut,
   type ConfirmationResult,
   type User,
@@ -20,14 +26,13 @@ import {
   CloudUpload,
   Edit2,
   KeyRound,
-  MessageCircle,
+  Mail,
   Package,
   Plus,
   RefreshCw,
   ShieldCheck,
   SlidersHorizontal,
   Smartphone,
-  Undo2,
   Volume2,
   VolumeX,
   X,
@@ -155,8 +160,8 @@ import { CashKhataFeed } from './cockpit/CashKhataFeed';
 import { CollectionView } from './CollectionView';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GallaCashbookView } from './GallaCashbookView';
-import { BottomSpatialDock } from './layout/BottomSpatialDock';
-import { DynamicIslandHeader } from './layout/DynamicIslandHeader';
+import { BottomSpatialDock, type DockDestination } from './layout/BottomSpatialDock';
+import { DynamicIslandHeader, type DynamicIslandToast } from './layout/DynamicIslandHeader';
 import { PartyStatementView } from './ledger/PartyStatementView';
 import { ParchiScannerModal } from './ParchiScannerModal';
 import { PersonaOnboardingSheet } from './PersonaOnboardingSheet';
@@ -165,7 +170,6 @@ import {
   AccountSummaryView,
   BusinessProfileView,
   HelpSupportView,
-  MoreBentoView,
   MultiDeviceView,
   NotificationsDrawer,
   PinLockOverlay,
@@ -232,11 +236,16 @@ function BolBahiAppInner() {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
-  // Optional OTP Cloud Sync Bottom Sheet state
+  // Optional Multi-Auth Cloud Sync Bottom Sheet state (Google + Email Link + Mobile OTP)
   const [syncSheetOpen, setSyncSheetOpen] = useState(false);
   const [syncPhoneInput, setSyncPhoneInput] = useState(
     () => guestVault.profile.mobileNumber || ''
   );
+  const [syncEmailInput, setSyncEmailInput] = useState('');
+  const [emailLinkSentTo, setEmailLinkSentTo] = useState('');
+  const [showPhoneOtpInSync, setShowPhoneOtpInSync] = useState(false);
+  const [emailConfirmPrompt, setEmailConfirmPrompt] = useState(false);
+  const [emailConfirmInput, setEmailConfirmInput] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [otpSentTo, setOtpSentTo] = useState<string | null>(null);
   const [otpResendCooldown, setOtpResendCooldown] = useState(0);
@@ -281,7 +290,7 @@ function BolBahiAppInner() {
   const [personaOnboardingOpen, setPersonaOnboardingOpen] = useState<boolean>(
     () => !loadPersonaPrefs().onboarded
   );
-  const [personaOnboardingStep, setPersonaOnboardingStep] = useState<1 | 2>(1);
+  const [personaOnboardingStep, setPersonaOnboardingStep] = useState<1 | 2 | 3>(1);
   const [showAllModes, setShowAllModes] = useState(false);
 
   // Voice, Counter Mode, AI Parchi Scanner & Bill Drafts
@@ -460,49 +469,6 @@ function BolBahiAppInner() {
     };
   }, []);
 
-  // Register Service Worker, hydrate notification prefs, and capture PWA shortcut params
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker
-          .register('/sw.js')
-          .then((reg) => reg.update().catch(() => {}))
-          .catch(() => {});
-      }
-      const params = new URLSearchParams(window.location.search);
-      const actionParam = params.get('action');
-      const tabParam = params.get('tab');
-      if (actionParam || tabParam) {
-        pendingLaunchRef.current = { action: actionParam, tab: tabParam };
-      }
-
-      Promise.resolve().then(() => {
-        try {
-          const rawNotifs =
-            localStorage.getItem('ucred_notif_prefs') ||
-            localStorage.getItem('bolbahi_notif_prefs');
-          if (rawNotifs) {
-            setNotifPrefs(JSON.parse(rawNotifs) as NotifPrefsMap);
-          }
-        } catch {
-          // Ignore storage read errors
-        }
-      });
-    }
-  }, []);
-
-  // Apply Light / Dark mode + Accent Theme on documentElement
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const root = document.documentElement;
-    if (accentTheme === 'rose') {
-      root.setAttribute('data-accent', 'rose');
-    } else {
-      root.removeAttribute('data-accent');
-    }
-    root.classList.toggle('dark', appearance === 'dark');
-  }, [appearance, accentTheme]);
-
   // Merge local guest records into Firestore when authenticating
   const mergeGuestVaultIntoFirestore = async (
     uid: string,
@@ -613,6 +579,100 @@ function BolBahiAppInner() {
     setGuestVault(freshGuest);
     return saved;
   };
+
+  // Register Service Worker, hydrate notification prefs, and capture PWA shortcut params
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .register('/sw.js')
+          .then((reg) => reg.update().catch(() => {}))
+          .catch(() => {});
+      }
+      const params = new URLSearchParams(window.location.search);
+      const actionParam = params.get('action');
+      const tabParam = params.get('tab');
+      const autostartParam = params.get('autostart');
+      if (actionParam || tabParam) {
+        pendingLaunchRef.current = { action: actionParam, tab: tabParam };
+      }
+      if (autostartParam === '1') {
+        Promise.resolve().then(() => {
+          const saved = savePersonaPrefs({ ...loadPersonaPrefs(), onboarded: true });
+          setPersonaPrefs(saved);
+          setPersonaOnboardingOpen(false);
+        });
+      }
+
+      Promise.resolve().then(() => {
+        try {
+          const rawNotifs =
+            localStorage.getItem('ucred_notif_prefs') ||
+            localStorage.getItem('bolbahi_notif_prefs');
+          if (rawNotifs) {
+            setNotifPrefs(JSON.parse(rawNotifs) as NotifPrefsMap);
+          }
+        } catch {
+          // Ignore storage read errors
+        }
+      });
+
+      // Handle Passwordless Email Verification Link return
+      if (isSignInWithEmailLink(auth, window.location.href)) {
+        const pendingEmail = (() => {
+          try {
+            return localStorage.getItem('ucred_email_link_pending') || '';
+          } catch {
+            return '';
+          }
+        })();
+        if (pendingEmail) {
+          authFlowBusyRef.current = true;
+          signInWithEmailLink(auth, pendingEmail, window.location.href)
+            .then(async (cred) => {
+              try {
+                localStorage.removeItem('ucred_email_link_pending');
+              } catch {
+                // Ignore storage cleanup error
+              }
+              window.history.replaceState(null, '', '/');
+              const existing = await getUserProfile(cred.user.uid);
+              const saved = await mergeGuestVaultIntoFirestore(
+                cred.user.uid,
+                mobileNumber,
+                existing
+              );
+              setProfile(saved);
+              if (!saved.appLockPin) setPinUnlocked(true);
+              setPersonaOnboardingStep((prev) => (prev === 2 ? 3 : prev));
+            })
+            .catch((err) => {
+              setAuthError(
+                err instanceof Error ? err.message : 'Email verification link expired or invalid.'
+              );
+            })
+            .finally(() => {
+              authFlowBusyRef.current = false;
+            });
+        } else {
+          Promise.resolve().then(() => setEmailConfirmPrompt(true));
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Apply Light / Dark mode + Accent Theme on documentElement
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    if (accentTheme === 'rose') {
+      root.setAttribute('data-accent', 'rose');
+    } else {
+      root.removeAttribute('data-accent');
+    }
+    root.classList.toggle('dark', appearance === 'dark');
+  }, [appearance, accentTheme]);
 
   // Background Firebase Auth listener (never blocks Guest Mode entry)
   useEffect(() => {
@@ -979,6 +1039,7 @@ function BolBahiAppInner() {
       setTimeout(() => {
         setSyncSheetOpen(false);
         setSyncSuccessMsg('');
+        setPersonaOnboardingStep((prev) => (prev === 2 ? 3 : prev));
       }, 1300);
     } catch (err) {
       setAuthError(formatFirebasePhoneError(err));
@@ -994,6 +1055,108 @@ function BolBahiAppInner() {
     setOtpInput('');
     setOtpResendCooldown(0);
     setAuthError('');
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthError('');
+    setSyncSuccessMsg('');
+    setAuthBusy(true);
+    authFlowBusyRef.current = true;
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const cred = await signInWithPopup(auth, provider);
+      const fbUser = cred.user;
+      const phoneDigits =
+        (fbUser.phoneNumber || '').replace(/^\+91/, '').replace(/\D/g, '').slice(-10) ||
+        syncPhoneInput ||
+        mobileNumber;
+      const existing = await getUserProfile(fbUser.uid);
+      const saved = await mergeGuestVaultIntoFirestore(fbUser.uid, phoneDigits, existing);
+      setProfile(saved);
+      if (!saved.appLockPin) setPinUnlocked(true);
+      setSyncSuccessMsg('Google Cloud Sync connected!');
+      setTimeout(() => {
+        setSyncSheetOpen(false);
+        setSyncSuccessMsg('');
+        setPersonaOnboardingStep((prev) => (prev === 2 ? 3 : prev));
+      }, 1100);
+    } catch (err) {
+      const code = err instanceof Error ? err.message : String(err || '');
+      if (code.includes('popup-closed-by-user')) {
+        setAuthError('Google sign-in cancelled.');
+      } else if (code.includes('popup-blocked')) {
+        setAuthError('Browser blocked pop-up. Allow pop-ups or use Email Verification Link below.');
+      } else if (code.includes('operation-not-allowed')) {
+        setAuthError('Google sign-in is disabled in Firebase Console. Enable Google under Authentication.');
+      } else {
+        setAuthError(code || 'Google sign-in failed. Please try again.');
+      }
+    } finally {
+      authFlowBusyRef.current = false;
+      setAuthBusy(false);
+    }
+  };
+
+  const handleSendEmailLink = async (rawEmail: string) => {
+    const cleanEmail = rawEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setAuthError('Enter a valid email address.');
+      return;
+    }
+    setAuthError('');
+    setSyncSuccessMsg('');
+    setAuthBusy(true);
+    try {
+      const actionCodeSettings = {
+        url: typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://ucred.app/',
+        handleCodeInApp: true,
+      };
+      await sendSignInLinkToEmail(auth, cleanEmail, actionCodeSettings);
+      try {
+        localStorage.setItem('ucred_email_link_pending', cleanEmail);
+      } catch {
+        // Ignore storage write errors
+      }
+      setSyncEmailInput(cleanEmail);
+      setEmailLinkSentTo(cleanEmail);
+    } catch (err) {
+      const code = err instanceof Error ? err.message : String(err || '');
+      if (code.includes('operation-not-allowed')) {
+        setAuthError('Email link sign-in is disabled in Firebase Console. Enable Email Link under Authentication.');
+      } else {
+        setAuthError(code || 'Could not send verification link.');
+      }
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleConfirmCrossBrowserEmailLink = async () => {
+    const cleanEmail = emailConfirmInput.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setAuthError('Enter the exact email address where you received the sign-in link.');
+      return;
+    }
+    setAuthError('');
+    setAuthBusy(true);
+    authFlowBusyRef.current = true;
+    try {
+      const cred = await signInWithEmailLink(auth, cleanEmail, window.location.href);
+      window.history.replaceState(null, '', '/');
+      const existing = await getUserProfile(cred.user.uid);
+      const saved = await mergeGuestVaultIntoFirestore(cred.user.uid, mobileNumber, existing);
+      setProfile(saved);
+      if (!saved.appLockPin) setPinUnlocked(true);
+      setEmailConfirmPrompt(false);
+      setEmailConfirmInput('');
+      setPersonaOnboardingStep((prev) => (prev === 2 ? 3 : prev));
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Email link verification failed.');
+    } finally {
+      authFlowBusyRef.current = false;
+      setAuthBusy(false);
+    }
   };
 
   const startOtpReauthFlow = async (target: 'delete-account' | 'forgot-pin') => {
@@ -1305,9 +1468,9 @@ function BolBahiAppInner() {
     if (capabilities.focus !== 'personal') {
       items.push({
         id: 'tip-parchi-scanner',
-        title: 'Scan Handwritten Parchi with AI',
+        title: 'Scan Handwritten Receipt with AI',
         bullets: [
-          'Snap any handwritten kacha slip or supplier bill to auto-extract party, items & ₹ total.',
+          'Snap any handwritten slip or supplier bill to auto-extract party, items & ₹ total.',
         ],
         actionLabel: 'Open Scanner',
         targetAction: 'parchi',
@@ -1321,7 +1484,7 @@ function BolBahiAppInner() {
       id: 'tip-voice-entry',
       title:
         capabilities.focus === 'personal'
-          ? 'Bolne Wala Munim · Hands-Free Voice'
+          ? 'Voice Munim · Hands-Free Voice'
           : 'Hands-Free Counter Mode & AI Voice Bills',
       bullets: [
         capabilities.focus === 'personal'
@@ -1520,7 +1683,7 @@ function BolBahiAppInner() {
         actorName: activeOperator.name,
         actorRole: activeOperator.role,
         actionType: 'ledger',
-        summary: `Voice ${entry.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${entry.amount} for ${entry.customerName}`,
+        summary: `Voice ${entry.direction === 'given' ? 'Credit' : 'Received'} ₹${entry.amount} for ${entry.customerName}`,
         targetName: entry.customerName,
         amount: entry.amount,
       });
@@ -1579,7 +1742,7 @@ function BolBahiAppInner() {
     });
     logActivity(
       'ledger',
-      `Voice ${entry.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${entry.amount} for ${entry.customerName}`,
+      `Voice ${entry.direction === 'given' ? 'Credit' : 'Received'} ₹${entry.amount} for ${entry.customerName}`,
       entry.customerName,
       entry.amount
     );
@@ -1646,7 +1809,7 @@ function BolBahiAppInner() {
         actorName: activeOperator.name,
         actorRole: activeOperator.role,
         actionType: 'ledger',
-        summary: `Quick ${payload.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${payload.amount} for ${account.name}`,
+        summary: `Quick ${payload.direction === 'given' ? 'Credit' : 'Received'} ₹${payload.amount} for ${account.name}`,
         targetName: account.name,
         amount: payload.amount,
       });
@@ -1690,7 +1853,7 @@ function BolBahiAppInner() {
     });
     logActivity(
       'ledger',
-      `Quick ${payload.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${payload.amount} for ${account.name}`,
+      `Quick ${payload.direction === 'given' ? 'Credit' : 'Received'} ₹${payload.amount} for ${account.name}`,
       account.name,
       payload.amount
     );
@@ -1770,9 +1933,18 @@ function BolBahiAppInner() {
 
   const handleDeleteAccount = async () => {
     if (!user) return;
+    const hasGoogle = user.providerData.some((p) => p.providerId === 'google.com');
     if (needsRecentSignIn(user.metadata.lastSignInTime)) {
-      await startOtpReauthFlow('delete-account');
-      return;
+      if (hasGoogle) {
+        await reauthenticateWithPopup(user, new GoogleAuthProvider());
+      } else if (user.phoneNumber) {
+        await startOtpReauthFlow('delete-account');
+        return;
+      } else {
+        throw new Error(
+          'For security, please Sign Out and sign in again with your Email Link, then tap Delete Forever.'
+        );
+      }
     }
     await deleteUserAccountCascade(user.uid);
     try {
@@ -1780,10 +1952,20 @@ function BolBahiAppInner() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('requires-recent-login')) {
-        await startOtpReauthFlow('delete-account');
-        return;
+        if (hasGoogle) {
+          await reauthenticateWithPopup(user, new GoogleAuthProvider());
+          await deleteUser(user);
+        } else if (user.phoneNumber) {
+          await startOtpReauthFlow('delete-account');
+          return;
+        } else {
+          throw new Error(
+            'For security, please Sign Out and sign in again with your Email Link, then tap Delete Forever.'
+          );
+        }
+      } else {
+        throw err;
       }
-      throw err;
     }
     clearGuestVault();
     try {
@@ -1850,11 +2032,13 @@ function BolBahiAppInner() {
   const unreadCount = notifications.filter((n) => !n.read).length;
   const verifiedPhoneDisplay = isGuestMode
     ? 'Guest Mode'
-    : user?.phoneNumber || (mobileNumber ? `+91 ${mobileNumber}` : 'Cloud Verified');
+    : user?.email || user?.phoneNumber || (mobileNumber ? `+91 ${mobileNumber}` : 'Cloud Verified');
 
   const openCloudSyncSheet = () => {
     setAuthError('');
     setSyncSuccessMsg('');
+    setEmailLinkSentTo('');
+    setShowPhoneOtpInSync(false);
     if (mobileNumber && !syncPhoneInput) setSyncPhoneInput(mobileNumber);
     setSyncSheetOpen(true);
   };
@@ -1876,17 +2060,62 @@ function BolBahiAppInner() {
     mainScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const islandToast: DynamicIslandToast | null = actionToast
+    ? {
+        id: actionToast.tx.id,
+        kind: actionToast.kind,
+        title:
+          actionToast.kind === 'added'
+            ? `Saved ${formatINR(actionToast.tx.amount)}`
+            : `Removed ${formatINR(actionToast.tx.amount)}`,
+        subtitle:
+          actionToast.kind === 'added'
+            ? `${actionToast.account.name} · Bal ${formatINR(Math.abs(actionToast.newBalance))}`
+            : `${actionToast.account.name} · Entry removed`,
+        whatsappUrl:
+          actionToast.kind === 'added'
+            ? buildWhatsAppUrl(
+                actionToast.account.phone,
+                buildTransactionSlipMessage({
+                  customerName: actionToast.account.name,
+                  direction: actionToast.tx.direction,
+                  amount: actionToast.tx.amount,
+                  newBalance: actionToast.newBalance,
+                  shopName: currentBusiness.name,
+                  upiId: currentBusiness.upiId,
+                  language,
+                })
+              )
+            : undefined,
+        onUndo: () => void handleUndoToast(),
+        onDismiss: dismissActionToast,
+      }
+    : null;
+
+  const activeDockDestination: DockDestination =
+    effectiveMainTab === 'more' || effectiveSecondaryRoute === 'settings'
+      ? 'settings'
+      : effectiveSecondaryRoute === 'account-summary' && !capabilities.showGstBills
+        ? 'bills'
+        : effectiveMainTab === 'bills' || effectiveMainTab === 'stock'
+          ? 'bills'
+          : effectiveMainTab === 'collection'
+            ? 'overdue'
+            : 'home';
+
   const showSubNavStrip =
     !selectedAccount &&
-    ((!effectiveSecondaryRoute && effectiveMainTab !== 'ledger') ||
-      (capabilities.focus === 'personal' && effectiveSecondaryRoute === 'account-summary'));
+    !effectiveSecondaryRoute &&
+    effectiveMainTab !== 'ledger' &&
+    effectiveMainTab !== 'more';
+  const hasForegroundOverlay = Boolean(selectedAccount || effectiveSecondaryRoute);
 
   return (
-    <div className="max-w-[430px] mx-auto h-dvh overflow-hidden relative shadow-2xl flex flex-col select-none spatial-shell-bg native-app-shell text-[var(--ink)]">
+    <div className="w-full max-w-[460px] lg:max-w-[1040px] mx-auto h-dvh overflow-hidden relative shadow-2xl flex flex-col select-none spatial-shell-bg native-app-shell text-[var(--ink)]">
       <OfflineIndicator />
 
-      {/* Scroll-Linked Matte Dynamic Island Header */}
-      {!selectedAccount && !personaOnboardingOpen && (
+      {/* Scroll-Linked Living Matte Dynamic Island Header */}
+      {!hasForegroundOverlay && !personaOnboardingOpen && (
         <DynamicIslandHeader
           business={currentBusiness}
           isGuestMode={isGuestMode}
@@ -1904,6 +2133,9 @@ function BolBahiAppInner() {
           dockedPillOpacity={spatialMotion.dockedPillOpacity}
           dockedPillScale={spatialMotion.dockedPillScale}
           dockedPillY={spatialMotion.dockedPillY}
+          voiceModalOpen={voiceModalOpen}
+          islandToast={islandToast}
+          undoBusy={undoBusy}
           onOpenBusinessSwitcher={() => setBizSwitcherOpen(true)}
           onToggleSearch={() => setSearchOpen((v) => !v)}
           onChangeSearch={setSearchQuery}
@@ -1915,23 +2147,23 @@ function BolBahiAppInner() {
           }}
           onSwitchPersonaFocus={handleSwitchPersonaFocus}
           onEditPersonaModes={() => {
-            setPersonaOnboardingStep(2);
+            setPersonaOnboardingStep(3);
             setPersonaOnboardingOpen(true);
           }}
           onBackToTop={handleBackToTop}
         />
       )}
 
-      {/* Cockpit Main Canvas (Recesses Smoothly along Z-Axis when Party Statement Opens) */}
+      {/* Cockpit Main Canvas (Recesses Smoothly along Z-Axis when Statement or Secondary Overlay Opens) */}
       <main
         ref={mainScrollRef}
-        className={`flex-1 min-h-0 w-full overflow-y-auto no-scrollbar px-4 py-3 pb-32 origin-top transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-          selectedAccount
-            ? 'scale-[0.94] -translate-y-2 opacity-55 pointer-events-none will-change-transform'
+        className={`flex-1 min-h-0 w-full overflow-y-auto no-scrollbar px-4 lg:px-6 py-3 pb-32 origin-top transition-[transform,opacity,border-radius,filter] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          hasForegroundOverlay
+            ? 'scale-[0.92] -translate-y-2.5 rounded-[34px] opacity-45 brightness-90 pointer-events-none will-change-transform'
             : ''
         }`}
       >
-        {/* Crisp Home Return + Persona-Gated Sub-Tool Switcher Bar */}
+        {/* Single Unified Home Return + Sub-Tool Switcher Bar (Zero Double Back Buttons) */}
         {showSubNavStrip && (
           <div className="mb-3 flex items-center justify-between gap-2">
             <motion.button
@@ -1950,15 +2182,11 @@ function BolBahiAppInner() {
             </motion.button>
 
             {(effectiveMainTab === 'bills' ||
-              effectiveMainTab === 'stock' ||
-              effectiveMainTab === 'more' ||
-              effectiveSecondaryRoute === 'account-summary') && (
+              effectiveMainTab === 'stock') && (
               <div className="flex items-center gap-1 rounded-full bg-[var(--surface-subtle)] p-1">
                 {subNavigationTabs.map((sub) => {
                   const subActive =
-                    sub.id === 'activity'
-                      ? effectiveSecondaryRoute === 'account-summary'
-                      : !effectiveSecondaryRoute && effectiveMainTab === sub.id;
+                    sub.id === 'activity' ? false : effectiveMainTab === sub.id;
                   return (
                     <button
                       key={sub.id}
@@ -1987,248 +2215,8 @@ function BolBahiAppInner() {
           </div>
         )}
 
-        {effectiveSecondaryRoute === 'galla' && capabilities.showGalla && (
-          <GallaCashbookView
-            cashbookEntries={activeCashbookEntries}
-            transactions={activeTransactions}
-            bills={activeBills}
-            stockItems={activeStockItems}
-            activeOperatorName={activeOperator.name}
-            hideBalance={hideBalance}
-            onToggleHideBalance={() => setHideBalance((v) => !v)}
-            onAddEntry={async (payload) => {
-              if (isGuestMode) {
-                updateGuestVault(
-                  (prev) =>
-                    applyAddCashbookEntry(prev, {
-                      businessId: currentBusiness.id,
-                      entryType: payload.entryType,
-                      mode: payload.mode,
-                      category: payload.category,
-                      amount: payload.amount,
-                      note: payload.note,
-                      entryDate: payload.entryDate,
-                      actorName: activeOperator.name,
-                    }).vault
-                );
-              } else if (user) {
-                await addCashbookEntry({
-                  ownerId: user.uid,
-                  businessId: currentBusiness.id,
-                  entryType: payload.entryType,
-                  mode: payload.mode,
-                  category: payload.category,
-                  amount: payload.amount,
-                  note: payload.note,
-                  entryDate: payload.entryDate,
-                  actorName: activeOperator.name,
-                });
-              }
-              logActivity(
-                'galla',
-                `Galla ${payload.entryType} ₹${payload.amount} (${payload.category})`,
-                payload.category,
-                payload.amount
-              );
-            }}
-            onDeleteEntry={async (entryId) => {
-              if (isGuestMode) {
-                updateGuestVault((prev) => applyDeleteCashbookEntry(prev, entryId));
-              } else {
-                await deleteCashbookEntry(entryId);
-              }
-              logActivity('galla', 'Deleted Galla cashbook entry');
-            }}
-            onBack={() => setSecondaryRoute(null)}
-          />
-        )}
-
-        {effectiveSecondaryRoute === 'staff-audit' && (
-          <StaffAuditView
-            uid={activeOwnerUid}
-            staffMembers={activeStaffMembers}
-            activityLogs={activeActivityLogs}
-            activeOperator={activeOperator}
-            onSwitchOperator={(op) => {
-              setActiveOperator(op);
-              logActivity('staff', `Counter switched to ${op.name} (${op.role})`, op.name);
-            }}
-            onSaveStaff={async (payload) => {
-              if (isGuestMode) {
-                updateGuestVault(
-                  (prev) =>
-                    applySaveStaffMember(prev, {
-                      businessId: currentBusiness.id,
-                      ...payload,
-                    }).vault
-                );
-              } else if (user) {
-                await saveStaffMember({
-                  ownerId: user.uid,
-                  businessId: currentBusiness.id,
-                  ...payload,
-                });
-              }
-              logActivity(
-                'staff',
-                `${payload.existingId ? 'Updated' : 'Added'} staff ${payload.name} (${payload.role})`,
-                payload.name
-              );
-            }}
-            onDeleteStaff={async (staffId) => {
-              const st = activeStaffMembers.find((s) => s.id === staffId);
-              if (isGuestMode) {
-                updateGuestVault((prev) => applyDeleteStaffMember(prev, staffId));
-              } else {
-                await deleteStaffMember(staffId);
-              }
-              if (activeOperator.staffId === staffId) {
-                setActiveOperator({ staffId: 'owner', name: 'Shop Owner', role: 'owner' });
-              }
-              logActivity('staff', `Removed staff ${st?.name || ''}`, st?.name);
-            }}
-            onBack={() => setSecondaryRoute(null)}
-          />
-        )}
-
-        {effectiveSecondaryRoute === 'settings' && (
-          <SettingsView
-            key={currentBusiness.id}
-            language={language}
-            appearance={appearance}
-            mobileNumber={mobileNumber}
-            verifiedPhone={verifiedPhoneDisplay}
-            business={currentBusiness}
-            appLockPin={appLockPin}
-            isGuestMode={isGuestMode}
-            onOpenCloudSync={openCloudSyncSheet}
-            onBack={() => setSecondaryRoute(null)}
-            onChangeLanguage={handleSelectLanguage}
-            onChangeAppearance={handleSetAppearance}
-            onSaveMobile={async (phone) => {
-              persistPrelogin({ mobileNumber: phone });
-              if (isGuestMode) {
-                updateGuestVault((prev) =>
-                  applyUpdateBusiness(
-                    { ...prev, profile: { ...prev.profile, mobileNumber: phone } },
-                    currentBusiness.id,
-                    { phone }
-                  )
-                );
-                return;
-              }
-              if (!user) return;
-              const updated = await upsertUserProfile(user.uid, { mobileNumber: phone });
-              setProfile(updated);
-              await updateBusiness(currentBusiness.id, { phone });
-            }}
-            onSaveUpiId={async (upiId) => {
-              if (isGuestMode) {
-                updateGuestVault((prev) => applyUpdateBusiness(prev, currentBusiness.id, { upiId }));
-                return;
-              }
-              await updateBusiness(currentBusiness.id, { upiId });
-            }}
-            onSavePin={async (pin) => {
-              if (isGuestMode) {
-                const hashedPin = pin ? await hashPinForUid(pin, GUEST_OWNER_ID) : '';
-                updateGuestVault((prev) => ({
-                  ...prev,
-                  profile: { ...prev.profile, appLockPin: hashedPin },
-                }));
-                setPinUnlocked(true);
-                return;
-              }
-              if (!user) return;
-              const hashedPin = pin ? await hashPinForUid(pin, user.uid) : '';
-              const updated = await upsertUserProfile(user.uid, { appLockPin: hashedPin });
-              setProfile(updated);
-              setPinUnlocked(true);
-            }}
-            onExportCsv={handleExportCsv}
-            onExportJson={handleExportJson}
-            onRestoreJson={handleRestoreJson}
-            onClearAll={async () => {
-              if (isGuestMode) {
-                updateGuestVault((prev) => applyClearBusinessData(prev, currentBusiness.id));
-                setSelectedAccountId(null);
-                return;
-              }
-              if (!user) return;
-              await clearBusinessData(user.uid, currentBusiness.id);
-              setSelectedAccountId(null);
-            }}
-            onDeleteAccount={handleDeleteAccount}
-            onLogout={async () => {
-              await signOut(auth);
-              setSecondaryRoute(null);
-              setSelectedAccountId(null);
-            }}
-          />
-        )}
-
-        {effectiveSecondaryRoute === 'business-profile' && (
-          <BusinessProfileView
-            key={currentBusiness.id}
-            business={currentBusiness}
-            canDeleteBusiness={activeBusinesses.length > 1}
-            onBack={() => setSecondaryRoute(null)}
-            onSave={async (patch) => {
-              if (isGuestMode) {
-                updateGuestVault((prev) => applyUpdateBusiness(prev, currentBusiness.id, patch));
-              } else {
-                await updateBusiness(currentBusiness.id, patch);
-              }
-              logActivity('account', 'Updated business profile', patch.name || currentBusiness.name);
-            }}
-            onDeleteBusiness={async () => {
-              if (isGuestMode) {
-                updateGuestVault((prev) => applyDeleteBusinessCascade(prev, currentBusiness.id));
-                setSelectedAccountId(null);
-                setSecondaryRoute(null);
-                return;
-              }
-              if (!user) return;
-              const fallback = activeBusinesses.find((b) => b.id !== currentBusiness.id);
-              await deleteBusinessCascade(user.uid, currentBusiness.id);
-              if (fallback) {
-                const updated = await upsertUserProfile(user.uid, {
-                  activeBusinessId: fallback.id,
-                });
-                setProfile(updated);
-              }
-              setSelectedAccountId(null);
-              setSecondaryRoute(null);
-            }}
-          />
-        )}
-
-        {effectiveSecondaryRoute === 'account-summary' && (
-          <AccountSummaryView
-            accounts={scopedAccounts}
-            transactions={scopedTransactions}
-            onBack={() => setSecondaryRoute(null)}
-            onExportJson={handleExportJson}
-            onExportCsv={handleExportCsv}
-          />
-        )}
-
-        {effectiveSecondaryRoute === 'multi-device' && (
-          <MultiDeviceView
-            verifiedPhone={verifiedPhoneDisplay}
-            mobileNumber={mobileNumber}
-            isGuestMode={isGuestMode}
-            onOpenCloudSync={openCloudSyncSheet}
-            onBack={() => setSecondaryRoute(null)}
-          />
-        )}
-
-        {effectiveSecondaryRoute === 'help-support' && (
-          <HelpSupportView onBack={() => setSecondaryRoute(null)} />
-        )}
-
-        {/* Home Cockpit: Cash & Khata Feed */}
-        {!effectiveSecondaryRoute && effectiveMainTab === 'ledger' && (
+        {/* Home Cockpit: Cash & Khata Feed (Always mounted behind overlays when on ledger or foreground overlay) */}
+        {(effectiveMainTab === 'ledger' || Boolean(effectiveSecondaryRoute)) && (
           <CashKhataFeed
             accounts={scopedAccounts}
             transactions={scopedTransactions}
@@ -2248,6 +2236,9 @@ function BolBahiAppInner() {
             heroOpacity={spatialMotion.heroOpacity}
             heroScale={spatialMotion.heroScale}
             heroY={spatialMotion.heroY}
+            largeTitleOpacity={spatialMotion.largeTitleOpacity}
+            largeTitleScale={spatialMotion.largeTitleScale}
+            largeTitleY={spatialMotion.largeTitleY}
             jellySkew={spatialMotion.jellySkew}
             onToggleHideBalance={() => setHideBalance((v) => !v)}
             onToggleShowAllModes={() => setShowAllModes((v) => !v)}
@@ -2300,6 +2291,16 @@ function BolBahiAppInner() {
               setVoicePrefillName('');
               setVoiceCounterMode(false);
               setVoiceModalOpen(true);
+            }}
+            onRunVoiceDemo={() => {
+              void handleVoiceSave({
+                customerName: 'Ramesh',
+                direction: 'given',
+                amount: 500,
+                note: 'Voice Demo Entry',
+                voiceRaw: 'Ramesh 500 credit',
+                kind: 'customer',
+              });
             }}
             onOpenCounterMode={() => {
               setVoicePrefillName('');
@@ -2582,48 +2583,102 @@ function BolBahiAppInner() {
         )}
 
         {!effectiveSecondaryRoute && effectiveMainTab === 'more' && (
-          <MoreBentoView
-            business={currentBusiness}
+          <SettingsView
+            key={currentBusiness.id}
             appearance={appearance}
             accentTheme={accentTheme}
+            mobileNumber={mobileNumber}
             verifiedPhone={verifiedPhoneDisplay}
             activeOperatorName={activeOperator.name}
+            workspaceBadge={personaAdaptation.focusBadge}
+            business={currentBusiness}
+            appLockPin={appLockPin}
             isGuestMode={isGuestMode}
+            showBackButton={false}
             capabilities={capabilities}
             onOpenCloudSync={openCloudSyncSheet}
-            onToggleAppearance={() => void handleToggleAppearance()}
+            onOpenWorkspaces={() => {
+              setPersonaOnboardingStep(3);
+              setPersonaOnboardingOpen(true);
+            }}
+            onOpenBusinessProfile={() => setSecondaryRoute('business-profile')}
+            onOpenStaffAudit={() => setSecondaryRoute('staff-audit')}
+            onOpenGalla={
+              capabilities.showGalla ? () => setSecondaryRoute('galla') : undefined
+            }
+            onOpenStock={
+              capabilities.showStock
+                ? () => {
+                    setSecondaryRoute(null);
+                    setMainTab('stock');
+                  }
+                : undefined
+            }
+            onOpenHelp={() => setSecondaryRoute('help-support')}
+            onChangeAppearance={handleSetAppearance}
             onSelectAccentTheme={(theme) => void handleSelectAccentTheme(theme)}
-            onOpenBusinessSwitcher={() => setBizSwitcherOpen(true)}
-            onNavigate={(target) => {
-              setSelectedAccountId(null);
-              if (target === 'scan-parchi') {
-                if (capabilities.focus !== 'personal') setParchiScannerOpen(true);
+            onSaveMobile={async (phone) => {
+              persistPrelogin({ mobileNumber: phone });
+              if (isGuestMode) {
+                updateGuestVault((prev) =>
+                  applyUpdateBusiness(
+                    { ...prev, profile: { ...prev.profile, mobileNumber: phone } },
+                    currentBusiness.id,
+                    { phone }
+                  )
+                );
                 return;
               }
-              if (target === 'bills') {
-                if (!capabilities.showGstBills) return;
-                setSecondaryRoute(null);
-                setMainTab('bills');
+              if (!user) return;
+              const updated = await upsertUserProfile(user.uid, { mobileNumber: phone });
+              setProfile(updated);
+              await updateBusiness(currentBusiness.id, { phone });
+            }}
+            onSaveUpiId={async (upiId) => {
+              if (isGuestMode) {
+                updateGuestVault((prev) =>
+                  applyUpdateBusiness(prev, currentBusiness.id, { upiId })
+                );
                 return;
               }
-              if (target === 'stock') {
-                if (!capabilities.showStock) return;
-                setSecondaryRoute(null);
-                setMainTab('stock');
+              await updateBusiness(currentBusiness.id, { upiId });
+            }}
+            onSavePin={async (pin) => {
+              if (isGuestMode) {
+                const hashedPin = pin ? await hashPinForUid(pin, GUEST_OWNER_ID) : '';
+                updateGuestVault((prev) => ({
+                  ...prev,
+                  profile: { ...prev.profile, appLockPin: hashedPin },
+                }));
+                setPinUnlocked(true);
                 return;
               }
-              if (target === 'collection') {
-                setSecondaryRoute(null);
-                setMainTab('collection');
-              } else if (target === 'galla') {
-                if (!capabilities.showGalla) return;
-                setSecondaryRoute('galla');
-              } else {
-                setSecondaryRoute(target);
-              }
+              if (!user) return;
+              const hashedPin = pin ? await hashPinForUid(pin, user.uid) : '';
+              const updated = await upsertUserProfile(user.uid, { appLockPin: hashedPin });
+              setProfile(updated);
+              setPinUnlocked(true);
             }}
             onExportCsv={handleExportCsv}
             onExportJson={handleExportJson}
+            onRestoreJson={handleRestoreJson}
+            onClearAll={async () => {
+              if (isGuestMode) {
+                updateGuestVault((prev) => applyClearBusinessData(prev, currentBusiness.id));
+                setSelectedAccountId(null);
+                return;
+              }
+              if (!user) return;
+              await clearBusinessData(user.uid, currentBusiness.id);
+              setSelectedAccountId(null);
+            }}
+            onDeleteAccount={handleDeleteAccount}
+            onLogout={async () => {
+              await signOut(auth);
+              setSecondaryRoute(null);
+              setSelectedAccountId(null);
+              setMainTab('ledger');
+            }}
           />
         )}
       </main>
@@ -2631,8 +2686,9 @@ function BolBahiAppInner() {
       {/* Z-Axis Foreground Party Statement Sheet (Shared layoutId Morph from PartyLedgerCard) */}
       <AnimatePresence>
         {selectedAccount && (
-          <div className="absolute inset-0 z-30 p-3 pt-4 pb-3 flex flex-col">
-            <PartyStatementView
+          <div className="absolute inset-0 z-30 p-3 pt-4 pb-3 flex flex-col items-center">
+            <div className="w-full max-w-[560px] flex-1 min-h-0 flex flex-col">
+              <PartyStatementView
               key={selectedAccount.id}
               account={selectedAccount}
               business={currentBusiness}
@@ -2668,7 +2724,7 @@ function BolBahiAppInner() {
                     actorName: activeOperator.name,
                     actorRole: activeOperator.role,
                     actionType: 'ledger',
-                    summary: `${payload.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${payload.amount} for ${selectedAccount.name}`,
+                    summary: `${payload.direction === 'given' ? 'Credit' : 'Received'} ₹${payload.amount} for ${selectedAccount.name}`,
                     targetName: selectedAccount.name,
                     amount: payload.amount,
                   });
@@ -2709,7 +2765,7 @@ function BolBahiAppInner() {
                 });
                 logActivity(
                   'ledger',
-                  `${payload.direction === 'given' ? 'Udhaar' : 'Jama'} ₹${payload.amount} for ${selectedAccount.name}`,
+                  `${payload.direction === 'given' ? 'Credit' : 'Received'} ₹${payload.amount} for ${selectedAccount.name}`,
                   selectedAccount.name,
                   payload.amount
                 );
@@ -2801,52 +2857,332 @@ function BolBahiAppInner() {
                 setSelectedAccountId(null);
                 setMainTab('bills');
               }}
-            />
+              />
+            </div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Solid Matte Spatial Bottom Dock: Separated Left Pill + Center Matte Indigo Mic Orb + Right Pill */}
-      {!selectedAccount && !personaOnboardingOpen && (
+      {/* Z-Axis In-Place Overlay Sheet for Secondary Routes (Single Header · Zero Double Back Buttons) */}
+      <AnimatePresence>
+        {!selectedAccount && effectiveSecondaryRoute && (
+          <motion.div
+            key={`secondary-overlay-${effectiveSecondaryRoute}`}
+            initial={{ opacity: 0, y: 26, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 26, scale: 0.98, transition: { duration: 0.18, ease: 'easeOut' } }}
+            transition={{ type: 'spring', stiffness: 360, damping: 32 }}
+            className="absolute inset-0 z-30 p-3 pt-4 pb-3 flex flex-col items-center"
+          >
+            <div className="w-full max-w-[680px] flex-1 min-h-0 rounded-[34px] spatial-card bg-[var(--app-bg)] overflow-y-auto no-scrollbar px-4 pt-3 pb-8">
+              <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto mb-3" />
+
+              {effectiveSecondaryRoute === 'galla' && capabilities.showGalla && (
+                <GallaCashbookView
+                  cashbookEntries={activeCashbookEntries}
+                  transactions={activeTransactions}
+                  bills={activeBills}
+                  stockItems={activeStockItems}
+                  activeOperatorName={activeOperator.name}
+                  hideBalance={hideBalance}
+                  onToggleHideBalance={() => setHideBalance((v) => !v)}
+                  onAddEntry={async (payload) => {
+                    if (isGuestMode) {
+                      updateGuestVault(
+                        (prev) =>
+                          applyAddCashbookEntry(prev, {
+                            businessId: currentBusiness.id,
+                            entryType: payload.entryType,
+                            mode: payload.mode,
+                            category: payload.category,
+                            amount: payload.amount,
+                            note: payload.note,
+                            entryDate: payload.entryDate,
+                            actorName: activeOperator.name,
+                          }).vault
+                      );
+                    } else if (user) {
+                      await addCashbookEntry({
+                        ownerId: user.uid,
+                        businessId: currentBusiness.id,
+                        entryType: payload.entryType,
+                        mode: payload.mode,
+                        category: payload.category,
+                        amount: payload.amount,
+                        note: payload.note,
+                        entryDate: payload.entryDate,
+                        actorName: activeOperator.name,
+                      });
+                    }
+                    logActivity(
+                      'galla',
+                      `Galla ${payload.entryType} ₹${payload.amount} (${payload.category})`,
+                      payload.category,
+                      payload.amount
+                    );
+                  }}
+                  onDeleteEntry={async (entryId) => {
+                    if (isGuestMode) {
+                      updateGuestVault((prev) => applyDeleteCashbookEntry(prev, entryId));
+                    } else {
+                      await deleteCashbookEntry(entryId);
+                    }
+                    logActivity('galla', 'Deleted Galla cashbook entry');
+                  }}
+                  onBack={() => setSecondaryRoute(null)}
+                />
+              )}
+
+              {effectiveSecondaryRoute === 'staff-audit' && (
+                <StaffAuditView
+                  uid={activeOwnerUid}
+                  staffMembers={activeStaffMembers}
+                  activityLogs={activeActivityLogs}
+                  activeOperator={activeOperator}
+                  onSwitchOperator={(op) => {
+                    setActiveOperator(op);
+                    logActivity('staff', `Counter switched to ${op.name} (${op.role})`, op.name);
+                  }}
+                  onSaveStaff={async (payload) => {
+                    if (isGuestMode) {
+                      updateGuestVault(
+                        (prev) =>
+                          applySaveStaffMember(prev, {
+                            businessId: currentBusiness.id,
+                            ...payload,
+                          }).vault
+                      );
+                    } else if (user) {
+                      await saveStaffMember({
+                        ownerId: user.uid,
+                        businessId: currentBusiness.id,
+                        ...payload,
+                      });
+                    }
+                    logActivity(
+                      'staff',
+                      `${payload.existingId ? 'Updated' : 'Added'} staff ${payload.name} (${payload.role})`,
+                      payload.name
+                    );
+                  }}
+                  onDeleteStaff={async (staffId) => {
+                    const st = activeStaffMembers.find((s) => s.id === staffId);
+                    if (isGuestMode) {
+                      updateGuestVault((prev) => applyDeleteStaffMember(prev, staffId));
+                    } else {
+                      await deleteStaffMember(staffId);
+                    }
+                    if (activeOperator.staffId === staffId) {
+                      setActiveOperator({ staffId: 'owner', name: 'Shop Owner', role: 'owner' });
+                    }
+                    logActivity('staff', `Removed staff ${st?.name || ''}`, st?.name);
+                  }}
+                  onBack={() => setSecondaryRoute(null)}
+                />
+              )}
+
+              {effectiveSecondaryRoute === 'settings' && (
+                <SettingsView
+                  key={currentBusiness.id}
+                  appearance={appearance}
+                  accentTheme={accentTheme}
+                  mobileNumber={mobileNumber}
+                  verifiedPhone={verifiedPhoneDisplay}
+                  activeOperatorName={activeOperator.name}
+                  workspaceBadge={personaAdaptation.focusBadge}
+                  business={currentBusiness}
+                  appLockPin={appLockPin}
+                  isGuestMode={isGuestMode}
+                  showBackButton
+                  capabilities={capabilities}
+                  onOpenCloudSync={openCloudSyncSheet}
+                  onOpenWorkspaces={() => {
+                    setSecondaryRoute(null);
+                    setPersonaOnboardingStep(3);
+                    setPersonaOnboardingOpen(true);
+                  }}
+                  onOpenBusinessProfile={() => setSecondaryRoute('business-profile')}
+                  onOpenStaffAudit={() => setSecondaryRoute('staff-audit')}
+                  onOpenGalla={
+                    capabilities.showGalla ? () => setSecondaryRoute('galla') : undefined
+                  }
+                  onOpenHelp={() => setSecondaryRoute('help-support')}
+                  onBack={() => setSecondaryRoute(null)}
+                  onChangeAppearance={handleSetAppearance}
+                  onSelectAccentTheme={(theme) => void handleSelectAccentTheme(theme)}
+                  onSaveMobile={async (phone) => {
+                    persistPrelogin({ mobileNumber: phone });
+                    if (isGuestMode) {
+                      updateGuestVault((prev) =>
+                        applyUpdateBusiness(
+                          { ...prev, profile: { ...prev.profile, mobileNumber: phone } },
+                          currentBusiness.id,
+                          { phone }
+                        )
+                      );
+                      return;
+                    }
+                    if (!user) return;
+                    const updated = await upsertUserProfile(user.uid, { mobileNumber: phone });
+                    setProfile(updated);
+                    await updateBusiness(currentBusiness.id, { phone });
+                  }}
+                  onSaveUpiId={async (upiId) => {
+                    if (isGuestMode) {
+                      updateGuestVault((prev) =>
+                        applyUpdateBusiness(prev, currentBusiness.id, { upiId })
+                      );
+                      return;
+                    }
+                    await updateBusiness(currentBusiness.id, { upiId });
+                  }}
+                  onSavePin={async (pin) => {
+                    if (isGuestMode) {
+                      const hashedPin = pin ? await hashPinForUid(pin, GUEST_OWNER_ID) : '';
+                      updateGuestVault((prev) => ({
+                        ...prev,
+                        profile: { ...prev.profile, appLockPin: hashedPin },
+                      }));
+                      setPinUnlocked(true);
+                      return;
+                    }
+                    if (!user) return;
+                    const hashedPin = pin ? await hashPinForUid(pin, user.uid) : '';
+                    const updated = await upsertUserProfile(user.uid, { appLockPin: hashedPin });
+                    setProfile(updated);
+                    setPinUnlocked(true);
+                  }}
+                  onExportCsv={handleExportCsv}
+                  onExportJson={handleExportJson}
+                  onRestoreJson={handleRestoreJson}
+                  onClearAll={async () => {
+                    if (isGuestMode) {
+                      updateGuestVault((prev) => applyClearBusinessData(prev, currentBusiness.id));
+                      setSelectedAccountId(null);
+                      return;
+                    }
+                    if (!user) return;
+                    await clearBusinessData(user.uid, currentBusiness.id);
+                    setSelectedAccountId(null);
+                  }}
+                  onDeleteAccount={handleDeleteAccount}
+                  onLogout={async () => {
+                    await signOut(auth);
+                    setSecondaryRoute(null);
+                    setSelectedAccountId(null);
+                  }}
+                />
+              )}
+
+              {effectiveSecondaryRoute === 'business-profile' && (
+                <BusinessProfileView
+                  key={currentBusiness.id}
+                  business={currentBusiness}
+                  canDeleteBusiness={activeBusinesses.length > 1}
+                  onBack={() => setSecondaryRoute(null)}
+                  onSave={async (patch) => {
+                    if (isGuestMode) {
+                      updateGuestVault((prev) =>
+                        applyUpdateBusiness(prev, currentBusiness.id, patch)
+                      );
+                    } else {
+                      await updateBusiness(currentBusiness.id, patch);
+                    }
+                    logActivity(
+                      'account',
+                      'Updated business profile',
+                      patch.name || currentBusiness.name
+                    );
+                  }}
+                  onDeleteBusiness={async () => {
+                    if (isGuestMode) {
+                      updateGuestVault((prev) => applyDeleteBusinessCascade(prev, currentBusiness.id));
+                      setSelectedAccountId(null);
+                      setSecondaryRoute(null);
+                      return;
+                    }
+                    if (!user) return;
+                    const fallback = activeBusinesses.find((b) => b.id !== currentBusiness.id);
+                    await deleteBusinessCascade(user.uid, currentBusiness.id);
+                    if (fallback) {
+                      const updated = await upsertUserProfile(user.uid, {
+                        activeBusinessId: fallback.id,
+                      });
+                      setProfile(updated);
+                    }
+                    setSelectedAccountId(null);
+                    setSecondaryRoute(null);
+                  }}
+                />
+              )}
+
+              {effectiveSecondaryRoute === 'account-summary' && (
+                <AccountSummaryView
+                  accounts={scopedAccounts}
+                  transactions={scopedTransactions}
+                  onBack={() => setSecondaryRoute(null)}
+                  onExportJson={handleExportJson}
+                  onExportCsv={handleExportCsv}
+                />
+              )}
+
+              {effectiveSecondaryRoute === 'multi-device' && (
+                <MultiDeviceView
+                  verifiedPhone={verifiedPhoneDisplay}
+                  mobileNumber={mobileNumber}
+                  isGuestMode={isGuestMode}
+                  onOpenCloudSync={openCloudSyncSheet}
+                  onBack={() => setSecondaryRoute(null)}
+                />
+              )}
+
+              {effectiveSecondaryRoute === 'help-support' && (
+                <HelpSupportView onBack={() => setSecondaryRoute(null)} />
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Solid Matte iOS 27 Floating Capsule Dock */}
+      {!hasForegroundOverlay && !personaOnboardingOpen && (
         <BottomSpatialDock
-          mainTab={effectiveMainTab}
-          hasSecondaryRoute={Boolean(effectiveSecondaryRoute)}
+          activeDestination={activeDockDestination}
           voiceModalOpen={voiceModalOpen}
           capabilities={capabilities}
-          onSelectLeftTab={() => {
+          onSelectHome={() => {
             setSecondaryRoute(null);
             setSelectedAccountId(null);
-            setMainTab((prev) => (prev === 'collection' ? 'ledger' : 'collection'));
+            setMainTab('ledger');
+          }}
+          onSelectBills={() => {
+            setSelectedAccountId(null);
+            if (!capabilities.showGstBills) {
+              setSecondaryRoute('account-summary');
+              return;
+            }
+            setSecondaryRoute(null);
+            setMainTab('bills');
           }}
           onOpenVoice={() => {
             setVoicePrefillName('');
             setVoiceCounterMode(false);
             setVoiceModalOpen(true);
           }}
-          onSelectRightTab={() => {
+          onSelectOverdue={() => {
+            setSecondaryRoute(null);
             setSelectedAccountId(null);
-            if (!capabilities.showGstBills) {
-              if (effectiveSecondaryRoute === 'account-summary' || effectiveMainTab === 'more') {
-                setSecondaryRoute(null);
-                setMainTab('ledger');
-              } else {
-                setSecondaryRoute('account-summary');
-              }
-              return;
-            }
-            if (effectiveSecondaryRoute) {
-              setSecondaryRoute(null);
-              setMainTab('bills');
-              return;
-            }
-            setMainTab((prev) =>
-              prev === 'bills' || prev === 'stock' || prev === 'more' ? 'ledger' : 'bills'
-            );
+            setMainTab('collection');
+          }}
+          onSelectSettings={() => {
+            setSecondaryRoute(null);
+            setSelectedAccountId(null);
+            setMainTab('more');
           }}
         />
       )}
 
-      {/* Optional Cloud Sync & Backup Phone OTP Spring Bottom Sheet */}
+      {/* Optional Multi-Auth Cloud Sync Bottom Sheet (Google + Email Link + Mobile OTP) */}
       <AnimatePresence>
         {syncSheetOpen && (
           <motion.div
@@ -2873,7 +3209,7 @@ function BolBahiAppInner() {
                 if (info.offset.y > 90 && !authBusy) setSyncSheetOpen(false);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
+              className="w-full max-w-[460px] rounded-t-[34px] spatial-sheet p-6 space-y-4 pb-safe max-h-[92dvh] overflow-y-auto no-scrollbar"
             >
               <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
               <div className="flex items-center justify-between gap-2">
@@ -2889,7 +3225,7 @@ function BolBahiAppInner() {
                       Cloud Backup &amp; Sync
                     </h3>
                     <p className="text-xs text-[var(--ink-muted)] font-semibold">
-                      Optional +91 OTP · Merges local guest entries automatically
+                      Free Google, Email Link, or +91 OTP · Auto-merges local ledger
                     </p>
                   </div>
                 </div>
@@ -2921,57 +3257,7 @@ function BolBahiAppInner() {
                     {syncSuccessMsg}
                   </p>
                 </div>
-              ) : !otpSentTo ? (
-                <div className="space-y-3">
-                  <div>
-                    <label
-                      htmlFor="sync-mobile-input"
-                      className="block text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)] mb-1"
-                    >
-                      10-Digit Mobile Number
-                    </label>
-                    <div className="flex items-center gap-2 rounded-2xl bg-[var(--app-bg)] ring-2 ring-[var(--brand)] px-3.5 min-h-[52px]">
-                      <Smartphone className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
-                      <span className="font-tabular font-bold text-[var(--ink-muted)]">+91</span>
-                      <input
-                        id="sync-mobile-input"
-                        type="tel"
-                        inputMode="numeric"
-                        maxLength={10}
-                        value={syncPhoneInput}
-                        onChange={(e) =>
-                          setSyncPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !authBusy) {
-                            void handleSendOtp(syncPhoneInput);
-                          }
-                        }}
-                        placeholder="9876543210"
-                        className="w-full bg-transparent text-lg font-extrabold font-tabular text-[var(--ink)] outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {authError && (
-                    <p
-                      role="alert"
-                      className="rounded-2xl bg-[var(--credit-tint)] px-3.5 py-2.5 text-xs font-bold text-[var(--credit-red)]"
-                    >
-                      {authError}
-                    </p>
-                  )}
-
-                  <button
-                    type="button"
-                    disabled={authBusy}
-                    onClick={() => void handleSendOtp(syncPhoneInput)}
-                    className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm shadow-md disabled:opacity-60 active:scale-95 transition"
-                  >
-                    {authBusy ? 'Sending SMS OTP...' : 'Send SMS OTP to Backup'}
-                  </button>
-                </div>
-              ) : (
+              ) : otpSentTo ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-xs text-[var(--ink-muted)]">
                     <span>
@@ -3033,11 +3319,180 @@ function BolBahiAppInner() {
                     </button>
                   </div>
                 </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* 1. Primary Zero-Cost Google (Gmail) Sign-In */}
+                  <button
+                    type="button"
+                    disabled={authBusy}
+                    onClick={() => {
+                      haptics.tap();
+                      void handleGoogleSignIn();
+                    }}
+                    className="tactile-key-primary w-full min-h-[50px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-display font-extrabold text-sm flex items-center justify-center gap-2.5 disabled:opacity-60 active:scale-[0.98] transition"
+                  >
+                    <span className="w-5 h-5 rounded-full bg-white text-[#4F46E5] font-black text-xs flex items-center justify-center">
+                      G
+                    </span>
+                    <span>{authBusy ? 'Connecting...' : 'Continue with Google (Gmail)'}</span>
+                  </button>
+
+                  {/* 2. Passwordless Email Verification Link */}
+                  <div className="rounded-2xl bg-[var(--app-bg)] p-3.5 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
+                      <span className="text-xs font-extrabold text-[var(--ink)]">
+                        Or Email Verification Link (No Password)
+                      </span>
+                    </div>
+
+                    {emailLinkSentTo ? (
+                      <p className="rounded-xl bg-[var(--debit-tint)] p-3 text-xs font-bold text-[var(--debit-green)]">
+                        Verification link sent to <span className="underline">{emailLinkSentTo}</span>. Open that email on this browser to finish syncing!
+                      </p>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={syncEmailInput}
+                          onChange={(e) => setSyncEmailInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !authBusy) {
+                              void handleSendEmailLink(syncEmailInput);
+                            }
+                          }}
+                          placeholder="you@gmail.com"
+                          className="flex-1 min-h-[42px] rounded-xl bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                        />
+                        <button
+                          type="button"
+                          disabled={authBusy}
+                          onClick={() => {
+                            haptics.tap();
+                            void handleSendEmailLink(syncEmailInput);
+                          }}
+                          className="min-h-[42px] px-4 rounded-xl bg-[var(--surface)] ring-1 ring-[var(--surface-border)] text-xs font-extrabold text-[var(--ink)] hover:bg-[var(--brand-tint)] disabled:opacity-60"
+                        >
+                          Send Link
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Collapsible +91 Mobile OTP */}
+                  {!showPhoneOtpInSync ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.tap();
+                        setShowPhoneOtpInSync(true);
+                      }}
+                      className="w-full min-h-[42px] rounded-xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] inline-flex items-center justify-center gap-1.5"
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Use +91 Mobile SMS OTP instead</span>
+                    </button>
+                  ) : (
+                    <div className="rounded-2xl bg-[var(--app-bg)] p-3.5 space-y-2.5">
+                      <label
+                        htmlFor="sync-mobile-input"
+                        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]"
+                      >
+                        10-Digit Mobile Number
+                      </label>
+                      <div className="flex items-center gap-2 rounded-xl bg-[var(--surface)] ring-1 ring-[var(--brand)] px-3 min-h-[46px]">
+                        <Smartphone className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
+                        <span className="font-tabular font-bold text-sm text-[var(--ink-muted)]">+91</span>
+                        <input
+                          id="sync-mobile-input"
+                          type="tel"
+                          inputMode="numeric"
+                          maxLength={10}
+                          value={syncPhoneInput}
+                          onChange={(e) =>
+                            setSyncPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !authBusy) {
+                              void handleSendOtp(syncPhoneInput);
+                            }
+                          }}
+                          placeholder="9876543210"
+                          className="w-full bg-transparent text-base font-extrabold font-tabular text-[var(--ink)] outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={authBusy}
+                        onClick={() => void handleSendOtp(syncPhoneInput)}
+                        className="w-full min-h-[44px] rounded-xl bg-[var(--surface)] ring-1 ring-[var(--brand)] text-[var(--brand-accent)] font-extrabold text-xs disabled:opacity-60 active:scale-95 transition"
+                      >
+                        {authBusy ? 'Sending SMS OTP...' : 'Send SMS OTP'}
+                      </button>
+                    </div>
+                  )}
+
+                  {authError && (
+                    <p
+                      role="alert"
+                      className="rounded-2xl bg-[var(--credit-tint)] px-3.5 py-2.5 text-xs font-bold text-[var(--credit-red)]"
+                    >
+                      {authError}
+                    </p>
+                  )}
+                </div>
               )}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Cross-Browser Email Link Confirmation Modal (zero window.prompt) */}
+      {emailConfirmPrompt && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm Email Address"
+          className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4"
+        >
+          <div className="w-full max-w-sm rounded-[28px] spatial-sheet p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
+                Confirm Your Email
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEmailConfirmPrompt(false)}
+                aria-label="Cancel email confirmation"
+                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--ink-muted)]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
+              Enter the email address you used to request your sign-in link to complete cloud backup sync.
+            </p>
+            <input
+              type="email"
+              value={emailConfirmInput}
+              onChange={(e) => setEmailConfirmInput(e.target.value)}
+              placeholder="you@gmail.com"
+              className="w-full min-h-[46px] rounded-xl bg-[var(--app-bg)] px-3.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            />
+            {authError && (
+              <p className="text-xs font-bold text-[var(--credit-red)]">{authError}</p>
+            )}
+            <button
+              type="button"
+              disabled={authBusy}
+              onClick={() => void handleConfirmCrossBrowserEmailLink()}
+              className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-white text-sm font-extrabold disabled:opacity-60"
+            >
+              {authBusy ? 'Verifying...' : 'Complete Sign-In'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Business Switcher Bottom Sheet */}
       <AnimatePresence>
@@ -3061,7 +3516,7 @@ function BolBahiAppInner() {
                 if (info.offset.y > 90) setBizSwitcherOpen(false);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
+              className="w-full max-w-[460px] rounded-t-[34px] spatial-sheet p-6 space-y-4 pb-safe"
             >
               <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
               <div className="flex items-center justify-between">
@@ -3135,7 +3590,7 @@ function BolBahiAppInner() {
                   onClick={() => {
                     haptics.tap();
                     setBizSwitcherOpen(false);
-                    setPersonaOnboardingStep(2);
+                    setPersonaOnboardingStep(3);
                     setPersonaOnboardingOpen(true);
                   }}
                   className="w-full min-h-[46px] rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center justify-center gap-2 active:scale-95 transition"
@@ -3177,85 +3632,7 @@ function BolBahiAppInner() {
         }}
       />
 
-      {/* Floating Undo + Instant WhatsApp Receipt Snackbar */}
-      <AnimatePresence>
-        {actionToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 18, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 14, scale: 0.96 }}
-            transition={{ type: 'spring', stiffness: 440, damping: 28 }}
-            className="no-print fixed bottom-[104px] left-1/2 -translate-x-1/2 w-full max-w-[410px] px-3 z-40 pointer-events-none"
-          >
-            <div className="pointer-events-auto w-full rounded-[22px] bg-[#0F172A] dark:bg-[#27272A] text-white shadow-[0_14px_40px_rgba(0,0,0,0.28)] px-3.5 py-2.5 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs font-extrabold truncate font-tabular">
-                  {actionToast.kind === 'added'
-                    ? `Saved ${formatINR(actionToast.tx.amount)} · ${actionToast.account.name}`
-                    : `Deleted ${formatINR(actionToast.tx.amount)} · ${actionToast.account.name}`}
-                </p>
-                <p className="text-[11px] text-slate-300 truncate font-tabular">
-                  {actionToast.kind === 'added'
-                    ? `Balance: ${formatINR(Math.abs(actionToast.newBalance))} ${
-                        actionToast.newBalance > 0
-                          ? 'Due'
-                          : actionToast.newBalance < 0
-                            ? 'Adv'
-                            : 'Clear'
-                      }`
-                    : 'Entry removed from ledger'}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                {actionToast.kind === 'added' && (
-                  <a
-                    href={buildWhatsAppUrl(
-                      actionToast.account.phone,
-                      buildTransactionSlipMessage({
-                        customerName: actionToast.account.name,
-                        direction: actionToast.tx.direction,
-                        amount: actionToast.tx.amount,
-                        newBalance: actionToast.newBalance,
-                        shopName: currentBusiness.name,
-                        upiId: currentBusiness.upiId,
-                        language,
-                      })
-                    )}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="min-h-[36px] px-2.5 rounded-xl bg-[#15803D] hover:bg-[#166534] active:scale-95 text-white text-[11px] font-extrabold inline-flex items-center gap-1 transition"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>Receipt</span>
-                  </a>
-                )}
-
-                <button
-                  type="button"
-                  disabled={undoBusy}
-                  onClick={() => void handleUndoToast()}
-                  className="min-h-[36px] px-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-95 text-white text-[11px] font-extrabold inline-flex items-center gap-1 disabled:opacity-50 transition"
-                >
-                  <Undo2 className="w-3.5 h-3.5" />
-                  <span>Undo</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={dismissActionToast}
-                  aria-label="Dismiss notification"
-                  className="min-w-[32px] min-h-[32px] rounded-lg text-slate-300 hover:text-white flex items-center justify-center"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Daily Munim Closing Summary Modal */}
+      {/* Today's Business Audio Summary Modal */}
       <AnimatePresence>
         {dailySummaryOpen && (
           <motion.div
@@ -3277,7 +3654,7 @@ function BolBahiAppInner() {
                 if (info.offset.y > 90) closeDailyMunimSummary();
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
+              className="w-full max-w-[460px] rounded-t-[34px] spatial-sheet p-6 space-y-4 pb-safe"
             >
               <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
               <div className="flex items-center justify-between gap-2">
@@ -3289,7 +3666,7 @@ function BolBahiAppInner() {
                     <Volume2 className="w-5 h-5" />
                   </span>
                   <div>
-                    <h3 className="text-lg font-extrabold text-[var(--ink)]">Aaj Ka Munim Hisaab</h3>
+                    <h3 className="text-lg font-extrabold text-[var(--ink)]">Today&apos;s Business Summary</h3>
                     <p className="text-xs text-[var(--ink-muted)] font-semibold">
                       {currentBusiness.name} · {dailyStats.todayKey}
                     </p>
@@ -3298,7 +3675,7 @@ function BolBahiAppInner() {
                 <button
                   type="button"
                   onClick={closeDailyMunimSummary}
-                  aria-label="Close Munim Summary"
+                  aria-label="Close Daily Summary"
                   className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
                 >
                   <X className="w-5 h-5" />
@@ -3313,13 +3690,13 @@ function BolBahiAppInner() {
                   </p>
                 </div>
                 <div className="rounded-[20px] bg-[var(--debit-tint)] p-3 text-center">
-                  <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase">Vasooli Today</p>
+                  <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase">Collected</p>
                   <p className="text-base font-extrabold text-[var(--debit-green)] font-tabular mt-0.5">
                     {formatINR(dailyStats.receivedToday)}
                   </p>
                 </div>
                 <div className="rounded-[20px] bg-[var(--brand-tint)] p-3 text-center">
-                  <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase">Galla Cash</p>
+                  <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase">Cash Drawer</p>
                   <p className="text-base font-extrabold text-[var(--brand-accent)] font-tabular mt-0.5">
                     {formatINR(gallaPulse.cashDrawerBalance)}
                   </p>
@@ -3446,11 +3823,22 @@ function BolBahiAppInner() {
         }}
       />
 
-      {/* First-Time Greeting & Multi-Select Persona Onboarding (Zero Forced Login) */}
+      {/* First-Time Greeting, Optional Multi-Auth & Workspace Setup (Zero Forced Login) */}
       {personaOnboardingOpen && (
         <PersonaOnboardingSheet
           initialPrefs={personaPrefs}
           initialStep={personaOnboardingStep}
+          isSignedIn={!isGuestMode}
+          verifiedIdentity={verifiedPhoneDisplay}
+          authBusy={authBusy}
+          authError={authError}
+          emailLinkSentTo={emailLinkSentTo}
+          onGoogleSignIn={handleGoogleSignIn}
+          onSendEmailLink={handleSendEmailLink}
+          onOpenPhoneSignIn={() => {
+            openCloudSyncSheet();
+            setShowPhoneOtpInSync(true);
+          }}
           onComplete={(nextPrefs) => {
             const saved = savePersonaPrefs(nextPrefs);
             setPersonaPrefs(saved);
@@ -3490,7 +3878,7 @@ function BolBahiAppInner() {
               personaContext: match?.personaContext || personaAdaptation.activeFocus,
               direction: payload.direction,
               amount: payload.amount,
-              note: payload.note || 'AI Parchi Scan',
+              note: payload.note || 'AI Receipt Scan',
               billDate: payload.billDate,
               billImage: payload.billImage,
               createdByName: activeOperator.name,
@@ -3507,7 +3895,7 @@ function BolBahiAppInner() {
               actorName: activeOperator.name,
               actorRole: activeOperator.role,
               actionType: 'ledger',
-              summary: `Scanned Parchi ₹${payload.amount} for ${payload.customerName}`,
+              summary: `Scanned Receipt ₹${payload.amount} for ${payload.customerName}`,
               targetName: payload.customerName,
               amount: payload.amount,
             });
@@ -3537,7 +3925,7 @@ function BolBahiAppInner() {
             personaContext: match?.personaContext || personaAdaptation.activeFocus,
             direction: payload.direction,
             amount: payload.amount,
-            note: payload.note || 'AI Parchi Scan',
+            note: payload.note || 'AI Receipt Scan',
             billDate: payload.billDate,
             billImage: payload.billImage,
             createdByName: activeOperator.name,
@@ -3570,7 +3958,7 @@ function BolBahiAppInner() {
           });
           logActivity(
             'ledger',
-            `Scanned Parchi ₹${payload.amount} for ${payload.customerName}`,
+            `Scanned Receipt ₹${payload.amount} for ${payload.customerName}`,
             payload.customerName,
             payload.amount
           );
@@ -3695,7 +4083,7 @@ export const BolBahiApp: React.FC = () => {
     return (
       <div
         suppressHydrationWarning
-        className="max-w-[430px] mx-auto h-dvh overflow-hidden shadow-2xl spatial-shell-bg native-app-shell"
+        className="w-full max-w-[460px] lg:max-w-[1040px] mx-auto h-dvh overflow-hidden shadow-2xl spatial-shell-bg native-app-shell"
       />
     );
   }

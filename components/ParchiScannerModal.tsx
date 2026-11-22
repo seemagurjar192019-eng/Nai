@@ -325,7 +325,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
             </div>
             <div className="space-y-1">
               <p className="font-display text-base font-extrabold text-[var(--ink)]">
-                Capture Handwritten Parchi or Invoice
+                Capture Handwritten Receipt or Invoice
               </p>
               <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
                 Supports Hindi, Hinglish, and English kirana slips, supplier invoices, and thermal
@@ -408,7 +408,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                 >
                   <Loader2 className="w-6 h-6 animate-spin shrink-0" />
                   <div>
-                    <p className="text-sm font-extrabold">Reading Parchi with Ucred AI...</p>
+                    <p className="text-sm font-extrabold">Reading Receipt with Ucred AI...</p>
                     <p className="text-xs opacity-90">
                       Extracting party name, line items, quantities, and total amount.
                     </p>
@@ -453,7 +453,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                       setScanError('');
                       setHasScanResult(true);
                       if (items.length === 0) {
-                        setItems([{ name: 'Parchi Item', qty: 1, rate: 0, gstRate: 0 }]);
+                        setItems([{ name: 'Receipt Item', qty: 1, rate: 0, gstRate: 0 }]);
                       }
                     }}
                     className="min-h-[40px] px-3 rounded-xl spatial-card text-xs font-bold text-[var(--ink)] active:scale-95 transition"
@@ -518,7 +518,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                               : 'bg-[var(--app-bg)] text-[var(--ink)]'
                           }`}
                         >
-                          Udhaar
+                          Credit
                         </button>
                         <button
                           type="button"
@@ -629,7 +629,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-[11px] font-bold text-[var(--ink-muted)] mb-1">
-                      Note / Parchi Ref
+                      Note / Receipt Ref
                     </label>
                     <input
                       type="text"

@@ -33,32 +33,32 @@ export const PERSONA_STORAGE_KEY = 'ucred_persona_prefs_v1';
 export const PERSONA_OPTIONS: PersonaOptionMeta[] = [
   {
     id: 'personal',
-    title: 'Personal / Normal Khata',
-    subtitle: 'Friends, rent, home staff & daily personal lending',
+    title: 'Personal Ledger',
+    subtitle: 'Friends, rent, household staff & daily personal expenses',
     badge: 'Personal',
     accentHex: '#0EA5E9',
     tintBg: '#E0F2FE',
   },
   {
     id: 'kirana',
-    title: 'Dukaan / Kirana Store',
-    subtitle: 'Daily customer udhaar, Parchi AI & live Galla cashbook',
-    badge: 'Kirana',
+    title: 'Retail & Kirana Store',
+    subtitle: 'Daily customer credit, AI receipt scan & live cashbook',
+    badge: 'Retail Store',
     accentHex: '#4F46E5',
     tintBg: '#EEF2FF',
   },
   {
     id: 'mandi',
-    title: 'Mandi / Vyapari (Bori, Wazan, Aadat)',
-    subtitle: 'Lot weight, bori count, kisan hisaab & aadat commission',
+    title: 'Mandi / Grain Trade',
+    subtitle: 'Bag count, weight, grower accounts & commission math',
     badge: 'Mandi',
     accentHex: '#D97706',
     tintBg: '#FEF3C7',
   },
   {
     id: 'wholesale',
-    title: 'Wholesale / Distributor',
-    subtitle: 'Bulk GST billing, credit limits, stock & route vasooli',
+    title: 'Wholesale & Distribution',
+    subtitle: 'Bulk GST billing, credit limits, stock & route collections',
     badge: 'Wholesale',
     accentHex: '#059669',
     tintBg: '#DCFCE7',
@@ -129,18 +129,18 @@ export function getPersonaAdaptation(
     case 'personal':
       return {
         activeFocus: 'personal',
-        focusBadge: 'Personal Khata',
-        heroCaption: 'Personal Hisaab · Zero Cloud Lock',
-        quickNotePlaceholder: 'Note (e.g. Cab split, Rent, Chai, Dinner)',
+        focusBadge: 'Personal',
+        heroCaption: 'Personal Ledger · On-Device Privacy',
+        quickNotePlaceholder: 'Note (e.g. Cab split, Rent, Coffee, Dinner)',
         quickNotePresets: ['Lunch Split', 'Rent', 'UPI Return', 'Travel'],
-        voicePlaceholder: 'Rahul 500 udhaar ya Amit 300 mila',
+        voicePlaceholder: 'Say "Rahul 500 credit" or "Amit 300 mila"',
         voiceSamples: [
-          'Rahul 500 udhaar',
-          'Amit 1200 wapas mila',
+          'Rahul 500 credit',
+          'Amit 1200 received',
           'Rahul ka hisaab batao',
           'Aaj ka hisaab',
         ],
-        emptyStateHint: 'Add a friend or contact, or tap the glowing Munim Orb to speak.',
+        emptyStateHint: 'Add a contact or tap Speak to Save below to log an entry.',
         addPartyPlaceholder: 'Rahul Sharma',
         featuredToolsLabel: 'Expense Log & Exports',
       };
@@ -148,10 +148,10 @@ export function getPersonaAdaptation(
       return {
         activeFocus: 'mandi',
         focusBadge: 'Mandi / Vyapari',
-        heroCaption: 'Bori · Wazan · Aadat Hisaab',
-        quickNotePlaceholder: 'Note (e.g. 12 Bori Gehu, 520kg Wazan, Aadat 2%)',
-        quickNotePresets: ['10 Bori', 'Wazan Kata', 'Aadat Jama', 'Bilty Paid'],
-        voicePlaceholder: 'Kisan 12 bori gehu 24000 udhaar ya Aadat 1500 mila',
+        heroCaption: 'Bags · Weight · Commission Ledger',
+        quickNotePlaceholder: 'Note (e.g. 12 Bori Wheat, 520kg, Aadat 2%)',
+        quickNotePresets: ['10 Bori', 'Weight Slip', 'Aadat Settled', 'Freight Paid'],
+        voicePlaceholder: 'Say "Ramesh 12 bori gehu 24000" or "Aadat 1500 mila"',
         voiceSamples: [
           'Ramesh 12 bori gehu 24000 udhaar',
           'Kisan 8500 aadat mila',
@@ -159,26 +159,26 @@ export function getPersonaAdaptation(
           'Aaj ka hisaab',
         ],
         emptyStateHint:
-          'Record Bori, Wazan, and Aadat entries by voice or snap a handwritten mandi parchi.',
-        addPartyPlaceholder: 'Kisan / Aadat Party',
-        featuredToolsLabel: 'Mandi Parchi & Galla',
+          'Log bags, weight, and commission by voice or scan a handwritten mandi slip.',
+        addPartyPlaceholder: 'Kisan / Trader Name',
+        featuredToolsLabel: 'Mandi Receipts & Cashbook',
       };
     case 'wholesale':
       return {
         activeFocus: 'wholesale',
         focusBadge: 'Wholesale',
         heroCaption: 'Distributors · GST & Credit Control',
-        quickNotePlaceholder: 'Note (e.g. 5 Carton Oil, Invoice #42, NEFT)',
-        quickNotePresets: ['GST Bill', 'NEFT Jama', 'Cartoon Lot', 'Route Due'],
-        voicePlaceholder: 'Gupta Traders 15000 udhaar ya 8000 NEFT mila',
+        quickNotePlaceholder: 'Note (e.g. 5 Cartons Oil, Invoice #42, NEFT)',
+        quickNotePresets: ['GST Bill', 'NEFT Received', 'Carton Lot', 'Route Due'],
+        voicePlaceholder: 'Say "Gupta Traders 15000 credit" or "8000 received"',
         voiceSamples: [
-          'Gupta Traders 15000 udhaar',
+          'Gupta Traders 15000 credit',
           'Verma ka 10 carton oil 12000 bill banao',
-          'Gupta Traders ka hisaab batao',
-          'Aaj ka hisaab',
+          'Gupta Traders balance',
+          'Today summary',
         ],
         emptyStateHint:
-          'Track distributor credit limits, GST invoices, stock deduction, and route vasooli.',
+          'Track distributor credit limits, GST invoices, stock deduction, and route collections.',
         addPartyPlaceholder: 'Gupta Distributors',
         featuredToolsLabel: 'GST Bills & Stock Dispatch',
       };
@@ -186,21 +186,21 @@ export function getPersonaAdaptation(
     default:
       return {
         activeFocus: 'kirana',
-        focusBadge: 'Kirana Store',
-        heroCaption: 'Daily Dukaan Khata & Live Galla',
-        quickNotePlaceholder: 'Optional note (e.g. Chini, Atta, Oil, UPI)',
-        quickNotePresets: ['Atta / Ration', 'UPI Mila', 'Parchi Udhaar', 'Doodh Bread'],
-        voicePlaceholder: 'Ramesh 500 udhaar aur Suresh 300 mila',
+        focusBadge: 'Retail Store',
+        heroCaption: 'Daily Store Ledger & Live Cashbook',
+        quickNotePlaceholder: 'Optional note (e.g. Sugar, Flour, Oil, UPI)',
+        quickNotePresets: ['Groceries', 'UPI Received', 'Credit Slip', 'Milk & Bread'],
+        voicePlaceholder: 'Say "Ramesh 500 credit" or "Suresh 300 mila"',
         voiceSamples: [
-          'Ramesh 500 udhaar',
+          'Ramesh 500 credit',
+          'Suresh 300 received',
           'Ramesh ka hisaab batao',
           'Aaj ka hisaab',
-          'Verma ka 2 atta 480 aur 1 oil 175 bill banao',
         ],
         emptyStateHint:
-          'Add your first customer, tap the Voice Orb below to speak, or snap a parchi.',
-        addPartyPlaceholder: 'Ramesh Kirana',
-        featuredToolsLabel: 'Galla, Stock & AI Parchi',
+          'Add your first customer, tap Speak to Save below, or scan a handwritten receipt.',
+        addPartyPlaceholder: 'Ramesh Store',
+        featuredToolsLabel: 'Cashbook, Stock & Scanner',
       };
   }
 }
@@ -222,13 +222,6 @@ export interface PersonaCapabilities {
   denaLabel: string;
 }
 
-/**
- * Strict Persona Gating Matrix:
- * - personal: hides Galla, Suppliers, GST Bills & Stock completely; exposes Friends/Contacts + Notes/Activity.
- * - kirana: Customers, Suppliers, Live Galla, GST Bills & Stock.
- * - mandi: Kisan, Vyapari, Mandi Cash + Bori/Wazan/Aadat inline calculator.
- * - wholesale: Parties, Suppliers, Bulk GST Bills, Stock & Route Vasooli.
- */
 export function getPersonaCapabilities(focus: PersonaCategoryId): PersonaCapabilities {
   switch (focus) {
     case 'personal':
@@ -245,8 +238,8 @@ export function getPersonaCapabilities(focus: PersonaCategoryId): PersonaCapabil
         gallaSegmentLabel: null,
         leftDockLabel: 'Notes',
         rightDockLabel: 'Activity',
-        lenaLabel: 'Lena',
-        denaLabel: 'Dena',
+        lenaLabel: 'Receivable',
+        denaLabel: 'Payable',
       };
     case 'mandi':
       return {
@@ -256,14 +249,14 @@ export function getPersonaCapabilities(focus: PersonaCategoryId): PersonaCapabil
         showGstBills: true,
         showStock: false,
         showMandiCalculator: true,
-        feedTitle: 'Mandi Hisaab',
+        feedTitle: 'Mandi Ledger',
         primarySegmentLabel: 'Kisan',
         secondarySegmentLabel: 'Vyapari',
         gallaSegmentLabel: 'Mandi Cash',
-        leftDockLabel: 'Vasooli',
+        leftDockLabel: 'Overdue',
         rightDockLabel: 'Bills',
-        lenaLabel: 'Lena',
-        denaLabel: 'Dena',
+        lenaLabel: 'Receivable',
+        denaLabel: 'Payable',
       };
     case 'wholesale':
       return {
@@ -273,14 +266,14 @@ export function getPersonaCapabilities(focus: PersonaCategoryId): PersonaCapabil
         showGstBills: true,
         showStock: true,
         showMandiCalculator: false,
-        feedTitle: 'Trade Khata',
+        feedTitle: 'Trade Ledger',
         primarySegmentLabel: 'Parties',
         secondarySegmentLabel: 'Suppliers',
-        gallaSegmentLabel: 'Galla',
-        leftDockLabel: 'Vasooli',
+        gallaSegmentLabel: 'Cashbook',
+        leftDockLabel: 'Overdue',
         rightDockLabel: 'Bills',
-        lenaLabel: 'Lena',
-        denaLabel: 'Dena',
+        lenaLabel: 'Receivable',
+        denaLabel: 'Payable',
       };
     case 'kirana':
     default:
@@ -291,14 +284,14 @@ export function getPersonaCapabilities(focus: PersonaCategoryId): PersonaCapabil
         showGstBills: true,
         showStock: true,
         showMandiCalculator: false,
-        feedTitle: 'Cash & Khata',
+        feedTitle: 'Credit & Cashbook',
         primarySegmentLabel: 'Customers',
         secondarySegmentLabel: 'Suppliers',
-        gallaSegmentLabel: 'Galla',
-        leftDockLabel: 'Vasooli',
+        gallaSegmentLabel: 'Cashbook',
+        leftDockLabel: 'Overdue',
         rightDockLabel: 'Bills',
-        lenaLabel: 'Lena',
-        denaLabel: 'Dena',
+        lenaLabel: 'Receivable',
+        denaLabel: 'Payable',
       };
   }
 }

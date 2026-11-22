@@ -239,7 +239,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
         notices.push(`deducted stock for ${res.deductedCount} item(s)`);
       }
       if (docTypeFilter === 'bill' && effectiveStatus === 'unpaid') {
-        notices.push(`posted ${formatINR(grandTotal)} Udhaar to ${customerName.trim()}'s Khata`);
+        notices.push(`posted ${formatINR(grandTotal)} Credit to ${customerName.trim()}'s Ledger`);
       }
       if (syncToGalla) {
         notices.push(`synced ${formatINR(grandTotal)} to Galla (${syncToGalla.mode.toUpperCase()})`);
@@ -501,7 +501,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                       : 'bg-red-100 text-red-800'
                   }`}
                 >
-                  {previewBill.paymentStatus === 'paid' ? 'Paid' : 'Udhaar / Unpaid'}
+                  {previewBill.paymentStatus === 'paid' ? 'Paid' : 'Credit / Unpaid'}
                 </span>
               )}
             </div>
@@ -786,7 +786,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                             : 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
                         }`}
                       >
-                        {isUnpaid ? 'Udhaar' : 'Paid'}
+                        {isUnpaid ? 'Credit' : 'Paid'}
                       </span>
                     )}
                   </div>
@@ -1038,7 +1038,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
                           : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
                       }`}
                     >
-                      Udhaar
+                      Credit
                     </button>
                   </div>
                 </div>

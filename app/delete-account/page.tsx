@@ -5,7 +5,7 @@ import { ArrowLeft, Trash2, ShieldAlert, CheckCircle2 } from 'lucide-react';
 export const metadata: Metadata = {
   title: 'Delete Account & Data',
   description:
-    'How to permanently delete your Ucred account and all associated businesses, customers, transactions, Galla cashbook, staff logs, bills, and stock data.',
+    'How to permanently delete your Ucred account (Google, Email Link, or Mobile OTP) and all associated businesses, contacts, transactions, cashbook, staff logs, bills, and stock data.',
   alternates: { canonical: '/delete-account' },
 };
 
@@ -35,7 +35,7 @@ export default function DeleteAccountPage() {
             Delete Your Ucred Account or Local Data
           </h1>
           <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-            Whether you use Ucred in Instant Guest Mode (stored locally on your device) or with optional +91 Mobile OTP Cloud Sync, you can permanently erase all ledger, Galla, staff, and billing records in under 30 seconds.
+            Whether you use Ucred in Instant Guest Mode (stored locally on your device) or with optional Cloud Sync (Google Sign-In, Email Verification Link, or +91 Mobile OTP), you can permanently erase all ledger, cashbook, staff, and billing records in under 30 seconds.
           </p>
         </header>
 
@@ -44,9 +44,9 @@ export default function DeleteAccountPage() {
             Option A: Delete Guest Mode (On-Device) Data
           </h2>
           <ol className="list-decimal pl-5 text-sm text-[var(--ink-muted)] space-y-2 leading-relaxed">
-            <li>Open <strong className="text-[var(--ink)]">Ucred</strong> and tap <strong className="text-[var(--ink)]">More</strong> at the bottom right.</li>
-            <li>Open <strong className="text-[var(--ink)]">PIN &amp; All (Settings)</strong> and optionally export a JSON/CSV backup first.</li>
-            <li>Tap <strong className="text-[var(--ink)]">Clear All Business Data</strong> and confirm to erase local businesses, khata entries, Galla records, bills, and stock from this device.</li>
+            <li>Open <strong className="text-[var(--ink)]">Ucred</strong> and tap <strong className="text-[var(--ink)]">Settings</strong> in the bottom navigation dock (or the profile avatar at top-right).</li>
+            <li>(Optional) Tap <strong className="text-[var(--ink)]">JSON Backup</strong> or <strong className="text-[var(--ink)]">Export CSV</strong> first to keep a copy.</li>
+            <li>Scroll to <strong className="text-[var(--ink)]">Data &amp; Danger Zone</strong>, tap <strong className="text-[var(--ink)]">Clear All Business Data</strong>, and confirm to wipe local workspaces, contacts, cashbook, bills, and stock from this device.</li>
           </ol>
         </section>
 
@@ -55,11 +55,11 @@ export default function DeleteAccountPage() {
             Option B: Permanently Delete Signed-In Cloud Account
           </h2>
           <ol className="list-decimal pl-5 text-sm text-[var(--ink-muted)] space-y-2 leading-relaxed">
-            <li>Open <strong className="text-[var(--ink)]">Ucred</strong> while signed in with your Mobile Number &amp; SMS OTP.</li>
-            <li>Tap <strong className="text-[var(--ink)]">More</strong> at the bottom right and open <strong className="text-[var(--ink)]">PIN &amp; All (Settings)</strong>.</li>
-            <li>(Recommended) Tap <strong className="text-[var(--ink)]">Download JSON Backup</strong> first if you want a local copy.</li>
-            <li>Scroll down and tap <strong className="text-[var(--ink)]">Delete Account &amp; All Cloud Data</strong>.</li>
-            <li>Confirm deletion (if prompted for a fresh OTP verification, enter the 6-digit code) to permanently wipe all cloud and Firebase Auth records.</li>
+            <li>Open <strong className="text-[var(--ink)]">Ucred</strong> while signed in with Google, your verified Email, or +91 Mobile OTP.</li>
+            <li>Tap <strong className="text-[var(--ink)]">Settings</strong> in the bottom dock (or the profile avatar at top-right).</li>
+            <li>(Recommended) Tap <strong className="text-[var(--ink)]">JSON Backup</strong> first if you want a personal archive.</li>
+            <li>Scroll to <strong className="text-[var(--ink)]">Data &amp; Danger Zone</strong> and tap <strong className="text-[var(--ink)]">Delete Account &amp; All Cloud Data</strong>.</li>
+            <li>Confirm deletion (re-authenticating via Google popup, email, or 6-digit OTP if prompted) to permanently wipe all Cloud Firestore records and your Firebase Authentication account.</li>
           </ol>
         </section>
 
@@ -69,19 +69,19 @@ export default function DeleteAccountPage() {
             What Data Is Permanently Deleted
           </h2>
           <ul className="list-disc pl-5 text-sm text-[var(--ink-muted)] space-y-1.5">
-            <li>User profile, verified mobile number, language, theme preference, and App Lock PIN hash</li>
+            <li>User profile, verified Gmail/email/mobile identity, theme preference, and App Lock PIN hash</li>
             <li>All business profiles, UPI IDs, and GST settings</li>
-            <li>All customer and supplier ledger accounts and transactions, including attached parchi photos</li>
-            <li>All Galla cashbook entries, staff/Munim profiles, and activity audit logs</li>
+            <li>All customer and supplier ledger accounts and transactions, including attached receipt photos</li>
+            <li>All cashbook entries, staff profiles, and activity audit logs</li>
             <li>All bills, quotes, and stock inventory items</li>
-            <li>Your Firebase Authentication phone record for Ucred (when signed in)</li>
+            <li>Your Firebase Authentication account record for Ucred (when signed in)</li>
           </ul>
         </section>
 
         <div className="rounded-[22px] bg-[var(--brand-tint)] p-4 flex items-start gap-3 text-xs text-[var(--ink)] leading-relaxed">
           <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5 text-[var(--brand-accent)]" />
           <p>
-            Deletion is immediate and irreversible. Need help or want to request deletion via email? Contact <strong className="font-extrabold">support@ucred.app</strong> from your registered phone details.
+            Deletion is immediate and irreversible. Need manual assistance? Contact <strong className="font-extrabold">naitik.webstudio45@gmail.com</strong> or <strong className="font-extrabold">support@ucred.app</strong> from your registered email or mobile details.
           </p>
         </div>
 

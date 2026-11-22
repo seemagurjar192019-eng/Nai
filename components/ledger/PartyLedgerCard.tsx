@@ -10,6 +10,8 @@ import { haptics } from '@/utils/haptics';
 import { OdometerNumber } from '../motion/OdometerNumber';
 
 const RING_RADIUS = 19;
+const SWIPE_ARC_RADIUS = 8;
+const SWIPE_ARC_CIRCUMFERENCE = 2 * Math.PI * SWIPE_ARC_RADIUS;
 const SPRING_FAST = { type: 'spring' as const, stiffness: 460, damping: 26 };
 const SWIPE_THRESHOLD = 58;
 
@@ -77,6 +79,7 @@ export interface PartyLedgerCardProps {
   isSelected: boolean;
   isRecentlySaved: boolean;
   repulsionOffsetY: number;
+  groupedRow?: boolean;
   dueLabel: string;
   advanceLabel: string;
   settledLabel: string;
@@ -88,10 +91,10 @@ export interface PartyLedgerCardProps {
 }
 
 /**
- * Spatial Party Ledger Card with:
+ * iOS 27 Spatial Party Card:
  * - Z-axis `layoutId` shared card-to-statement morph
- * - Velocity swipe revealing detached 'Receive ₹' and 'WhatsApp' pills
- * - Neighbour repulsion (`±3px`) when an adjacent card is pressed/dragged
+ * - Progressive circular SVG swipe arc drawing while dragging right ('Receive ₹') or left ('Remind')
+ * - Neighbour repulsion (`±3px`) when an adjacent card is active
  */
 export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
   account,
@@ -101,6 +104,7 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
   isSelected,
   isRecentlySaved,
   repulsionOffsetY,
+  groupedRow = false,
   dueLabel,
   advanceLabel,
   settledLabel,
@@ -160,7 +164,9 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
 
   // Reserve slot without duplicating layoutId while foreground PartyStatementView is open
   if (isSelected) {
-    return <div className="min-h-[72px] rounded-[24px] opacity-0 pointer-events-none" aria-hidden="true" />;
+    return (
+      <div className="min-h-[72px] rounded-[24px] opacity-0 pointer-events-none" aria-hidden="true" />
+    );
   }
 
   const absBal = Math.abs(account.balance);
@@ -174,39 +180,50 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
     : account.lastNote && account.lastNote !== 'Added Today'
       ? account.lastNote
       : trust && account.kind === 'customer'
-        ? `Trust ${trust.score}/100${account.dueDate ? ` · Due ${account.dueDate}` : ''}`
+        ? `Score ${trust.score}/100${account.dueDate ? ` · Due ${account.dueDate}` : ''}`
         : account.phone
           ? `+91 ${account.phone}`
           : 'Tap for ledger';
 
-  const rightPillVisible = dragX > 14;
-  const leftPillVisible = dragX < -14;
+  const rightProgress = Math.max(0, Math.min(1, dragX / SWIPE_THRESHOLD));
+  const leftProgress = Math.max(0, Math.min(1, -dragX / SWIPE_THRESHOLD));
+  const rightPillVisible = dragX > 12;
+  const leftPillVisible = dragX < -12;
 
   return (
-    <div className="relative rounded-[24px] touch-pan-y">
-      {/* Detached Spring-Popping Swipe Action Pills */}
+    <div className={`relative touch-pan-y ${groupedRow ? '' : 'rounded-[24px]'}`}>
+      {/* Detached Spring-Popping Swipe Action Pills with Progressive Circular SVG Arcs */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 rounded-[24px] flex items-center justify-between px-2.5 pointer-events-none"
+        className={`absolute inset-0 flex items-center justify-between px-3 pointer-events-none ${
+          groupedRow ? 'bg-[var(--app-bg)]/60' : 'rounded-[24px]'
+        }`}
       >
         <motion.span
           animate={{
-            scale: rightPillVisible ? (dragX > SWIPE_THRESHOLD ? 1.04 : 0.94) : 0.72,
+            scale: rightPillVisible ? (rightProgress >= 1 ? 1.05 : 0.94) : 0.72,
             opacity: rightPillVisible ? 1 : 0,
           }}
           transition={SPRING_FAST}
           className="min-h-[38px] px-3.5 rounded-full bg-[var(--debit-green)] text-white inline-flex items-center gap-1.5 text-xs font-extrabold shadow-sm"
         >
-          <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" aria-hidden="true">
-            <motion.path
-              d="M8 3v10m0 0-3.5-3.5M8 13l3.5-3.5"
-              stroke="currentColor"
-              strokeWidth="2.2"
+          <svg viewBox="0 0 22 22" className="w-4 h-4 -rotate-90" fill="none" aria-hidden="true">
+            <circle
+              cx="11"
+              cy="11"
+              r={SWIPE_ARC_RADIUS}
+              stroke="rgba(255,255,255,0.28)"
+              strokeWidth="2.4"
+            />
+            <circle
+              cx="11"
+              cy="11"
+              r={SWIPE_ARC_RADIUS}
+              stroke="#FFFFFF"
+              strokeWidth="2.4"
               strokeLinecap="round"
-              strokeLinejoin="round"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: rightPillVisible ? 1 : 0 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
+              strokeDasharray={SWIPE_ARC_CIRCUMFERENCE}
+              strokeDashoffset={SWIPE_ARC_CIRCUMFERENCE * (1 - rightProgress)}
             />
           </svg>
           <span>Receive ₹</span>
@@ -214,14 +231,33 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
 
         <motion.span
           animate={{
-            scale: leftPillVisible ? (dragX < -SWIPE_THRESHOLD ? 1.04 : 0.94) : 0.72,
+            scale: leftPillVisible ? (leftProgress >= 1 ? 1.05 : 0.94) : 0.72,
             opacity: leftPillVisible ? 1 : 0,
           }}
           transition={SPRING_FAST}
           className="min-h-[38px] px-3.5 rounded-full bg-[var(--brand)] text-white inline-flex items-center gap-1.5 text-xs font-extrabold shadow-sm"
         >
+          <svg viewBox="0 0 22 22" className="w-4 h-4 -rotate-90" fill="none" aria-hidden="true">
+            <circle
+              cx="11"
+              cy="11"
+              r={SWIPE_ARC_RADIUS}
+              stroke="rgba(255,255,255,0.28)"
+              strokeWidth="2.4"
+            />
+            <circle
+              cx="11"
+              cy="11"
+              r={SWIPE_ARC_RADIUS}
+              stroke="#FFFFFF"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeDasharray={SWIPE_ARC_CIRCUMFERENCE}
+              strokeDashoffset={SWIPE_ARC_CIRCUMFERENCE * (1 - leftProgress)}
+            />
+          </svg>
           <MessageSquare className="w-3.5 h-3.5 stroke-[2.2]" />
-          <span>WhatsApp</span>
+          <span>Remind</span>
         </motion.span>
       </div>
 
@@ -230,27 +266,28 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
         {...(bind() as Record<string, unknown>)}
         style={{ touchAction: 'pan-y' }}
         onPointerEnter={() => onInteractionStart?.(idx)}
-        onPointerDown={() => onInteractionStart?.(idx)}
-        onPointerUp={() => onInteractionEnd?.()}
-        onPointerCancel={() => onInteractionEnd?.()}
         onPointerLeave={() => onInteractionEnd?.()}
         initial={{ opacity: 0, y: 10, scale: 0.98 }}
         animate={{
           opacity: 1,
           y: repulsionOffsetY,
           x: dragX,
-          scale: isRecentlySaved ? 1.02 : 1,
+          scale: isRecentlySaved ? 1.015 : 1,
         }}
-        whileTap={{ scale: 0.98 }}
+        whileTap={{ scale: 0.985 }}
         transition={
           isDragging
             ? { duration: 0 }
             : { ...SPRING_FAST, delay: Math.min(idx, 10) * 0.02 }
         }
-        className={`relative rounded-[24px] spatial-card px-3.5 py-3 flex items-center justify-between gap-2.5 will-change-transform ${
-          isRecentlySaved
-            ? 'bg-[var(--debit-tint)] ring-2 ring-[var(--debit-green)]'
-            : 'bg-[var(--surface)]'
+        className={`relative px-4 py-3.5 flex items-center justify-between gap-2.5 will-change-transform ${
+          groupedRow
+            ? isRecentlySaved
+              ? 'bg-[var(--debit-tint)]'
+              : 'bg-[var(--surface)] hover:bg-[var(--surface-subtle)]/45 transition-colors'
+            : isRecentlySaved
+              ? 'rounded-[24px] spatial-card bg-[var(--debit-tint)] ring-2 ring-[var(--debit-green)]'
+              : 'rounded-[24px] spatial-card bg-[var(--surface)]'
         }`}
       >
         <button
@@ -259,8 +296,8 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
             haptics.tap();
             onSelect(account);
           }}
-          aria-label={`Open ${account.name} khata`}
-          className="flex-1 min-w-0 flex items-center gap-3 text-left rounded-2xl focus:outline-none"
+          aria-label={`Open ${account.name} ledger`}
+          className="flex-1 min-w-0 flex items-center gap-3 text-left rounded-2xl focus:outline-none min-h-[44px]"
         >
           <TrustAvatarRing
             name={account.name}
@@ -276,15 +313,15 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
               </p>
               {trust && account.kind === 'customer' && (
                 <span
-                  className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold font-tabular shrink-0 ${
+                  className={`text-[11px] font-extrabold font-tabular shrink-0 ${
                     trust.band === 'high-risk'
-                      ? 'bg-[var(--credit-tint)] text-[var(--credit-red)]'
+                      ? 'text-[var(--credit-red)]'
                       : trust.band === 'watch'
-                        ? 'bg-[var(--alert-tint)] text-[var(--alert-amber)]'
-                        : 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
+                        ? 'text-[var(--alert-amber)]'
+                        : 'text-[var(--debit-green)]'
                   }`}
                 >
-                  {trust.score}
+                  · {trust.score}
                 </span>
               )}
             </div>
@@ -336,7 +373,7 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
             haptics.tap();
             onQuickAdd(account, 'given');
           }}
-          aria-label={`Quick ₹ entry for ${account.name}`}
+          aria-label={`Quick entry for ${account.name}`}
           className="min-w-[44px] min-h-[42px] px-2.5 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] font-extrabold text-xs inline-flex items-center justify-center gap-0.5 shrink-0 shadow-xs"
         >
           <Plus className="w-3.5 h-3.5 stroke-[2.5]" />

@@ -28,6 +28,8 @@ import {
   Receipt,
   Share2,
   ShieldCheck,
+  SlidersHorizontal,
+  Smartphone,
   Star,
   Store,
   Sun,
@@ -35,12 +37,12 @@ import {
   Upload,
   User,
   UserCheck,
+  Volume2,
   Wallet,
   X,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  LANGUAGE_OPTIONS,
   buildUpiUri,
   formatINR,
   isValidGstNumber,
@@ -52,12 +54,18 @@ import type {
   AppNotificationItem,
   AppearanceMode,
   Business,
-  LanguageCode,
   LedgerAccount,
   LedgerTransaction,
 } from '@/lib/types';
 
 import type { PersonaCapabilities } from '@/lib/persona';
+import {
+  getHapticsEnabled,
+  getSoundEnabled,
+  haptics,
+  setHapticsEnabled,
+  setSoundEnabled,
+} from '@/utils/haptics';
 
 import { PWAInstallButton } from './PwaControls';
 
@@ -162,9 +170,9 @@ export const MoreBentoView: React.FC<MoreBentoViewProps> = ({
             <div className="flex items-center gap-2.5 min-w-0 text-left">
               <CloudUpload className="w-4 h-4 shrink-0" />
               <div className="min-w-0">
-                <p className="text-xs font-extrabold truncate">Backup / Sync via Mobile OTP</p>
+                <p className="text-xs font-extrabold truncate">Backup / Sync Cloud Account</p>
                 <p className="text-[10px] text-indigo-100 truncate">
-                  Optional — auto-merges local guest khata to cloud
+                  Free Google, Email Link, or +91 OTP backup
                 </p>
               </div>
             </div>
@@ -224,7 +232,7 @@ export const MoreBentoView: React.FC<MoreBentoViewProps> = ({
               <UserCheck className="w-5 h-5" />
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-extrabold text-[var(--ink)]">Staff Munim Logs</p>
+              <p className="text-xs font-extrabold text-[var(--ink)]">Staff Counter Logs</p>
               <p className="text-[11px] text-[var(--ink-muted)] truncate">Switch &amp; Audit</p>
             </div>
           </button>
@@ -240,7 +248,7 @@ export const MoreBentoView: React.FC<MoreBentoViewProps> = ({
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-extrabold text-[var(--ink)]">
-                  {capabilities?.gallaSegmentLabel || 'Galla'} Cashbook
+                  {capabilities?.gallaSegmentLabel || 'Cashbook'}
                 </p>
                 <p className="text-[11px] text-[var(--ink-muted)] truncate">Cash &amp; Profit</p>
               </div>
@@ -276,8 +284,8 @@ export const MoreBentoView: React.FC<MoreBentoViewProps> = ({
                 <Camera className="w-4 h-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-xs font-extrabold text-[var(--ink)]">AI Parchi Scan</p>
-                <p className="text-[11px] text-[var(--ink-muted)] truncate">Photo to Khata</p>
+                <p className="text-xs font-extrabold text-[var(--ink)]">AI Receipt Scan</p>
+                <p className="text-[11px] text-[var(--ink-muted)] truncate">Photo to Ledger</p>
               </div>
             </button>
           )}
@@ -290,7 +298,7 @@ export const MoreBentoView: React.FC<MoreBentoViewProps> = ({
           Theme &amp; Cloud Backup
         </p>
 
-        {/* Tenmin-Style Theme Accent Selector: Sapphire Indigo | Rose | Onyx Dark */}
+        {/* iOS 27 Matte Theme Accent Selector: Sapphire Indigo | Rose | Onyx Dark */}
         {onSelectAccentTheme && (
           <div className="grid grid-cols-3 gap-2">
             {(
@@ -435,17 +443,27 @@ export const MoreBentoView: React.FC<MoreBentoViewProps> = ({
 
 
 interface SettingsViewProps {
-  language: LanguageCode;
   appearance: AppearanceMode;
+  accentTheme?: ThemeAccentId;
   mobileNumber: string;
   verifiedPhone: string;
+  activeOperatorName?: string;
+  workspaceBadge?: string;
   business: Business;
   appLockPin: string;
   isGuestMode?: boolean;
+  showBackButton?: boolean;
+  capabilities?: PersonaCapabilities;
   onOpenCloudSync?: () => void;
-  onBack: () => void;
-  onChangeLanguage: (lang: LanguageCode) => Promise<void>;
+  onOpenWorkspaces?: () => void;
+  onOpenBusinessProfile?: () => void;
+  onOpenStaffAudit?: () => void;
+  onOpenGalla?: () => void;
+  onOpenStock?: () => void;
+  onOpenHelp?: () => void;
+  onBack?: () => void;
   onChangeAppearance: (mode: AppearanceMode) => Promise<void>;
+  onSelectAccentTheme?: (theme: ThemeAccentId) => Promise<void> | void;
   onSaveMobile: (phone: string) => Promise<void>;
   onSaveUpiId: (upiId: string) => Promise<void>;
   onSavePin: (pin: string) => Promise<void>;
@@ -458,17 +476,27 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
-  language,
   appearance,
+  accentTheme = 'sapphire',
   mobileNumber,
   verifiedPhone,
+  activeOperatorName = 'Shop Owner',
+  workspaceBadge = 'Retail Store',
   business,
   appLockPin,
   isGuestMode = false,
+  showBackButton = true,
+  capabilities,
   onOpenCloudSync,
+  onOpenWorkspaces,
+  onOpenBusinessProfile,
+  onOpenStaffAudit,
+  onOpenGalla,
+  onOpenStock,
+  onOpenHelp,
   onBack,
-  onChangeLanguage,
   onChangeAppearance,
+  onSelectAccentTheme,
   onSaveMobile,
   onSaveUpiId,
   onSavePin,
@@ -487,7 +515,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [confirmClear, setConfirmClear] = useState(false);
   const [confirmDeleteAcc, setConfirmDeleteAcc] = useState(false);
   const [busyAction, setBusyAction] = useState('');
+  const [soundEnabled, setSoundState] = useState<boolean>(() => getSoundEnabled());
+  const [hapticsEnabled, setHapticsState] = useState<boolean>(() => getHapticsEnabled());
   const restoreRef = useRef<HTMLInputElement | null>(null);
+
+  const activeTheme: ThemeAccentId =
+    appearance === 'dark' ? 'onyx' : accentTheme === 'rose' ? 'rose' : 'sapphire';
 
   const flash = (msg: string) => {
     setErrorMsg('');
@@ -510,17 +543,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <div className="space-y-4 pb-32 stagger-fade-up">
+      {/* Header Row */}
       <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl spatial-card text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Settings</span>
-        </button>
+        {showBackButton && onBack ? (
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              onBack();
+            }}
+            className="inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl spatial-card text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>Settings</span>
+          </button>
+        ) : (
+          <div className="px-0.5">
+            <h1 className="font-display text-2xl font-extrabold text-[var(--ink)] tracking-tight">
+              Settings
+            </h1>
+            <p className="text-[11px] font-semibold text-[var(--ink-muted)]">
+              Account, Sound &amp; Haptics, Appearance, Backups &amp; Legal
+            </p>
+          </div>
+        )}
+
         {statusMsg && (
-          <span className="text-xs font-bold px-3.5 py-2 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-xs">
+          <span className="text-xs font-bold px-3.5 py-2 rounded-full bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-xs">
             {statusMsg}
           </span>
         )}
@@ -543,98 +592,336 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* Section 1: Ucred Sapphire, Rose & Onyx Theme */}
-      <section className="rounded-[26px] spatial-card p-5 space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
-              <Palette className="w-4 h-4" />
-            </span>
-            <h2 className="font-display text-base font-extrabold text-[var(--ink)]">
-              Ucred Display Theme
-            </h2>
-          </div>
-          <span className="text-[11px] font-bold text-[var(--ink-muted)]">
-            {appearance === 'dark' ? 'Onyx Dark' : 'Solid Light Canvas'}
-          </span>
-        </div>
-
-        <div className="rounded-2xl bg-[var(--surface-subtle)] p-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex items-center -space-x-1.5 shrink-0">
-              <span className="w-5 h-5 rounded-full bg-[#4F46E5] ring-2 ring-white dark:ring-zinc-900" />
-              <span className="w-5 h-5 rounded-full bg-[#06B6D4] ring-2 ring-white dark:ring-zinc-900" />
-              <span className="w-5 h-5 rounded-full bg-[#F6F7FB] ring-2 ring-white dark:ring-zinc-900" />
+      {/* Group 1: Cloud Account & Sync Card (iOS Apple ID Style) */}
+      <section className="rounded-[24px] spatial-card p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-full bg-[var(--brand)] text-white font-display font-extrabold text-lg flex items-center justify-center shrink-0">
+              {(business.name || 'U').charAt(0).toUpperCase()}
             </div>
-            <p className="text-xs font-semibold text-[var(--ink-muted)] truncate">
-              Solid Tenmin-inspired Light &amp; Onyx Dark system
-            </p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="font-display text-base font-extrabold text-[var(--ink)] truncate">
+                  {business.name}
+                </p>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                    isGuestMode
+                      ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
+                      : 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
+                  }`}
+                >
+                  {isGuestMode ? 'Guest Vault' : 'Cloud Synced'}
+                </span>
+              </div>
+              <p className="text-xs text-[var(--ink-muted)] truncate">
+                {isGuestMode
+                  ? `On-device · Google, Email & +91 OTP available`
+                  : `${verifiedPhone} · ${activeOperatorName}`}
+              </p>
+            </div>
           </div>
+          {!isGuestMode && (
+            <button
+              type="button"
+              onClick={() => void runSafely('logout', onLogout, 'Signed out to Guest Vault')}
+              className="min-h-[36px] px-3 rounded-full bg-[var(--surface-subtle)] text-xs font-extrabold text-[var(--ink)] inline-flex items-center gap-1 shrink-0 active:scale-95 transition"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
+          )}
         </div>
 
-        <div className="space-y-2">
-          <p className="text-xs font-bold text-[var(--ink-muted)] uppercase">Display Mode</p>
-          <div className="grid grid-cols-2 gap-2.5">
+        {isGuestMode && onOpenCloudSync && (
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              onOpenCloudSync();
+            }}
+            style={{ background: 'var(--munim-gradient)' }}
+            className="w-full min-h-[48px] px-4 rounded-2xl text-white font-extrabold text-xs flex items-center justify-between gap-2 tactile-key-primary active:scale-[0.98] transition"
+          >
+            <span className="inline-flex items-center gap-2">
+              <CloudUpload className="w-4 h-4 shrink-0" />
+              <span>Connect Free Cloud Backup</span>
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full bg-white text-[#4F46E5] text-[10px] font-black shrink-0">
+              Free
+            </span>
+          </button>
+        )}
+      </section>
+
+      {/* Group 2: Workspaces, Tools & Shop Profile */}
+      <section className="rounded-[24px] spatial-card divide-y divide-[var(--surface-subtle)] overflow-hidden">
+        {onOpenWorkspaces && (
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              onOpenWorkspaces();
+            }}
+            className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)] transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                <SlidersHorizontal className="w-4 h-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-[var(--ink)]">Workspace Modes</span>
+                <span className="block text-[11px] text-[var(--ink-muted)] truncate">
+                  Active: {workspaceBadge}
+                </span>
+              </span>
+            </span>
+            <span className="text-xs font-extrabold text-[var(--brand-accent)] shrink-0">Edit</span>
+          </button>
+        )}
+
+        {onOpenBusinessProfile && (
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              onOpenBusinessProfile();
+            }}
+            className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)] transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                <Store className="w-4 h-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-[var(--ink)]">Shop Profile &amp; GSTIN</span>
+                <span className="block text-[11px] text-[var(--ink-muted)] truncate">
+                  {business.gstNumber || 'Add address, GSTIN & digital card'}
+                </span>
+              </span>
+            </span>
+            <span className="text-xs font-extrabold text-[var(--ink-muted)] shrink-0">Open</span>
+          </button>
+        )}
+
+        {capabilities?.showGalla && onOpenGalla && (
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              onOpenGalla();
+            }}
+            className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)] transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
+                <Wallet className="w-4 h-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-[var(--ink)]">
+                  {capabilities.gallaSegmentLabel || 'Cashbook'}
+                </span>
+                <span className="block text-[11px] text-[var(--ink-muted)]">
+                  Daily cash drawer, UPI &amp; expenses
+                </span>
+              </span>
+            </span>
+            <span className="text-xs font-extrabold text-[var(--ink-muted)] shrink-0">Open</span>
+          </button>
+        )}
+
+        {capabilities?.showStock && onOpenStock && (
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              onOpenStock();
+            }}
+            className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)] transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-[var(--alert-tint)] text-[var(--alert-amber)] flex items-center justify-center shrink-0">
+                <Package className="w-4 h-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-[var(--ink)]">Stock Inventory</span>
+                <span className="block text-[11px] text-[var(--ink-muted)]">
+                  Rates, units &amp; low-stock alerts
+                </span>
+              </span>
+            </span>
+            <span className="text-xs font-extrabold text-[var(--ink-muted)] shrink-0">Open</span>
+          </button>
+        )}
+
+        {onOpenStaffAudit && (
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              onOpenStaffAudit();
+            }}
+            className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)] transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                <UserCheck className="w-4 h-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-[var(--ink)]">Staff Counter Logs</span>
+                <span className="block text-[11px] text-[var(--ink-muted)]">
+                  Switch active counter operator &amp; audit trail
+                </span>
+              </span>
+            </span>
+            <span className="text-xs font-extrabold text-[var(--ink-muted)] shrink-0">Open</span>
+          </button>
+        )}
+      </section>
+
+      {/* Group 3: Tactile Sound, Haptics & Display Appearance */}
+      <section className="rounded-[24px] spatial-card p-4 space-y-4">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+          Sounds, Haptics &amp; Display
+        </p>
+
+        {/* Web Audio iOS-style Tactile Clicks Switch */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={soundEnabled}
+          onClick={() => {
+            const next = !soundEnabled;
+            setSoundEnabled(next);
+            setSoundState(next);
+            if (next) haptics.tap();
+            flash(next ? 'iOS tactile clicks enabled' : 'Tactile clicks muted');
+          }}
+          className="w-full rounded-2xl bg-[var(--surface-subtle)] px-3.5 py-3 flex items-center justify-between gap-3 text-left"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Volume2 className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-[var(--ink)]">Tactile Click Sounds</p>
+              <p className="text-[11px] text-[var(--ink-muted)]">
+                Soft iOS-style ticks &amp; save chime (zero-cost Web Audio)
+              </p>
+            </div>
+          </div>
+          <span
+            className={`w-11 h-6 rounded-full p-0.5 transition-colors flex items-center shrink-0 ${
+              soundEnabled ? 'bg-[var(--debit-green)] justify-end' : 'bg-[var(--surface-border)] justify-start'
+            }`}
+          >
+            <span className="w-5 h-5 rounded-full bg-white shadow-xs" />
+          </span>
+        </button>
+
+        {/* Haptic Vibration Switch */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={hapticsEnabled}
+          onClick={() => {
+            const next = !hapticsEnabled;
+            setHapticsEnabled(next);
+            setHapticsState(next);
+            if (next) haptics.tap();
+            flash(next ? 'Haptic vibration enabled' : 'Haptic vibration off');
+          }}
+          className="w-full rounded-2xl bg-[var(--surface-subtle)] px-3.5 py-3 flex items-center justify-between gap-3 text-left"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Smartphone className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-[var(--ink)]">Haptic Feedback</p>
+              <p className="text-[11px] text-[var(--ink-muted)]">
+                Subtle vibration ticks on swipes &amp; saves
+              </p>
+            </div>
+          </div>
+          <span
+            className={`w-11 h-6 rounded-full p-0.5 transition-colors flex items-center shrink-0 ${
+              hapticsEnabled ? 'bg-[var(--debit-green)] justify-end' : 'bg-[var(--surface-border)] justify-start'
+            }`}
+          >
+            <span className="w-5 h-5 rounded-full bg-white shadow-xs" />
+          </span>
+        </button>
+
+        {/* Display Mode */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {(
+            [
+              { id: 'light', label: 'Light Mode', icon: Sun },
+              { id: 'dark', label: 'OLED Dark', icon: Moon },
+            ] as const
+          ).map((m) => {
+            const Icon = m.icon;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={async () => {
+                  haptics.tap();
+                  await onChangeAppearance(m.id);
+                  flash(`${m.label} active`);
+                }}
+                className={`min-h-[46px] rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 active:scale-95 transition ${
+                  appearance === m.id
+                    ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)] text-[var(--brand-accent)] shadow-xs'
+                    : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{m.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Theme Accents */}
+        {onSelectAccentTheme && (
+          <div className="grid grid-cols-3 gap-2">
             {(
               [
-                { id: 'light', label: 'Light Mode', icon: Sun },
-                { id: 'dark', label: 'Dark Mode', icon: Moon },
+                { id: 'sapphire', label: 'Sapphire', dot: 'bg-[#4F46E5]' },
+                { id: 'rose', label: 'Rose', dot: 'bg-[#E11D48]' },
+                { id: 'onyx', label: 'Onyx', dot: 'bg-[#09090B] ring-2 ring-[#E5E7EB]' },
               ] as const
-            ).map((m) => {
-              const Icon = m.icon;
+            ).map((opt) => {
+              const selected = activeTheme === opt.id;
               return (
                 <button
-                  key={m.id}
+                  key={opt.id}
                   type="button"
-                  onClick={async () => {
-                    await onChangeAppearance(m.id);
-                    flash(`${m.label} active`);
+                  onClick={() => {
+                    haptics.tap();
+                    void onSelectAccentTheme(opt.id);
                   }}
-                  className={`min-h-[48px] rounded-xl text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition ${
-                    appearance === m.id
-                      ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)] text-[var(--brand-accent)] shadow-xs'
+                  className={`min-h-[42px] px-3 rounded-xl flex items-center justify-between text-xs font-bold active:scale-95 transition ${
+                    selected
+                      ? 'bg-[var(--brand-tint)] ring-1 ring-[var(--brand)] text-[var(--brand-accent)]'
                       : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span>{m.label}</span>
+                  <span className="flex items-center gap-2">
+                    <span className={`w-3.5 h-3.5 rounded-full ${opt.dot}`} />
+                    <span>{opt.label}</span>
+                  </span>
+                  {selected && <Check className="w-3.5 h-3.5" />}
                 </button>
               );
             })}
           </div>
-        </div>
+        )}
       </section>
 
-      {/* Section 2: Language */}
-      <section className="rounded-[26px] spatial-card p-5 space-y-3">
-        <h2 className="font-display text-base font-extrabold text-[var(--ink)]">App Language</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {LANGUAGE_OPTIONS.map((opt) => (
-            <button
-              key={opt.code}
-              type="button"
-              onClick={async () => {
-                await onChangeLanguage(opt.code);
-                flash(`Language set to ${opt.englishName}`);
-              }}
-              className={`min-h-[44px] px-3 rounded-xl text-left text-xs font-bold flex items-center justify-between active:scale-95 transition ${
-                language === opt.code
-                  ? 'bg-[var(--brand-tint)] ring-2 ring-[var(--brand-accent)] text-[var(--brand-accent)]'
-                  : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
-              }`}
-            >
-              <span>{opt.nativeName}</span>
-              {language === opt.code && <Check className="w-3.5 h-3.5 shrink-0" />}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Section 3: Shop Mobile, UPI QR & PIN Lock */}
-      <section className="rounded-[26px] spatial-card p-5 space-y-4">
-        <h2 className="font-display text-base font-extrabold text-[var(--ink)]">
-          Account, UPI &amp; Security
-        </h2>
+      {/* Group 4: Shop Mobile, UPI QR & 4-Digit PIN Lock */}
+      <section className="rounded-[24px] spatial-card p-4 space-y-4">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+          UPI Payment QR &amp; Security PIN
+        </p>
 
         <div className="space-y-1.5">
           <label className="block text-xs font-bold text-[var(--ink-muted)]">
@@ -667,7 +954,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         <div className="space-y-1.5">
           <label className="block text-xs font-bold text-[var(--ink-muted)]">
-            Shop UPI ID (for Live Collection QR Codes)
+            Shop UPI ID (for Payment QR &amp; Slips)
           </label>
           <div className="flex gap-2">
             <input
@@ -698,7 +985,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <label className="block text-xs font-bold text-[var(--ink-muted)]">
-              4-Digit App Lock PIN ({appLockPin ? 'Currently Active' : 'Not Set'})
+              4-Digit App Lock PIN ({appLockPin ? 'Active' : 'Off'})
             </label>
             {appLockPin && (
               <button
@@ -748,55 +1035,55 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               className="min-h-[44px] px-4 rounded-xl bg-slate-800 dark:bg-slate-700 text-white text-xs font-bold inline-flex items-center gap-1 shadow-sm active:scale-95 transition"
             >
               <KeyRound className="w-3.5 h-3.5" />
-              <span>{appLockPin ? 'Update PIN' : 'Set PIN'}</span>
+              <span>{appLockPin ? 'Update' : 'Set PIN'}</span>
             </button>
           </div>
         </div>
       </section>
 
-      {/* Section 4: Data Management */}
-      <section className="rounded-[26px] spatial-card p-5 space-y-3">
-        <div className="flex items-center gap-2.5">
-          <span className="w-9 h-9 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
-            <Database className="w-4 h-4" />
-          </span>
-          <h2 className="font-display text-base font-extrabold text-[var(--ink)]">
-            Data &amp; Backup Management
-          </h2>
+      {/* Group 5: Backup, Data Exports & Danger Zone */}
+      <section className="rounded-[24px] spatial-card p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Database className="w-4 h-4 text-[var(--brand-accent)]" />
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+            Backup &amp; Data Management
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => {
+              haptics.tap();
               onExportCsv();
               flash('CSV exported');
             }}
-            className="min-h-[46px] px-4 rounded-xl bg-[var(--surface-subtle)] text-sm font-bold text-[var(--ink)] flex items-center justify-center gap-2 active:scale-95 transition"
+            className="min-h-[44px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)] flex items-center justify-center gap-1.5 active:scale-95 transition"
           >
-            <FileSpreadsheet className="w-4 h-4 text-[var(--brand-accent)]" />
-            <span>Export Data (CSV)</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-[var(--brand-accent)] shrink-0" />
+            <span>CSV</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
+              haptics.tap();
               onExportJson();
               flash('JSON backup downloaded');
             }}
-            className="min-h-[46px] px-4 rounded-xl bg-[var(--surface-subtle)] text-sm font-bold text-[var(--ink)] flex items-center justify-center gap-2 active:scale-95 transition"
+            className="min-h-[44px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)] flex items-center justify-center gap-1.5 active:scale-95 transition"
           >
-            <Download className="w-4 h-4 text-[var(--brand-accent)]" />
-            <span>Download JSON Backup</span>
+            <Download className="w-3.5 h-3.5 text-[var(--brand-accent)] shrink-0" />
+            <span>JSON</span>
           </button>
 
           <button
             type="button"
             onClick={() => restoreRef.current?.click()}
-            className="min-h-[46px] px-4 rounded-xl bg-[var(--surface-subtle)] text-sm font-bold text-[var(--ink)] flex items-center justify-center gap-2 active:scale-95 transition"
+            className="min-h-[44px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)] flex items-center justify-center gap-1.5 active:scale-95 transition"
           >
-            <Upload className="w-4 h-4 text-[var(--brand-accent)]" />
-            <span>Restore JSON Backup</span>
+            <Upload className="w-3.5 h-3.5 text-[var(--brand-accent)] shrink-0" />
+            <span>Restore</span>
           </button>
           <input
             ref={restoreRef}
@@ -809,27 +1096,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               await runSafely(
                 'restore',
                 () => onRestoreJson(file),
-                'Backup restored to cloud khata'
+                'Backup restored cleanly'
               );
             }}
             className="hidden"
           />
         </div>
 
-        <div className="pt-2 space-y-2.5">
+        <div className="pt-1 space-y-2">
           {!confirmClear ? (
             <button
               type="button"
               onClick={() => setConfirmClear(true)}
-              className="w-full min-h-[46px] rounded-xl bg-[var(--credit-tint)] text-[var(--credit-red)] text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition"
+              className="w-full min-h-[44px] rounded-xl bg-[var(--credit-tint)] text-[var(--credit-red)] text-xs font-extrabold flex items-center justify-center gap-2 active:scale-95 transition"
             >
-              <Trash2 className="w-4 h-4" />
-              <span>Clear All Business Data</span>
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear All Shop Data</span>
             </button>
           ) : (
             <div className="rounded-2xl bg-[var(--credit-tint)] p-3.5 space-y-2.5">
               <p className="text-xs font-bold text-[var(--credit-red)] text-center">
-                Erase all customers, bills, Galla, staff, and stock for {business.name}?
+                Erase all parties, entries, bills, cashbook, staff &amp; stock for {business.name}?
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -839,106 +1126,98 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     await runSafely('clear', onClearAll, 'All shop data cleared');
                     setConfirmClear(false);
                   }}
-                  className="min-h-[44px] rounded-xl bg-[var(--credit-red)] text-white text-xs font-bold shadow-sm"
+                  className="min-h-[42px] rounded-xl bg-[var(--credit-red)] text-white text-xs font-bold"
                 >
                   {busyAction === 'clear' ? 'Clearing...' : 'Yes, Clear All'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmClear(false)}
-                  className="min-h-[44px] rounded-xl bg-[var(--surface)] text-xs font-bold text-[var(--ink)]"
+                  className="min-h-[42px] rounded-xl bg-[var(--surface)] text-xs font-bold text-[var(--ink)]"
                 >
                   Cancel
                 </button>
               </div>
             </div>
           )}
-        </div>
-      </section>
 
-      {/* Section 5: About, Cloud Backup / Legal & Account Controls */}
-      <section className="rounded-[26px] spatial-card p-5 space-y-4">
-        <div className="space-y-1">
-          <p className="font-display text-sm font-extrabold text-[var(--ink)]">
-            Ucred — Merchant Credit &amp; Galla OS
-          </p>
-          <p className="text-xs text-[var(--ink-muted)]">
-            {isGuestMode
-              ? 'Running in Instant Guest Mode (Local Device Storage). Use Clear All Business Data above to erase local Guest records, or sign in with +91 OTP anytime to sync across devices.'
-              : `Synced privately via Mobile OTP (${verifiedPhone || (mobileNumber ? `+91 ${mobileNumber}` : 'Authenticated')}). Your shop data stays 100% encrypted.`}
-          </p>
-          <div className="flex flex-wrap gap-3 pt-1 text-xs font-bold text-[var(--brand-accent)]">
-            <Link href="/privacy" className="hover:underline">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="hover:underline">
-              Terms of Service
-            </Link>
-            <Link href="/delete-account" className="hover:underline">
-              Data Deletion Info
-            </Link>
-          </div>
-        </div>
-
-        {isGuestMode ? (
-          onOpenCloudSync && (
-            <button
-              type="button"
-              onClick={onOpenCloudSync}
-              style={{ background: 'var(--munim-gradient)' }}
-              className="w-full min-h-[48px] rounded-2xl text-white font-extrabold text-sm flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
-            >
-              <CloudUpload className="w-4 h-4" />
-              <span>Connect +91 Mobile OTP &amp; Cloud Backup</span>
-            </button>
-          )
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="w-full min-h-[48px] rounded-2xl bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Log Out (Switch to Guest Mode)</span>
-            </button>
-
-            {!confirmDeleteAcc ? (
+          {!isGuestMode && (
+            !confirmDeleteAcc ? (
               <button
                 type="button"
                 onClick={() => setConfirmDeleteAcc(true)}
-                className="w-full min-h-[46px] rounded-xl bg-[var(--credit-tint)] text-[var(--credit-red)] text-xs font-extrabold flex items-center justify-center gap-1.5 active:scale-95 transition"
+                className="w-full min-h-[44px] rounded-xl bg-[var(--credit-tint)] text-[var(--credit-red)] text-xs font-extrabold flex items-center justify-center gap-1.5 active:scale-95 transition"
               >
-                <AlertTriangle className="w-4 h-4" />
-                <span>Delete Account &amp; All Cloud Data</span>
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Delete Cloud Account Permanently</span>
               </button>
             ) : (
               <div className="rounded-2xl bg-[var(--credit-tint)] p-3.5 space-y-2.5">
                 <p className="text-xs font-bold text-[var(--credit-red)] text-center leading-relaxed">
-                  This permanently erases ALL businesses, customers, transactions, bills, Galla, staff,
-                  stock, and removes your Ucred account. Export a JSON backup first!
+                  Permanently deletes ALL shops, ledgers, bills &amp; cloud account data. Export a JSON backup first.
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     disabled={busyAction === 'delete-account'}
                     onClick={() => runSafely('delete-account', onDeleteAccount)}
-                    className="min-h-[44px] rounded-xl bg-[var(--credit-red)] text-white text-xs font-extrabold shadow-sm disabled:opacity-60"
+                    className="min-h-[42px] rounded-xl bg-[var(--credit-red)] text-white text-xs font-extrabold disabled:opacity-60"
                   >
-                    {busyAction === 'delete-account' ? 'Deleting Account...' : 'Delete Permanently'}
+                    {busyAction === 'delete-account' ? 'Deleting...' : 'Delete Forever'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmDeleteAcc(false)}
-                    className="min-h-[44px] rounded-xl bg-[var(--surface)] text-xs font-bold text-[var(--ink)]"
+                    className="min-h-[42px] rounded-xl bg-[var(--surface)] text-xs font-bold text-[var(--ink)]"
                   >
                     Cancel
                   </button>
                 </div>
               </div>
-            )}
-          </>
-        )}
+            )
+          )}
+        </div>
+      </section>
+
+      {/* Group 6: Compliance, Help & PWA Install */}
+      <section className="rounded-[24px] spatial-card p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="font-display text-sm font-extrabold text-[var(--ink)]">
+              Ucred — Ledger &amp; Cashbook OS
+            </p>
+            <p className="text-[11px] text-[var(--ink-muted)]">
+              DPDP 2023 Compliant · Support: naitik.webstudio45@gmail.com
+            </p>
+          </div>
+          <PWAInstallButton compact />
+        </div>
+
+        <p className="text-[10px] text-[var(--ink-muted)] leading-relaxed">
+          Trust Score is an internal merchant recovery indicator only (not a statutory credit bureau score under CICRA/RBI). Verify GSTIN and HSN rates before tax filing.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-0.5 text-xs font-bold text-[var(--brand-accent)]">
+          <Link href="/privacy" className="hover:underline">
+            Privacy Policy
+          </Link>
+          <Link href="/terms" className="hover:underline">
+            Terms of Service
+          </Link>
+          <Link href="/delete-account" className="hover:underline">
+            Account Deletion
+          </Link>
+          {onOpenHelp && (
+            <button
+              type="button"
+              onClick={onOpenHelp}
+              className="hover:underline inline-flex items-center gap-1"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Voice Guide</span>
+            </button>
+          )}
+        </div>
       </section>
     </div>
   );
@@ -1628,9 +1907,9 @@ export const HelpSupportView: React.FC<{ onBack: () => void }> = ({ onBack }) =>
           <span>Ucred Powerhouse Suite — Free &amp; Private</span>
         </div>
         <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-          Ucred combines AI Parchi Photo Scanning, Live Galla Cashbook &amp; Daily Profit Pulse,
-          Customer Trust Scores, Staff Munim Counter Logs, Multi-Business Khata, GST Bills, and
-          1-Click WhatsApp UPI Vasooli inside your private local or OTP-verified cloud ledger.
+          Ucred combines AI Receipt Scanning, Live Cashbook &amp; Daily Profit Pulse,
+          Customer Trust Scores, Staff Counter Logs, Multi-Business Ledgers, GST Bills, and
+          1-Click WhatsApp UPI Collection inside your private local or cloud-verified vault.
         </p>
       </div>
     </div>

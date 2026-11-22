@@ -2,14 +2,14 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* Ucred Solid Matte Spatial Light Mode (#F5F6F8 Canvas · #FFFFFF Borderless Cards · Zero Glass/Blur) */
-  --app-bg: #F5F6F8;
-  --outer-frame: #EAECEF;
+  /* Ucred iOS 27 Matte Spatial Light Mode (#F2F2F7 Canvas · #FFFFFF Elevated Cards · Zero Glass/Blur) */
+  --app-bg: #F2F2F7;
+  --outer-frame: #E5E5EA;
   --surface: #FFFFFF;
-  --surface-subtle: #EDEEF2;
-  --surface-border: #E5E7EB;
+  --surface-subtle: #EBEBF0;
+  --surface-border: #E5E5EA;
   --ink: #111827;
-  --ink-muted: #6B7280;
+  --ink-muted: #6E6E73;
 
   /* Matte Royal Indigo Accent */
   --brand: #4F46E5;
@@ -21,7 +21,7 @@
   --brand-tint: #EEF2FF;
   --brand-soft: #E0E7FF;
 
-  /* Strict Hisaab-Kitaab Semantics (100% Solid Matte) */
+  /* Strict Hisaab Semantics (100% Solid Matte) */
   --credit-red: #DC2626;
   --credit-tint: #FEE2E2;
   --debit-green: #15803D;
@@ -29,14 +29,14 @@
   --alert-amber: #D97706;
   --alert-tint: #FEF3C7;
 
-  /* Solid Matte Royal Indigo Accent Fill (Zero Cyan Neon Gradients) */
+  /* Solid Matte Royal Indigo Accent Fill */
   --munim-gradient: #4F46E5;
 
   /* Soft Diffused Borderless Spatial Shadows */
-  --spatial-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
-  --spatial-shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.06);
-  --spatial-dock-shadow: 0 10px 28px rgba(17, 24, 39, 0.08);
-  --spatial-sheet-shadow: 0 -16px 40px rgba(17, 24, 39, 0.12);
+  --spatial-shadow: 0 4px 18px rgba(0, 0, 0, 0.045);
+  --spatial-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --spatial-dock-shadow: 0 10px 30px rgba(17, 24, 39, 0.11);
+  --spatial-sheet-shadow: 0 -16px 40px rgba(17, 24, 39, 0.14);
   --spatial-key-shadow: 0 8px 20px -4px rgba(79, 70, 229, 0.34);
   --spring-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
   --smooth-ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -53,12 +53,12 @@
 }
 
 .dark {
-  /* Ucred Solid Matte Dark Mode (#0B0C0E Canvas · #16181D Cards) */
-  --app-bg: #0B0C0E;
+  /* Ucred iOS 27 Matte OLED Dark Mode (#000000 Canvas · #1C1C1E Cards) */
+  --app-bg: #000000;
   --outer-frame: #000000;
-  --surface: #16181D;
-  --surface-subtle: #20232A;
-  --surface-border: #262932;
+  --surface: #1C1C1E;
+  --surface-subtle: #2C2C2E;
+  --surface-border: #38383A;
   --ink: #F9FAFB;
   --ink-muted: #9CA3AF;
 
@@ -67,7 +67,7 @@
   --brand-fg: #FFFFFF;
 
   --brand-accent: #818CF8;
-  --brand-accent-fg: #0B0C0E;
+  --brand-accent-fg: #000000;
   --brand-tint: #1E1B4B;
   --brand-soft: #312E81;
 
@@ -80,11 +80,11 @@
 
   --munim-gradient: #4F46E5;
 
-  --spatial-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
-  --spatial-shadow-lg: 0 14px 34px rgba(0, 0, 0, 0.52);
-  --spatial-dock-shadow: 0 12px 30px rgba(0, 0, 0, 0.56);
-  --spatial-sheet-shadow: 0 -16px 40px rgba(0, 0, 0, 0.65);
-  --spatial-key-shadow: 0 8px 22px -4px rgba(79, 70, 229, 0.45);
+  --spatial-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --spatial-shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.62);
+  --spatial-dock-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
+  --spatial-sheet-shadow: 0 -16px 40px rgba(0, 0, 0, 0.72);
+  --spatial-key-shadow: 0 8px 22px -4px rgba(79, 70, 229, 0.48);
 }
 
 .dark[data-accent="rose"] {
@@ -94,7 +94,7 @@
   --brand-tint: #4C0519;
   --brand-soft: #881337;
   --munim-gradient: #E11D48;
-  --spatial-key-shadow: 0 8px 22px -4px rgba(244, 63, 94, 0.45);
+  --spatial-key-shadow: 0 8px 22px -4px rgba(244, 63, 94, 0.48);
 }
 
 body {
@@ -116,28 +116,109 @@ body {
   font-feature-settings: "tnum";
 }
 
-/* 100% Solid Tenmin-Style Surfaces (Zero Glass / Zero Blur) */
+/* 100% Solid iOS 27 Matte Hardware & Ceramic Surfaces (Zero Glass / Zero Blur) */
 .spatial-shell-bg {
   background-color: var(--app-bg);
 }
 
 .spatial-card {
   background-color: var(--surface);
+  border: 1px solid rgba(15, 23, 42, 0.06);
   box-shadow: var(--spatial-shadow);
+}
+
+.dark .spatial-card {
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .spatial-hero {
   background-color: var(--surface);
+  border: 1px solid rgba(15, 23, 42, 0.07);
   box-shadow: var(--spatial-shadow-lg);
+}
+
+.dark .spatial-hero {
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.ios-obsidian-hero,
+.ios27-pass-obsidian {
+  background: linear-gradient(155deg, #161922 0%, #0C0E13 100%);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 18px 40px -10px rgba(10, 12, 18, 0.42);
+}
+
+.dark .ios-obsidian-hero,
+.dark .ios27-pass-obsidian {
+  background: linear-gradient(155deg, #1C1E26 0%, #101217 100%);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 20px 44px -10px rgba(0, 0, 0, 0.78);
+}
+
+.ios27-pass-indigo {
+  background: linear-gradient(155deg, #4F46E5 0%, #3730A3 100%);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 14px 30px -8px rgba(79, 70, 229, 0.36);
+}
+
+.ios27-pass-emerald {
+  background: linear-gradient(155deg, #065F46 0%, #022C22 100%);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 14px 30px -8px rgba(6, 95, 70, 0.34);
+}
+
+.ios27-ceramic-tile {
+  background-color: var(--surface);
+  border: 1px solid rgba(15, 23, 42, 0.065);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 4px 14px -2px rgba(15, 23, 42, 0.05);
+}
+
+.dark .ios27-ceramic-tile {
+  background-color: #16181E;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.ios27-inset-group {
+  background-color: var(--surface);
+  border: 1px solid rgba(15, 23, 42, 0.065);
+  box-shadow: 0 6px 24px -6px rgba(15, 23, 42, 0.06);
+}
+
+.dark .ios27-inset-group {
+  background-color: #14161B;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
 }
 
 .spatial-sheet {
   background-color: var(--surface);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: var(--spatial-sheet-shadow);
 }
 
 .spatial-dock {
+  border: 1px solid rgba(15, 23, 42, 0.07);
   box-shadow: var(--spatial-dock-shadow);
+}
+
+.dark .spatial-dock {
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .tactile-key-primary {

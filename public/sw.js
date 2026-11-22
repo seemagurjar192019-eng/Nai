@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ucred-nextjs-v8';
+const CACHE_NAME = 'ucred-nextjs-v9';
 const SHELL_ASSETS = [
   '/pwa-192x192.png',
   '/pwa-512x512.png',

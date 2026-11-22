@@ -2,114 +2,124 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Activity, NotebookPen, Receipt, Users } from 'lucide-react';
+import { Activity, Home, NotebookPen, Receipt, Settings, Users } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { MunimVoiceOrb } from '../voice/MunimVoiceOrb';
 import type { PersonaCapabilities } from '@/lib/persona';
-import type { MainTab } from '@/types';
+
+export type DockDestination = 'home' | 'bills' | 'overdue' | 'settings';
 
 export interface BottomSpatialDockProps {
-  mainTab: MainTab;
-  hasSecondaryRoute: boolean;
+  activeDestination: DockDestination;
   voiceModalOpen: boolean;
   capabilities: PersonaCapabilities;
-  onSelectLeftTab: () => void;
+  onSelectHome: () => void;
+  onSelectBills: () => void;
   onOpenVoice: () => void;
-  onSelectRightTab: () => void;
+  onSelectOverdue: () => void;
+  onSelectSettings: () => void;
 }
 
-const DOCK_SPRING = { type: 'spring' as const, stiffness: 420, damping: 28 };
+const DOCK_SPRING = { type: 'spring' as const, stiffness: 440, damping: 28 };
 
 /**
- * Solid Matte Spatial Bottom Dock:
- * Separated left pill (Vasooli / Notes) + raised center Matte Royal Indigo Mic Orb + right pill (Bills / Activity).
- * Strictly zero floating right `+` FAB to prevent bottom-card overlap.
+ * Ergonomic iOS 27 Floating Capsule Dock:
+ * Left Capsule (`Home` + `Bills`/`Summary`) · Center Raised Matte Royal Indigo Voice Orb · Right Capsule (`Overdue`/`Notes` + `Settings`)
  */
 export const BottomSpatialDock: React.FC<BottomSpatialDockProps> = ({
-  mainTab,
-  hasSecondaryRoute,
+  activeDestination,
   voiceModalOpen,
   capabilities,
-  onSelectLeftTab,
+  onSelectHome,
+  onSelectBills,
   onOpenVoice,
-  onSelectRightTab,
+  onSelectOverdue,
+  onSelectSettings,
 }) => {
-  const leftActive = !hasSecondaryRoute && mainTab === 'collection';
-  const rightActive =
-    mainTab === 'bills' ||
-    mainTab === 'stock' ||
-    mainTab === 'more' ||
-    hasSecondaryRoute;
+  const BillsIcon = capabilities.showGstBills ? Receipt : Activity;
+  const OverdueIcon = capabilities.showGstBills ? Users : NotebookPen;
 
-  const LeftIcon = capabilities.showGstBills ? Users : NotebookPen;
-  const RightIcon = capabilities.showGstBills ? Receipt : Activity;
+  const renderDockButton = (params: {
+    id: DockDestination;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    onClick: () => void;
+  }) => {
+    const active = activeDestination === params.id;
+    const Icon = params.icon;
+    return (
+      <button
+        key={params.id}
+        type="button"
+        onClick={() => {
+          haptics.tap();
+          params.onClick();
+        }}
+        className={`relative flex-1 min-w-0 min-h-[46px] rounded-full flex flex-col items-center justify-center gap-0.5 px-1.5 text-[10px] font-extrabold whitespace-nowrap active:scale-95 transition-colors ${
+          active
+            ? 'text-[var(--brand-accent)]'
+            : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
+        }`}
+      >
+        {active && (
+          <motion.span
+            layoutId="dockActiveTab"
+            transition={DOCK_SPRING}
+            className="absolute inset-0 rounded-full bg-[var(--brand-tint)]"
+          />
+        )}
+        <Icon className="w-4 h-4 relative z-10 shrink-0" />
+        <span className="relative z-10 leading-none truncate max-w-full">{params.label}</span>
+      </button>
+    );
+  };
 
   return (
-    <div className="no-print absolute bottom-0 inset-x-0 z-40 pb-safe pointer-events-none">
+    <div className="no-print absolute bottom-0 inset-x-0 z-40 pb-safe pointer-events-none flex justify-center">
       <nav
         aria-label="Primary navigation"
-        className="mx-4 mb-3.5 flex items-center justify-between gap-2.5"
+        className="w-full max-w-[440px] mx-3.5 mb-2.5 flex items-center justify-between gap-2"
       >
-        {/* Left Separated Matte Pill */}
-        <div className="pointer-events-auto flex-1 bg-[var(--surface)] rounded-full p-1 shadow-[var(--spatial-dock-shadow)]">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              onSelectLeftTab();
-            }}
-            className={`relative w-full min-h-[46px] rounded-full flex items-center justify-center gap-1.5 px-3 text-xs font-extrabold whitespace-nowrap active:scale-95 transition-colors ${
-              leftActive
-                ? 'text-[var(--brand-accent)]'
-                : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
-            }`}
-          >
-            {leftActive && (
-              <motion.span
-                layoutId="dockActiveTab"
-                transition={DOCK_SPRING}
-                className="absolute inset-0 rounded-full bg-[var(--brand-tint)]"
-              />
-            )}
-            <LeftIcon className="w-[16px] h-[16px] relative z-10 shrink-0" />
-            <span className="relative z-10 leading-none">{capabilities.leftDockLabel}</span>
-          </button>
+        {/* Left Floating Capsule: Home + Bills / Summary */}
+        <div className="pointer-events-auto flex-1 min-w-0 bg-[var(--surface)] border border-[var(--surface-border)] rounded-full p-1 shadow-[var(--spatial-dock-shadow)] flex items-center gap-0.5">
+          {renderDockButton({
+            id: 'home',
+            label: 'Home',
+            icon: Home,
+            onClick: onSelectHome,
+          })}
+          {renderDockButton({
+            id: 'bills',
+            label: capabilities.showGstBills ? 'Bills' : 'Summary',
+            icon: BillsIcon,
+            onClick: onSelectBills,
+          })}
         </div>
 
-        {/* Dead-Center Raised Matte Royal Indigo Mic Orb */}
-        <div className="pointer-events-auto flex items-center justify-center -mt-4 relative z-20 shrink-0">
+        {/* Center Raised Matte Royal Indigo Voice Orb */}
+        <div className="pointer-events-auto flex items-center justify-center -mt-3.5 relative z-20 shrink-0">
           <MunimVoiceOrb
             size="dock"
             listening={voiceModalOpen}
             onClick={onOpenVoice}
-            ariaLabel="Open Bolne Wala Munim Voice Entry"
+            ariaLabel="Open Speak to Save Voice Entry"
           />
         </div>
 
-        {/* Right Separated Matte Pill */}
-        <div className="pointer-events-auto flex-1 bg-[var(--surface)] rounded-full p-1 shadow-[var(--spatial-dock-shadow)]">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              onSelectRightTab();
-            }}
-            className={`relative w-full min-h-[46px] rounded-full flex items-center justify-center gap-1.5 px-3 text-xs font-extrabold whitespace-nowrap active:scale-95 transition-colors ${
-              rightActive
-                ? 'text-[var(--brand-accent)]'
-                : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
-            }`}
-          >
-            {rightActive && (
-              <motion.span
-                layoutId="dockActiveTab"
-                transition={DOCK_SPRING}
-                className="absolute inset-0 rounded-full bg-[var(--brand-tint)]"
-              />
-            )}
-            <RightIcon className="w-[16px] h-[16px] relative z-10 shrink-0" />
-            <span className="relative z-10 leading-none">{capabilities.rightDockLabel}</span>
-          </button>
+        {/* Right Floating Capsule: Overdue / Notes + Settings */}
+        <div className="pointer-events-auto flex-1 min-w-0 bg-[var(--surface)] border border-[var(--surface-border)] rounded-full p-1 shadow-[var(--spatial-dock-shadow)] flex items-center gap-0.5">
+          {renderDockButton({
+            id: 'overdue',
+            label: capabilities.leftDockLabel,
+            icon: OverdueIcon,
+            onClick: onSelectOverdue,
+          })}
+          {renderDockButton({
+            id: 'settings',
+            label: 'Settings',
+            icon: Settings,
+            onClick: onSelectSettings,
+          })}
         </div>
       </nav>
     </div>
