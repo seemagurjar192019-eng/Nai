@@ -2,8 +2,10 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
+  ArrowLeft,
   ArrowRight,
   Check,
   CloudUpload,
@@ -71,7 +73,13 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
 }) => {
   const prefersReducedMotion = useReducedMotion();
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
+  const [direction, setDirection] = useState<1 | -1>(1);
   const [showEmailForm, setShowEmailForm] = useState(false);
+
+  const goStep = (next: 1 | 2 | 3) => {
+    setDirection(next >= step ? 1 : -1);
+    setStep(next);
+  };
   const [emailInput, setEmailInput] = useState('');
   const [localError, setLocalError] = useState('');
   const [selected, setSelected] = useState<PersonaCategoryId[]>(
@@ -119,17 +127,32 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
       className="fixed inset-0 z-50 bg-[var(--app-bg)] overflow-y-auto no-scrollbar select-none"
     >
       <div className="min-h-full max-w-[440px] mx-auto w-full flex flex-col justify-between px-6 py-6">
-        {/* Top Bar: Step Progress Indicator + Instant Skip */}
+        {/* Top Bar: Back + Step Progress Indicator + Instant Skip */}
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5" aria-label={`Step ${step} of 3`}>
-            {([1, 2, 3] as const).map((s) => (
-              <span
-                key={s}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  step === s ? 'w-7 bg-[var(--brand)]' : 'w-2 bg-[var(--surface-border)]'
-                }`}
-              />
-            ))}
+          <div className="flex items-center gap-2.5">
+            {step > 1 && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.tap();
+                  goStep(step === 3 ? 2 : 1);
+                }}
+                aria-label="Go back"
+                className="w-9 h-9 rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center active:scale-95 transition"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
+            <div className="flex items-center gap-1.5" aria-label={`Step ${step} of 3`}>
+              {([1, 2, 3] as const).map((s) => (
+                <span
+                  key={s}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    step === s ? 'w-7 bg-[var(--brand)]' : 'w-2 bg-[var(--surface-border)]'
+                  }`}
+                />
+              ))}
+            </div>
           </div>
 
           <motion.button
@@ -144,14 +167,14 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
         </div>
 
         {/* Main Step Viewport */}
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" custom={direction}>
           {step === 1 ? (
             <motion.div
               key="onboarding-step-1"
-              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -20 }}
-              transition={{ duration: 0.26, ease: STEP_EASE }}
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: direction * 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -direction * 20 }}
+              transition={{ duration: 0.24, ease: STEP_EASE }}
               className="flex-1 flex flex-col items-center justify-center py-8 space-y-8"
             >
               <div className="flex flex-col items-center text-center space-y-5">
@@ -231,10 +254,10 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
           ) : step === 2 ? (
             <motion.div
               key="onboarding-step-2-signin"
-              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 20 }}
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: direction * 20 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -20 }}
-              transition={{ duration: 0.26, ease: STEP_EASE }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -direction * 20 }}
+              transition={{ duration: 0.24, ease: STEP_EASE }}
               className="flex-1 flex flex-col items-center justify-center py-6 space-y-6"
             >
               <div className="flex flex-col items-center text-center space-y-3 max-w-[330px]">
@@ -359,7 +382,7 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                     type="button"
                     onClick={() => {
                       haptics.tap();
-                      setStep(3);
+                      goStep(3);
                     }}
                     className="w-full min-h-[46px] px-4 rounded-2xl bg-[var(--surface-subtle)] text-[var(--ink)] font-display font-extrabold text-sm flex items-center justify-center gap-1.5 cursor-pointer"
                   >
@@ -369,18 +392,29 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                 </div>
               </div>
 
-              <p className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[var(--ink-muted)]">
-                <ShieldCheck className="w-3.5 h-3.5 text-[var(--debit-green)] shrink-0" />
-                <span>End-to-end AES-256 encrypted before leaving your device</span>
-              </p>
+              <div className="space-y-1.5 text-center">
+                <p className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[var(--ink-muted)]">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[var(--debit-green)] shrink-0" />
+                  <span>End-to-end AES-256 encrypted before leaving your device</span>
+                </p>
+                <p className="text-[11px] font-semibold text-[var(--ink-muted)]">
+                  <Link href="/privacy" className="hover:underline">
+                    Privacy Policy
+                  </Link>
+                  {' · '}
+                  <Link href="/terms" className="hover:underline">
+                    Terms of Service
+                  </Link>
+                </p>
+              </div>
             </motion.div>
           ) : (
             <motion.div
               key="onboarding-step-3"
-              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 20 }}
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: direction * 20 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -14 }}
-              transition={{ duration: 0.26, ease: STEP_EASE }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -direction * 20 }}
+              transition={{ duration: 0.24, ease: STEP_EASE }}
               className="flex-1 flex flex-col justify-center py-6 space-y-5"
             >
               <div className="space-y-1.5 text-center">
@@ -460,7 +494,7 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
               transition={SPRING_TACTILE}
               onClick={() => {
                 haptics.tap();
-                setStep(2);
+                goStep(2);
               }}
               className="tactile-key-primary w-full min-h-[54px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-display font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer"
             >
@@ -472,7 +506,7 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
               type="button"
               onClick={() => {
                 haptics.tap();
-                setStep(3);
+                goStep(3);
               }}
               className="w-full min-h-[44px] text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] transition"
             >

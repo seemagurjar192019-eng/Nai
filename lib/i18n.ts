@@ -223,8 +223,14 @@ export function buildReminderMessage(params: {
 }
 
 export function buildWhatsAppUrl(phone: string, text: string): string {
-  const digits = phone.replace(/\D/g, '');
-  const cleanPhone = digits.length === 10 ? `91${digits}` : digits;
+  const rawDigits = phone.replace(/\D/g, '');
+  const stripped = rawDigits.replace(/^0+/, '');
+  const cleanPhone =
+    stripped.length === 10
+      ? `91${stripped}`
+      : stripped.length === 12 && stripped.startsWith('91')
+        ? stripped
+        : stripped;
   const encoded = encodeURIComponent(text);
   return cleanPhone
     ? `https://wa.me/${cleanPhone}?text=${encoded}`

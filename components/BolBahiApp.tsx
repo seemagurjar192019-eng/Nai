@@ -2709,8 +2709,16 @@ function BolBahiAppInner() {
           />
         )}
 
-        {!effectiveSecondaryRoute && effectiveMainTab === 'collection' && (
-          <CollectionView
+        <AnimatePresence mode="wait" initial={false}>
+          {!effectiveSecondaryRoute && effectiveMainTab === 'collection' && (
+            <motion.div
+              key="tab-collection"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <CollectionView
             key={`${currentBusiness.id}_${currentBusiness.upiId || ''}`}
             accounts={scopedAccounts}
             business={currentBusiness}
@@ -2742,10 +2750,18 @@ function BolBahiAppInner() {
               setMainTab('ledger');
             }}
           />
-        )}
+            </motion.div>
+          )}
 
-        {!effectiveSecondaryRoute && effectiveMainTab === 'bills' && capabilities.showGstBills && (
-          <BillsView
+          {!effectiveSecondaryRoute && effectiveMainTab === 'bills' && capabilities.showGstBills && (
+            <motion.div
+              key="tab-bills"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <BillsView
             key={`${currentBusiness.id}_${billDraft?.customerName || billPrefill?.name || 'none'}_${
               billDraft ? billDraft.items?.length || 0 : 0
             }`}
@@ -2935,10 +2951,18 @@ function BolBahiAppInner() {
               );
             }}
           />
-        )}
+            </motion.div>
+          )}
 
-        {!effectiveSecondaryRoute && effectiveMainTab === 'stock' && capabilities.showStock && (
-          <StockView
+          {!effectiveSecondaryRoute && effectiveMainTab === 'stock' && capabilities.showStock && (
+            <motion.div
+              key="tab-stock"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <StockView
             items={activeStockItems}
             onSaveItem={async (payload) => {
               if (isGuestMode) {
@@ -2973,10 +2997,18 @@ function BolBahiAppInner() {
               logActivity('stock', `Deleted stock item ${stk?.name || ''}`, stk?.name);
             }}
           />
-        )}
+            </motion.div>
+          )}
 
-        {!effectiveSecondaryRoute && effectiveMainTab === 'more' && (
-          <SettingsView
+          {!effectiveSecondaryRoute && effectiveMainTab === 'more' && (
+            <motion.div
+              key="tab-settings"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <SettingsView
             key={currentBusiness.id}
             appearance={appearance}
             accentTheme={accentTheme}
@@ -3079,7 +3111,9 @@ function BolBahiAppInner() {
               setMainTab('ledger');
             }}
           />
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* Z-Axis Foreground Party Statement Sheet (Shared layoutId Morph from PartyLedgerCard) */}

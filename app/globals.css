@@ -527,6 +527,16 @@ body {
   .bell-wiggle {
     animation: none !important;
   }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
 }
 
 .pb-safe {
@@ -548,9 +558,15 @@ body {
     overflow: visible !important;
     box-shadow: none !important;
   }
-  body {
-    background: #ffffff !important;
+  html.dark,
+  html.dark body,
+  body,
+  .print-area,
+  .print-area * {
+    background-color: #ffffff !important;
     color: #000000 !important;
+    border-color: #d1d5db !important;
+    box-shadow: none !important;
   }
   body.printing-bill * {
     visibility: hidden;

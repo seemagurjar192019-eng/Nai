@@ -7,6 +7,7 @@ import {
   useMotionValue,
   useReducedMotion,
   useSpring,
+  useTransform,
   type MotionValue,
 } from 'framer-motion';
 import {
@@ -100,6 +101,8 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
   const rawRotateY = useMotionValue(0);
   const rotateX = useSpring(rawRotateX, TILT_SPRING);
   const rotateY = useSpring(rawRotateY, TILT_SPRING);
+  const dragY = useMotionValue(0);
+  const dragScale = useTransform(dragY, [-90, 0, 90], [0.975, 1, 0.975]);
 
   const passOrder: PassId[] = useMemo(() => {
     const base: PassId[] = ['balance', 'collection', 'cashbook'];
@@ -209,7 +212,7 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
         className={fanned ? 'flex flex-col gap-3' : 'relative'}
         style={{
           perspective: 1100,
-          minHeight: fanned ? undefined : breakdownOpen && frontPass === 'balance' ? 310 : 240,
+          minHeight: fanned ? undefined : breakdownOpen && frontPass === 'balance' ? 316 : 232,
           transition: 'min-height 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
@@ -218,8 +221,8 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
           const meta = getPassMeta(id);
           const showBody = isFront || fanned;
 
-          // In stacked mode: Back cards peek 26px crisply above the front card (Apple Wallet style)
-          const targetY = fanned ? 0 : (2 - stackPos) * 26;
+          // In stacked mode: Back cards peek 28px crisply above the front card (Apple Wallet style)
+          const targetY = fanned ? 0 : (2 - stackPos) * 28;
           const targetScale = fanned ? 1 : 1 - stackPos * 0.04;
           const targetRotateX = fanned ? -2.5 : isFront ? 0 : -4;
           const zIndex = 30 - stackPos * 10;
@@ -239,6 +242,7 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={0.18}
               onDragEnd={(_, info) => {
+                dragY.set(0);
                 if (Math.abs(info.offset.y) > 40 || Math.abs(info.velocity.y) > 280) {
                   cycleNextPass();
                 }
@@ -256,16 +260,17 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
               }}
               style={{
                 zIndex,
-                rotateX: isFront && !fanned && !prefersReducedMotion ? rotateX : undefined,
-                rotateY: isFront && !fanned && !prefersReducedMotion ? rotateY : undefined,
+                ...(isFront && !fanned && !prefersReducedMotion
+                  ? { y: dragY, scale: dragScale, rotateX, rotateY }
+                  : {}),
                 transformOrigin: 'top center',
               }}
               className={`${
-                fanned ? 'relative w-full' : 'absolute inset-x-0 top-0 min-h-[170px]'
-              } rounded-[28px] ${meta.surfaceClass} px-4 pt-3 pb-4 cursor-pointer select-none will-change-transform overflow-hidden`}
+                fanned ? 'relative w-full' : 'absolute inset-x-0 top-0 min-h-[164px]'
+              } rounded-[28px] ${meta.surfaceClass} px-4 pt-2.5 pb-3.5 cursor-pointer select-none will-change-transform overflow-hidden`}
             >
               {/* Wallet Peeking Top Header Strip (Always visible even when tucked behind) */}
-              <div className="flex items-center justify-between gap-2 pb-1.5">
+              <div className="flex items-center justify-between gap-2 pb-1.5 leading-none">
                 <span className="text-[11px] font-bold tracking-wide text-white/85 uppercase truncate">
                   {meta.label}
                 </span>
@@ -355,21 +360,9 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
                     >
                       <span
                         style={{ backgroundColor: 'var(--brand)' }}
-                        className="relative w-11 h-11 rounded-full text-white flex items-center justify-center shadow-lg"
+                        className="w-11 h-11 rounded-full text-white flex items-center justify-center shadow-lg"
                       >
                         <Volume2 className="w-5 h-5 stroke-[2.2]" />
-                        <span
-                          aria-hidden="true"
-                          className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#16A34A] ring-2 ring-[#0E1117] flex items-center justify-center"
-                        >
-                          <span className="flex items-end gap-[1px] h-1.5">
-                            <span className="eq-bar w-[1.5px] h-1.5 rounded-full bg-white" />
-                            <span
-                              style={{ animationDelay: '0.18s' }}
-                              className="eq-bar w-[1.5px] h-1.5 rounded-full bg-white"
-                            />
-                          </span>
-                        </span>
                       </span>
                       <span className="text-[10px] font-bold text-white/90 leading-none">
                         Listen
@@ -380,12 +373,16 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
                   {/* Animated Receivable / Payable Ratio Rail */}
                   <div className="space-y-1">
                     <div className="h-1.5 w-full rounded-full bg-white/12 overflow-hidden">
-                      <motion.div
-                        initial={{ width: '50%' }}
-                        animate={{ width: `${cashflow.receivableSharePct}%` }}
-                        transition={{ type: 'spring', stiffness: 220, damping: 28 }}
-                        className="h-full rounded-full bg-[#22C55E]"
-                      />
+                      {cashflow.totalReceivable === 0 && cashflow.totalPayable === 0 ? (
+                        <div className="h-full w-full rounded-full bg-white/20" />
+                      ) : (
+                        <motion.div
+                          initial={{ width: '50%' }}
+                          animate={{ width: `${cashflow.receivableSharePct}%` }}
+                          transition={{ type: 'spring', stiffness: 220, damping: 28 }}
+                          className="h-full rounded-full bg-[#22C55E]"
+                        />
+                      )}
                     </div>
                   </div>
 

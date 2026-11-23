@@ -30,9 +30,18 @@ export default function createNextConfig(phase: string): NextConfig {
       ],
     },
     async headers() {
+      const isDevServer = phase === PHASE_DEVELOPMENT_SERVER;
+      const scriptSrc = [
+        "'self'",
+        "'unsafe-inline'",
+        ...(isDevServer ? ["'unsafe-eval'"] : []),
+        'https://apis.google.com',
+        'https://www.gstatic.com',
+        'https://www.google.com',
+      ].join(' ');
       const csp = [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com https://www.google.com",
+        `script-src ${scriptSrc}`,
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "img-src 'self' data: blob: https://*.googleusercontent.com https://picsum.photos",
         "font-src 'self' data: https://fonts.gstatic.com",

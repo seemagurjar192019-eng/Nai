@@ -153,6 +153,28 @@ export function useVaultSecurity({
     };
   }, [privacyCurtainEnabled]);
 
+  // Cross-tab security preference & vault lock synchronization
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key === 'ucred_auto_lock_sec_v1') {
+        setAutoLockSecondsState(getAutoLockSeconds());
+      } else if (e.key === 'ucred_privacy_curtain_v1') {
+        const next = getPrivacyCurtainEnabled();
+        setPrivacyCurtainEnabledState(next);
+        if (!next) setPrivacyCurtainVisible(false);
+      } else if (e.key === 'ucred_passkey_cred_v1') {
+        setPasskeyEnabledState(Boolean(getStoredPasskeyId()));
+      } else if (e.key === 'ucred_guest_vault_enc_v1' || e.key === 'ucred_guest_vault_v1') {
+        if (e.newValue === null && appLockPin) {
+          setPinUnlocked(false);
+        }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [appLockPin]);
+
   return {
     pinUnlocked,
     setPinUnlocked,

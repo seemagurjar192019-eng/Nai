@@ -213,6 +213,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   const [showFilterSortSheet, setShowFilterSortSheet] = useState(false);
   const [showQuickMenuSheet, setShowQuickMenuSheet] = useState(false);
   const [activeHoverIdx, setActiveHoverIdx] = useState<number | null>(null);
+  const [visibleCount, setVisibleCount] = useState(60);
 
   // Sanitize active segment/filter whenever persona gates off Suppliers or Galla
   const segment: CashKhataSegment =
@@ -652,10 +653,10 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
             onQuickCollect={openQuickEntrySheet}
           />
 
-          {/* 3. iOS 27 Control Center 2x2 Tactile Ceramic Tile Matrix */}
-          <div className="grid grid-cols-2 gap-2.5" aria-label="Control Center Quick Actions">
+          {/* 3. Compact 4-Column iOS Quick Action Bar */}
+          <div className="grid grid-cols-4 gap-2" aria-label="Quick Actions">
             <motion.button
-              whileTap={{ scale: 0.95, y: 1 }}
+              whileTap={{ scale: 0.94, y: 1 }}
               transition={SPRING_FAST}
               type="button"
               onClick={() =>
@@ -663,107 +664,88 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                   capabilities.showSuppliers && segment === 'supplier' ? 'supplier' : 'customer'
                 )
               }
-              className="ios27-ceramic-tile rounded-[22px] p-3 text-left flex items-center gap-3 min-h-[60px]"
+              className="ios27-ceramic-tile rounded-[20px] px-2 py-2.5 flex flex-col items-center justify-center gap-1.5"
             >
-              <span className="w-10 h-10 rounded-[14px] bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+              <span className="w-9 h-9 rounded-[12px] bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
                 <UserPlus className="w-4 h-4 stroke-[2.3]" />
               </span>
-              <div className="min-w-0">
-                <p className="text-xs font-extrabold text-[var(--ink)] truncate">
-                  {capabilities.focus === 'personal' ? 'New Contact' : 'New Party'}
-                </p>
-                <p className="text-[10px] font-semibold text-[var(--ink-muted)] truncate">
-                  {capabilities.showSuppliers && segment === 'supplier'
-                    ? capabilities.secondarySegmentLabel || 'Supplier'
-                    : capabilities.primarySegmentLabel}
-                </p>
-              </div>
+              <span className="text-[11px] font-extrabold text-[var(--ink)] truncate max-w-full">
+                {capabilities.focus === 'personal' ? 'Contact' : 'New Party'}
+              </span>
             </motion.button>
 
             <motion.button
-              whileTap={{ scale: 0.95, y: 1 }}
+              whileTap={{ scale: 0.94, y: 1 }}
               transition={SPRING_FAST}
               type="button"
               onClick={() => {
                 haptics.orbTap();
                 onOpenVoiceEntry();
               }}
-              className="ios27-ceramic-tile rounded-[22px] p-3 text-left flex items-center gap-3 min-h-[60px]"
+              className="ios27-ceramic-tile rounded-[20px] px-2 py-2.5 flex flex-col items-center justify-center gap-1.5"
             >
-              <span className="w-10 h-10 rounded-[14px] bg-[var(--brand)] text-white flex items-center justify-center shrink-0">
+              <span className="w-9 h-9 rounded-[12px] bg-[var(--brand)] text-white flex items-center justify-center shrink-0">
                 <Mic className="w-4 h-4 stroke-[2.3]" />
               </span>
-              <div className="min-w-0">
-                <p className="text-xs font-extrabold text-[var(--ink)] truncate">Speak Entry</p>
-                <p className="text-[10px] font-semibold text-[var(--ink-muted)] truncate">
-                  English &amp; Hinglish
-                </p>
-              </div>
+              <span className="text-[11px] font-extrabold text-[var(--ink)] truncate max-w-full">
+                Voice
+              </span>
             </motion.button>
 
             {capabilities.focus !== 'personal' ? (
               <motion.button
-                whileTap={{ scale: 0.95, y: 1 }}
+                whileTap={{ scale: 0.94, y: 1 }}
                 transition={SPRING_FAST}
                 type="button"
                 onClick={() => {
                   haptics.tap();
                   onOpenParchiScanner();
                 }}
-                className="ios27-ceramic-tile rounded-[22px] p-3 text-left flex items-center gap-3 min-h-[60px]"
+                className="ios27-ceramic-tile rounded-[20px] px-2 py-2.5 flex flex-col items-center justify-center gap-1.5"
               >
-                <span className="w-10 h-10 rounded-[14px] bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
+                <span className="w-9 h-9 rounded-[12px] bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
                   <Camera className="w-4 h-4 stroke-[2.3]" />
                 </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-extrabold text-[var(--ink)] truncate">Scan Receipt</p>
-                  <p className="text-[10px] font-semibold text-[var(--ink-muted)] truncate">
-                    Receipt Reader
-                  </p>
-                </div>
+                <span className="text-[11px] font-extrabold text-[var(--ink)] truncate max-w-full">
+                  Scan
+                </span>
               </motion.button>
             ) : (
               <motion.button
-                whileTap={{ scale: 0.95, y: 1 }}
+                whileTap={{ scale: 0.94, y: 1 }}
                 transition={SPRING_FAST}
                 type="button"
                 onClick={() => {
                   haptics.tap();
                   onOpenDailySummary();
                 }}
-                className="ios27-ceramic-tile rounded-[22px] p-3 text-left flex items-center gap-3 min-h-[60px]"
+                className="ios27-ceramic-tile rounded-[20px] px-2 py-2.5 flex flex-col items-center justify-center gap-1.5"
               >
-                <span className="w-10 h-10 rounded-[14px] bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
+                <span className="w-9 h-9 rounded-[12px] bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
                   <Volume2 className="w-4 h-4 stroke-[2.3]" />
                 </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-extrabold text-[var(--ink)] truncate">Daily Audio</p>
-                  <p className="text-[10px] font-semibold text-[var(--ink-muted)] truncate">
-                    Voice Summary
-                  </p>
-                </div>
+                <span className="text-[11px] font-extrabold text-[var(--ink)] truncate max-w-full">
+                  Audio
+                </span>
               </motion.button>
             )}
 
             <motion.button
-              whileTap={{ scale: 0.95, y: 1 }}
+              whileTap={{ scale: 0.94, y: 1 }}
               transition={SPRING_FAST}
               type="button"
               onClick={() => {
                 haptics.tap();
                 onOpenCollection();
               }}
-              className="ios27-ceramic-tile rounded-[22px] p-3 text-left flex items-center gap-3 min-h-[60px]"
+              className="ios27-ceramic-tile rounded-[20px] px-2 py-2.5 flex flex-col items-center justify-center gap-1.5 relative"
             >
-              <span className="w-10 h-10 rounded-[14px] bg-[var(--credit-tint)] text-[var(--credit-red)] flex items-center justify-center shrink-0">
+              <span className="w-9 h-9 rounded-[12px] bg-[var(--credit-tint)] text-[var(--credit-red)] flex items-center justify-center shrink-0">
                 <Repeat className="w-4 h-4 stroke-[2.3]" />
               </span>
-              <div className="min-w-0">
-                <p className="text-xs font-extrabold text-[var(--ink)] truncate">Collect Due</p>
-                <p className="text-[10px] font-semibold text-[var(--ink-muted)] truncate font-tabular">
-                  {overdueCount > 0 ? `${overdueCount} overdue` : 'Reminders'}
-                </p>
-              </div>
+              <span className="text-[11px] font-extrabold text-[var(--ink)] truncate max-w-full">
+                {overdueCount > 0 ? `Due (${overdueCount})` : 'Collect'}
+              </span>
             </motion.button>
           </div>
 
@@ -1054,6 +1036,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                       transition={SPRING_FAST}
                       type="button"
                       disabled={inlineBusy}
+                      aria-busy={inlineBusy}
                       onClick={() => void handleInlineSubmit('given')}
                       className="min-h-[48px] px-3 rounded-2xl bg-[var(--credit-red)] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-60"
                     >
@@ -1065,6 +1048,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                       transition={SPRING_FAST}
                       type="button"
                       disabled={inlineBusy}
+                      aria-busy={inlineBusy}
                       onClick={() => void handleInlineSubmit('received')}
                       className="min-h-[48px] px-3 rounded-2xl bg-[var(--debit-green)] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-60"
                     >
@@ -1157,7 +1141,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
             ) : (
               <div className="space-y-2">
                 <div className="ios27-inset-group rounded-[28px] divide-y divide-[var(--surface-border)] overflow-hidden">
-                  {filteredAccounts.map((acc, idx) => {
+                  {filteredAccounts.slice(0, visibleCount).map((acc, idx) => {
                     let repulsionOffsetY = 0;
                     if (activeHoverIdx !== null) {
                       if (idx === activeHoverIdx - 1) repulsionOffsetY = -3;
@@ -1188,9 +1172,23 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                     );
                   })}
                 </div>
-                <p className="text-[10px] font-semibold text-center text-[var(--ink-muted)] pt-1">
-                  Swipe row right to Receive ₹ or left for WhatsApp Remind
-                </p>
+                {filteredAccounts.length > visibleCount && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.tap();
+                      setVisibleCount((v) => v + 60);
+                    }}
+                    className="w-full min-h-[42px] rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] text-xs font-extrabold text-[var(--brand-accent)] active:scale-[0.99] transition"
+                  >
+                    Show More ({filteredAccounts.length - visibleCount} remaining)
+                  </button>
+                )}
+                {accounts.length <= 3 && (
+                  <p className="text-[10px] font-semibold text-center text-[var(--ink-muted)] pt-1">
+                    Swipe row right to Receive ₹ or left for WhatsApp Remind
+                  </p>
+                )}
               </div>
             )}
           </motion.div>

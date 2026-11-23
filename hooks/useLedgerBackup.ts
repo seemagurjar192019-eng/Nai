@@ -76,13 +76,14 @@ export function useLedgerBackup({
         ].join(',')
       );
     }
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const csvContent = `\uFEFF${rows.join('\n')}`;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${currentBusiness.name.replace(/\s+/g, '_')}_ucred_ledger.csv`;
     a.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, [currentBusiness, activeAccounts, activeTransactions]);
 
   const handleExportJson = useCallback(() => {
@@ -118,7 +119,7 @@ export function useLedgerBackup({
   ]);
 
   const handleRestoreJson = useCallback(
-    async (file: File) => {
+    async (file: File, options?: { mode?: 'merge' | 'replace' }) => {
       if (!currentBusiness) return;
       if (file.size > 5_000_000) {
         throw new Error('Backup file exceeds 5 MB limit.');
@@ -131,16 +132,22 @@ export function useLedgerBackup({
         throw new Error('Selected file is not valid JSON.');
       }
       const safePayload = validateSafeBackupJson(rawParsed);
+      const restoreMode = options?.mode === 'replace' ? 'replace' : 'merge';
       if (isGuestMode) {
         updateGuestVault(
-          (prev) => applyRestoreBusinessBackup(prev, currentBusiness.id, safePayload).vault
+          (prev) =>
+            applyRestoreBusinessBackup(prev, currentBusiness.id, safePayload, {
+              mode: restoreMode,
+            }).vault
         );
-        logActivity('account', 'Restored JSON local backup');
+        logActivity('account', `Restored JSON local backup (${restoreMode})`);
         return;
       }
       if (!user) return;
-      await restoreBusinessBackup(user.uid, currentBusiness.id, safePayload, cloudDek);
-      logActivity('account', 'Restored JSON cloud backup');
+      await restoreBusinessBackup(user.uid, currentBusiness.id, safePayload, cloudDek, {
+        mode: restoreMode,
+      });
+      logActivity('account', `Restored JSON cloud backup (${restoreMode})`);
     },
     [currentBusiness, isGuestMode, user, cloudDek, updateGuestVault, logActivity]
   );

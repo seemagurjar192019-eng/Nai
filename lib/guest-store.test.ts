@@ -7,6 +7,7 @@ import {
   applyCreateAccount,
   applyCreateBusiness,
   applyDeleteTransactionAtomic,
+  applyRestoreBusinessBackup,
   applyRestoreTransactionAtomic,
   applySaveBillDocument,
   applySaveStockItem,
@@ -14,6 +15,7 @@ import {
   createInitialGuestVault,
   hasGuestRecordsToSync,
 } from './guest-store';
+import { buildWhatsAppUrl } from './i18n';
 
 describe('Guest Mode Vault & Atomic Ledger Logic', () => {
   it('bootstraps 1 clean starter shop with zero dummy accounts or transactions', () => {
@@ -208,5 +210,56 @@ describe('Guest Mode Vault & Atomic Ledger Logic', () => {
     assert.equal(txRes.tx.personaContext, 'personal');
     assert.equal(vault.accounts.length, 2);
   });
-});
 
+  it('supports merge and replace modes in applyRestoreBusinessBackup without leaking other businesses', () => {
+    let vault = createInitialGuestVault();
+    const biz1 = vault.businesses[0].id;
+    const biz2Res = applyCreateBusiness(vault, { name: 'Second Branch' });
+    vault = biz2Res.vault;
+    const biz2 = biz2Res.created.id;
+
+    vault = applyAddTransactionAtomic(vault, {
+      businessId: biz1,
+      customerName: 'Existing Biz1 Customer',
+      direction: 'given',
+      amount: 300,
+    }).vault;
+    vault = applyAddTransactionAtomic(vault, {
+      businessId: biz2,
+      customerName: 'Protected Biz2 Customer',
+      direction: 'given',
+      amount: 900,
+    }).vault;
+
+    const backupPayload = {
+      accounts: [{ id: 'old_1', name: 'Restored Party', kind: 'customer', balance: 500 }],
+      transactions: [
+        { accountId: 'old_1', direction: 'given', amount: 500, note: 'Invoice' },
+      ],
+    };
+
+    const merged = applyRestoreBusinessBackup(vault, biz1, backupPayload, { mode: 'merge' });
+    assert.equal(merged.vault.accounts.filter((a) => a.businessId === biz1).length, 2);
+    assert.equal(merged.vault.accounts.filter((a) => a.businessId === biz2).length, 1);
+
+    const replaced = applyRestoreBusinessBackup(vault, biz1, backupPayload, { mode: 'replace' });
+    assert.equal(replaced.vault.accounts.filter((a) => a.businessId === biz1).length, 1);
+    assert.equal(
+      replaced.vault.accounts.find((a) => a.businessId === biz1)?.name,
+      'Restored Party'
+    );
+    assert.equal(replaced.vault.accounts.filter((a) => a.businessId === biz2).length, 1);
+  });
+
+  it('normalizes leading-zero and 10-digit Indian phone numbers in buildWhatsAppUrl', () => {
+    assert.equal(
+      buildWhatsAppUrl('09876543210', 'Hi'),
+      'https://wa.me/919876543210?text=Hi'
+    );
+    assert.equal(
+      buildWhatsAppUrl('+91 98765-43210', 'Pay'),
+      'https://wa.me/919876543210?text=Pay'
+    );
+    assert.equal(buildWhatsAppUrl('', 'Hi'), 'https://wa.me/?text=Hi');
+  });
+});

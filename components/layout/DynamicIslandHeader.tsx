@@ -112,16 +112,17 @@ export const DynamicIslandHeader: React.FC<DynamicIslandHeaderProps> = ({
   const initialLetter = (business.name || 'U').charAt(0).toUpperCase();
 
   return (
-    <header className="no-print shrink-0 z-40 px-4 pt-3 pb-1 relative space-y-2">
-      <motion.div
-        layout
-        transition={ISLAND_SPRING}
-        className={`rounded-[26px] px-2.5 py-1.5 transition-colors border ${
-          islandToast || voiceModalOpen
-            ? 'bg-[#11131A] text-white border-white/14 shadow-[0_14px_30px_-8px_rgba(17,19,26,0.45)]'
-            : 'bg-[var(--surface)] text-[var(--ink)] border-[var(--surface-border)] shadow-[var(--spatial-shadow)]'
-        }`}
-      >
+    <header className="no-print shrink-0 z-40 px-4 pt-3 pb-1 relative">
+      <div className="w-full max-w-[560px] mx-auto space-y-2">
+        <motion.div
+          layout
+          transition={ISLAND_SPRING}
+          className={`rounded-[26px] px-2.5 py-1.5 transition-colors border ${
+            islandToast || voiceModalOpen
+              ? 'bg-[#11131A] text-white border-white/14 shadow-[0_14px_30px_-8px_rgba(17,19,26,0.45)]'
+              : 'bg-[var(--surface)] text-[var(--ink)] border-[var(--surface-border)] shadow-[var(--spatial-shadow)]'
+          }`}
+        >
         <AnimatePresence mode="wait" initial={false}>
           {voiceModalOpen && !islandToast ? (
             <motion.div
@@ -164,12 +165,30 @@ export const DynamicIslandHeader: React.FC<DynamicIslandHeaderProps> = ({
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span
-                  className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                  className={`relative w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
                     islandToast.kind === 'added'
                       ? 'bg-[#16A34A] text-white'
                       : 'bg-[#DC2626] text-white'
                   }`}
                 >
+                  <svg
+                    viewBox="0 0 28 28"
+                    className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none"
+                    aria-hidden="true"
+                  >
+                    <motion.circle
+                      cx="14"
+                      cy="14"
+                      r="12"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.55)"
+                      strokeWidth="1.8"
+                      strokeDasharray="75.4"
+                      initial={{ strokeDashoffset: 0 }}
+                      animate={{ strokeDashoffset: 75.4 }}
+                      transition={{ duration: 6.5, ease: 'linear' }}
+                    />
+                  </svg>
                   <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" aria-hidden="true">
                     <motion.path
                       d="M5 12.5L9.5 17L19 7.5"
@@ -515,7 +534,7 @@ export const DynamicIslandHeader: React.FC<DynamicIslandHeaderProps> = ({
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="pt-0.5"
+            className="pt-0.5 relative"
           >
             <input
               type="search"
@@ -526,11 +545,25 @@ export const DynamicIslandHeader: React.FC<DynamicIslandHeaderProps> = ({
                   ? 'Search party name or phone...'
                   : 'Search contact name or phone...'
               }
-              className="w-full min-h-[44px] rounded-2xl bg-[var(--surface)] shadow-[var(--spatial-shadow)] px-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[44px] rounded-2xl bg-[var(--surface)] shadow-[var(--spatial-shadow)] pl-4 pr-10 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.tap();
+                  onChangeSearch('');
+                }}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-[var(--surface-subtle)] text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </header>
   );
 };

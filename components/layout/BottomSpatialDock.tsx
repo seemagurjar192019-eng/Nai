@@ -51,6 +51,7 @@ export const BottomSpatialDock: React.FC<BottomSpatialDockProps> = ({
       <button
         key={params.id}
         type="button"
+        aria-current={active ? 'page' : undefined}
         onClick={() => {
           haptics.tap();
           params.onClick();
@@ -68,7 +69,13 @@ export const BottomSpatialDock: React.FC<BottomSpatialDockProps> = ({
             className="absolute inset-0 rounded-full bg-[var(--brand-tint)]"
           />
         )}
-        <Icon className="w-4 h-4 relative z-10 shrink-0" />
+        <motion.span
+          animate={{ scale: active ? 1.08 : 1, y: active ? -1 : 0 }}
+          transition={DOCK_SPRING}
+          className="relative z-10 inline-flex items-center justify-center shrink-0"
+        >
+          <Icon className="w-4 h-4 shrink-0" />
+        </motion.span>
         <span className="relative z-10 leading-none truncate max-w-full">{params.label}</span>
       </button>
     );

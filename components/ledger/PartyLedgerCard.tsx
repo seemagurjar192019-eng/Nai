@@ -3,7 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
-import { MessageSquare, Plus } from 'lucide-react';
+import { Check, MessageSquare, Plus } from 'lucide-react';
 import { formatINR, getAvatarColor } from '@/lib/i18n';
 import type { CustomerTrustScore, LedgerAccount, TxDirection } from '@/types';
 import { haptics } from '@/utils/haptics';
@@ -280,7 +280,7 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
             ? { duration: 0 }
             : { ...SPRING_FAST, delay: Math.min(idx, 10) * 0.02 }
         }
-        className={`relative px-4 py-3.5 flex items-center justify-between gap-2.5 will-change-transform ${
+        className={`relative px-4 py-3 flex items-center justify-between gap-2.5 will-change-transform ${
           groupedRow
             ? isRecentlySaved
               ? 'bg-[var(--debit-tint)]'
@@ -349,7 +349,7 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
               <OdometerNumber value={absBal} hidden={hideBalance} />
             </p>
             <p
-              className={`text-[10px] font-extrabold uppercase tracking-wider ${
+              className={`text-[10px] font-extrabold uppercase tracking-wider inline-flex items-center justify-end gap-0.5 ${
                 overLimit
                   ? 'text-[var(--alert-amber)]'
                   : account.balance > 0
@@ -359,7 +359,10 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
                       : 'text-[var(--ink-muted)]'
               }`}
             >
-              {overLimit ? 'Limit' : statusText}
+              {!overLimit && account.balance === 0 && (
+                <Check className="w-2.5 h-2.5 text-[var(--debit-green)] stroke-[3]" />
+              )}
+              <span>{overLimit ? 'Limit' : statusText}</span>
             </p>
           </div>
         </button>

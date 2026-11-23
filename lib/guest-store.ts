@@ -1169,11 +1169,13 @@ export function applyRecordActivityLog(
 export function applyRestoreBusinessBackup(
   vault: GuestVaultState,
   businessId: string,
-  rawParsed: unknown
+  rawParsed: unknown,
+  options?: { mode?: 'merge' | 'replace' }
 ): {
   vault: GuestVaultState;
   counts: { accounts: number; transactions: number; bills: number; stockItems: number };
 } {
+  const mode = options?.mode === 'replace' ? 'replace' : 'merge';
   const parsed = validateSafeBackupJson(rawParsed);
 
   const accIdMap = new Map<string, string>();
@@ -1338,6 +1340,23 @@ export function applyRestoreBusinessBackup(
     }
   }
 
+  const baseAccounts =
+    mode === 'replace' ? vault.accounts.filter((a) => a.businessId !== businessId) : vault.accounts;
+  const baseTransactions =
+    mode === 'replace'
+      ? vault.transactions.filter((t) => t.businessId !== businessId)
+      : vault.transactions;
+  const baseBills =
+    mode === 'replace' ? vault.bills.filter((b) => b.businessId !== businessId) : vault.bills;
+  const baseStock =
+    mode === 'replace'
+      ? vault.stockItems.filter((s) => s.businessId !== businessId)
+      : vault.stockItems;
+  const baseCashbook =
+    mode === 'replace'
+      ? vault.cashbookEntries.filter((c) => c.businessId !== businessId)
+      : vault.cashbookEntries;
+
   return {
     counts: {
       accounts: addedAccs.length,
@@ -1347,11 +1366,11 @@ export function applyRestoreBusinessBackup(
     },
     vault: {
       ...vault,
-      accounts: [...addedAccs, ...vault.accounts],
-      transactions: [...addedTxs, ...vault.transactions],
-      bills: [...addedBills, ...vault.bills],
-      stockItems: [...addedStock, ...vault.stockItems],
-      cashbookEntries: [...addedCashbook, ...vault.cashbookEntries],
+      accounts: [...addedAccs, ...baseAccounts],
+      transactions: [...addedTxs, ...baseTransactions],
+      bills: [...addedBills, ...baseBills],
+      stockItems: [...addedStock, ...baseStock],
+      cashbookEntries: [...addedCashbook, ...baseCashbook],
     },
   };
 }

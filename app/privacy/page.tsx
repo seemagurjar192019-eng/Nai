@@ -78,13 +78,19 @@ export default function PrivacyPolicyPage() {
           </h2>
           <ul className="list-disc pl-5 text-sm text-[var(--ink-muted)] space-y-1.5 leading-relaxed">
             <li>
-              <strong className="text-[var(--ink)]">Client-Side AES-256-GCM + PBKDF2-SHA256:</strong> Party names, mobile numbers, transaction notes, receipt attachments, bill details, and cashbook descriptions are encrypted on your device before syncing to Cloud Firestore scoped strictly to your authenticated UID. App Lock and Staff PINs are hashed with salted PBKDF2-SHA256.
+              <strong className="text-[var(--ink)]">End-to-End AES-256-GCM Vault:</strong> Party names, mobile numbers, transaction notes, receipt attachments, bill details, stock titles, and cashbook descriptions are encrypted on your device using a 256-bit AES-GCM key before storing locally or syncing to Cloud Firestore.
+            </li>
+            <li>
+              <strong className="text-[var(--ink)]">Key Protection &amp; Salted PIN Hashing:</strong> App Lock and Staff PINs are hashed with 100,000-iteration salted PBKDF2-SHA256 and enforced with persistent brute-force cooldowns. Optional custom Cloud Sync Vault PINs wrap your encryption key locally so only you hold the plaintext secret.
+            </li>
+            <li>
+              <strong className="text-[var(--ink)]">EXIF &amp; GPS Stripping on Photos:</strong> Before saving receipt thumbnails or scanning slips, images are re-encoded cleanly in-browser, automatically stripping camera EXIF headers, device models, and GPS location tags.
             </li>
             <li>
               <strong className="text-[var(--ink)]">No Data Selling &amp; No Ads:</strong> Ucred never sells, rents, or shares your customer phone numbers, credit balances, or sales with advertisers, brokers, or credit bureaus.
             </li>
             <li>
-              <strong className="text-[var(--ink)]">Direct WhatsApp &amp; UPI:</strong> Payment reminders and digital receipts open your device&apos;s WhatsApp or UPI app directly with your configured UPI VPA.
+              <strong className="text-[var(--ink)]">Direct WhatsApp &amp; UPI:</strong> Payment reminders and digital receipts open your device&apos;s WhatsApp or UPI app directly with your configured UPI VPA. Trust Scores shown in the app are internal merchant recovery indicators only (not statutory credit bureau scores).
             </li>
           </ul>
         </section>

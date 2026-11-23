@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AnimatePresence,
   motion,
   useDragControls,
+  useMotionValue,
   useReducedMotion,
+  useTransform,
 } from 'framer-motion';
 import { Maximize2, Minimize2, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
@@ -26,8 +28,8 @@ export interface DetentSheetOverlayProps {
 const SHEET_SPRING = { type: 'spring' as const, stiffness: 360, damping: 32, mass: 0.88 };
 
 /**
- * iOS 27 Interactive Two-Detent Sheet Presentation (`66%` Peek <-> `94%` Full)
- * with live drag controls, velocity flick dismissal, and solid matte ceramic geometry.
+ * iOS 27 Interactive Two-Detent Sheet Presentation (`68%` Peek <-> `94%` Full)
+ * with live drag-coupled backdrop dimming, Escape key dismissal, and matte ceramic geometry.
  */
 export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
   open,
@@ -42,6 +44,21 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
   const prefersReducedMotion = useReducedMotion();
   const dragControls = useDragControls();
   const [detent, setDetent] = useState<SheetDetent>(initialDetent);
+  const dragY = useMotionValue(0);
+  const backdropFade = useTransform(dragY, [0, 260], [1, 0.25]);
+
+  useEffect(() => {
+    if (!open) return;
+    dragY.set(0);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose, dragY]);
 
   const heightTarget = detent === 'full' ? '94dvh' : '68dvh';
 
@@ -53,6 +70,7 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.16, ease: 'easeOut' } }}
+          style={prefersReducedMotion ? undefined : { opacity: backdropFade }}
           onClick={onClose}
           className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center p-0 sm:p-4 sm:items-center"
         >
@@ -78,6 +96,7 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0.14, bottom: 0.42 }}
             onDragEnd={(_, info) => {
+              dragY.set(0);
               if (info.offset.y > 125 || info.velocity.y > 460) {
                 haptics.swipe();
                 onClose();
@@ -92,6 +111,7 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
               }
             }}
             onClick={(e) => e.stopPropagation()}
+            style={prefersReducedMotion ? undefined : { y: dragY }}
             className={`w-full ${maxWidthClass} rounded-t-[34px] sm:rounded-[34px] spatial-sheet flex flex-col overflow-hidden pb-safe will-change-transform`}
           >
             {/* Interactive Grab Handle */}
@@ -99,7 +119,7 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
               onPointerDown={(e) => dragControls.start(e)}
               className="pt-2.5 pb-1 flex justify-center cursor-grab active:cursor-grabbing touch-none shrink-0"
             >
-              <span className="w-11 h-1.5 rounded-full bg-[var(--surface-subtle)]" />
+              <span className="w-11 h-1.5 rounded-full bg-[var(--surface-border)]" />
             </div>
 
             {/* Crisp Header Bar */}

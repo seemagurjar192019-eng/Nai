@@ -1578,8 +1578,12 @@ export async function restoreBusinessBackup(
   ownerId: string,
   businessId: string,
   rawParsed: unknown,
-  dek?: CryptoKey | null
+  dek?: CryptoKey | null,
+  options?: { mode?: 'merge' | 'replace' }
 ): Promise<{ accounts: number; transactions: number; bills: number; stockItems: number }> {
+  if (options?.mode === 'replace') {
+    await clearBusinessData(ownerId, businessId);
+  }
   const parsed = validateSafeBackupJson(rawParsed);
 
   const accIdMap = new Map<string, string>();

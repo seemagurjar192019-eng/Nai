@@ -18,7 +18,6 @@ import {
   EyeOff,
   FileSpreadsheet,
   Fingerprint,
-  KeyRound,
   Laptop,
   Lock,
   LogOut,
@@ -150,7 +149,7 @@ interface SettingsViewProps {
   onConfigureVaultMode?: (mode: 'auto' | 'pin', vaultPin?: string) => Promise<void>;
   onExportCsv: () => void;
   onExportJson: () => void;
-  onRestoreJson: (file: File) => Promise<void>;
+  onRestoreJson: (file: File, options?: { mode?: 'merge' | 'replace' }) => Promise<void>;
   onClearAll: () => Promise<void>;
   onDeleteAccount: () => Promise<void>;
   onLogout: () => Promise<void>;
@@ -194,13 +193,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const prefersReducedMotion = useReducedMotion();
   const [activeSheet, setActiveSheet] = useState<
-    null | 'pin' | 'e2ee' | 'payments' | 'clear-data' | 'delete-account'
+    | null
+    | 'account'
+    | 'security'
+    | 'appearance'
+    | 'sounds'
+    | 'payments'
+    | 'backup'
+    | 'clear-data'
+    | 'delete-account'
   >(null);
 
   const [phoneInput, setPhoneInput] = useState(mobileNumber);
   const [upiInput, setUpiInput] = useState(business.upiId || '');
   const [pinInput, setPinInput] = useState('');
   const [vaultPinInput, setVaultPinInput] = useState('');
+  const [restoreMode, setRestoreMode] = useState<'merge' | 'replace'>('merge');
   const [statusMsg, setStatusMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [sheetError, setSheetError] = useState('');
@@ -213,6 +221,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const activeTheme: ThemeAccentId =
     appearance === 'dark' ? 'onyx' : accentTheme === 'rose' ? 'rose' : 'sapphire';
+
+  const autoLockLabel =
+    autoLockSeconds === 60
+      ? '1m'
+      : autoLockSeconds === 300
+        ? '5m'
+        : autoLockSeconds === 900
+          ? '15m'
+          : 'Off';
+
+  const securityRightValue = appLockPin
+    ? autoLockSeconds > 0
+      ? `PIN · ${autoLockLabel}`
+      : 'PIN On'
+    : passkeyEnabled
+      ? 'Passkey'
+      : 'Off';
+
+  const appearanceRightValue =
+    appearance === 'dark'
+      ? 'OLED Dark'
+      : activeTheme === 'rose'
+        ? 'Light · Rose'
+        : 'Light · Sapphire';
+
+  const soundsRightValue =
+    soundEnabled && hapticsEnabled
+      ? 'On'
+      : !soundEnabled && !hapticsEnabled
+        ? 'Off'
+        : soundEnabled
+          ? 'Sound'
+          : 'Haptics';
 
   const flash = (msg: string) => {
     setErrorMsg('');
@@ -243,7 +284,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
-    <div className="space-y-5 pb-32">
+    <div className="max-w-[560px] mx-auto space-y-5 pb-32">
       {/* Header Row */}
       <div className="flex items-center justify-between gap-2">
         {showBackButton && onBack ? (
@@ -263,14 +304,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <h1 className="font-display text-2xl font-extrabold text-[var(--ink)] tracking-tight">
               Settings
             </h1>
-            <p className="text-xs font-medium text-[var(--ink-muted)]">
-              Vault security, shop profile, appearance &amp; backups
-            </p>
           </div>
         )}
 
         {statusMsg && (
-          <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-[var(--debit-tint)] text-[var(--debit-green)]">
+          <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-[var(--debit-tint)] text-[var(--debit-green)]">
             {statusMsg}
           </span>
         )}
@@ -293,728 +331,365 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* Group 1: Apple ID Style Account & Encrypted Vault Card */}
-      <div>
-        <InsetSectionLabel>Account &amp; Encrypted Vault</InsetSectionLabel>
-        <section className="ios27-inset-group rounded-[26px] p-4 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-12 h-12 rounded-2xl bg-[var(--brand)] text-white font-display font-extrabold text-lg flex items-center justify-center shrink-0 shadow-sm">
-                {(business.name || 'U').charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0">
-                <p className="font-display text-base font-extrabold text-[var(--ink)] truncate">
-                  {business.name}
-                </p>
-                <p className="text-xs font-semibold text-[var(--ink-muted)] truncate mt-0.5">
-                  {isGuestMode
-                    ? 'Guest Encrypted Vault · Local Device'
-                    : `Cloud Synced · AES-256 E2EE · ${verifiedPhone}`}
-                </p>
-              </div>
+      {/* Compact Apple Account Card */}
+      <section className="ios27-inset-group rounded-[26px] p-3.5">
+        <button
+          type="button"
+          onClick={() => {
+            haptics.tap();
+            if (isGuestMode && onOpenCloudSync) {
+              onOpenCloudSync();
+            } else {
+              setSheetError('');
+              setVaultPinInput('');
+              setRecoveryKeyValue('');
+              setRecoveryCopied(false);
+              setActiveSheet('account');
+            }
+          }}
+          className="w-full flex items-center justify-between gap-3 text-left active:scale-[0.99] transition"
+        >
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-full bg-[var(--brand)] text-white font-display font-extrabold text-base flex items-center justify-center shrink-0">
+              {(business.name || 'U').charAt(0).toUpperCase()}
             </div>
-
-            {!isGuestMode && (
-              <button
-                type="button"
-                onClick={() => void runSafely('logout', onLogout, 'Signed out to Guest Vault')}
-                className="min-h-[38px] px-3.5 rounded-xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)] inline-flex items-center gap-1.5 shrink-0 active:scale-95 transition"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Sign Out</span>
-              </button>
-            )}
+            <div className="min-w-0">
+              <p className="font-display text-base font-extrabold text-[var(--ink)] truncate">
+                {business.name}
+              </p>
+              <p className="text-xs font-semibold text-[var(--ink-muted)] truncate">
+                {isGuestMode
+                  ? 'Local Device Vault · Tap to Sync Cloud'
+                  : `Cloud Account · ${verifiedPhone || 'Synced'}`}
+              </p>
+            </div>
           </div>
 
-          {isGuestMode && onOpenCloudSync && (
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-[var(--brand-accent)] shrink-0">
+            {isGuestMode ? <span>Sign In</span> : null}
+            <ChevronRight className="w-4 h-4 text-[var(--ink-muted)]" />
+          </span>
+        </button>
+      </section>
+
+      {/* Group 1: Shop Profile */}
+      <div>
+        <InsetSectionLabel>Shop Profile</InsetSectionLabel>
+        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--surface-border)] overflow-hidden">
+          {onOpenBusinessProfile && (
             <button
               type="button"
               onClick={() => {
                 haptics.tap();
-                onOpenCloudSync();
+                onOpenBusinessProfile();
               }}
-              className="tactile-key-primary w-full min-h-[48px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-xs flex items-center justify-between gap-2 active:scale-[0.98] transition"
+              className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
             >
-              <span className="inline-flex items-center gap-2">
-                <CloudUpload className="w-4 h-4 shrink-0" />
-                <span>Connect Free Encrypted Cloud Backup</span>
+              <span className="flex items-center gap-3 min-w-0">
+                <span className="w-[29px] h-[29px] rounded-[8px] bg-[#007AFF] text-white flex items-center justify-center shrink-0">
+                  <Store className="w-4 h-4" />
+                </span>
+                <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                  Shop Profile &amp; GSTIN
+                </span>
               </span>
-              <ChevronRight className="w-4 h-4 opacity-80 shrink-0" />
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0 max-w-[140px]">
+                <span className="truncate">{business.gstNumber || 'Edit'}</span>
+                <ChevronRight className="w-4 h-4 shrink-0" />
+              </span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              setSheetError('');
+              setPhoneInput(mobileNumber);
+              setUpiInput(business.upiId || '');
+              setActiveSheet('payments');
+            }}
+            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#34C759] text-white flex items-center justify-center shrink-0">
+                <QrCode className="w-4 h-4" />
+              </span>
+              <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                UPI QR &amp; Mobile
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0 max-w-[150px]">
+              <span className="truncate">{business.upiId || mobileNumber || 'Off'}</span>
+              <ChevronRight className="w-4 h-4 shrink-0" />
+            </span>
+          </button>
+
+          {onOpenWorkspaces && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                onOpenWorkspaces();
+              }}
+              className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+            >
+              <span className="flex items-center gap-3 min-w-0">
+                <span className="w-[29px] h-[29px] rounded-[8px] bg-[#5856D6] text-white flex items-center justify-center shrink-0">
+                  <SlidersHorizontal className="w-4 h-4" />
+                </span>
+                <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                  Workspace Modes
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0">
+                <span>{workspaceBadge}</span>
+                <ChevronRight className="w-4 h-4 shrink-0" />
+              </span>
             </button>
           )}
         </section>
       </div>
 
-      {/* Desktop responsive 2-column grouping with balanced column heights */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-        <div className="space-y-5">
-          {/* Group 2: Shop Profile & Workspace */}
-          <div>
-            <InsetSectionLabel>Shop Profile &amp; Workspace</InsetSectionLabel>
-            <section className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
-              {onOpenWorkspaces && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.tap();
-                    onOpenWorkspaces();
-                  }}
-                  className="w-full min-h-[54px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-                >
-                  <span className="flex items-center gap-3 min-w-0">
-                    <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                      <SlidersHorizontal className="w-4 h-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-bold text-[var(--ink)]">
-                        Workspace Modes
-                      </span>
-                      <span className="block text-[11px] text-[var(--ink-muted)] truncate">
-                        Active: {workspaceBadge}
-                      </span>
-                    </span>
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
-                </button>
-              )}
+      {/* Group 2: Security & Privacy */}
+      <div>
+        <InsetSectionLabel>Security &amp; Privacy</InsetSectionLabel>
+        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--surface-border)] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              setSheetError('');
+              setPinInput('');
+              setActiveSheet('security');
+            }}
+            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#1C1C1E] dark:bg-[#5856D6] text-white flex items-center justify-center shrink-0">
+                <Lock className="w-4 h-4" />
+              </span>
+              <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                Passcode &amp; Biometrics
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0">
+              <span className={appLockPin ? 'text-[var(--debit-green)]' : ''}>
+                {securityRightValue}
+              </span>
+              <ChevronRight className="w-4 h-4 shrink-0" />
+            </span>
+          </button>
 
-              {onOpenBusinessProfile && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.tap();
-                    onOpenBusinessProfile();
-                  }}
-                  className="w-full min-h-[54px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-                >
-                  <span className="flex items-center gap-3 min-w-0">
-                    <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                      <Store className="w-4 h-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-bold text-[var(--ink)]">
-                        Shop Profile &amp; GSTIN
-                      </span>
-                      <span className="block text-[11px] text-[var(--ink-muted)] truncate">
-                        {business.gstNumber || 'Address, GSTIN & digital visiting card'}
-                      </span>
-                    </span>
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
-                </button>
-              )}
-            </section>
-          </div>
-
-          {/* Group 4: Sounds, Haptics & Display */}
-          <div>
-            <InsetSectionLabel>Sounds, Haptics &amp; Appearance</InsetSectionLabel>
-            <section className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={soundEnabled}
-                onClick={() => {
-                  const next = !soundEnabled;
-                  setSoundEnabled(next);
-                  setSoundState(next);
-                  if (next) haptics.tap();
-                  flash(next ? 'Tactile clicks enabled' : 'Tactile clicks muted');
-                }}
-                className="w-full min-h-[56px] px-4 py-3 flex items-center justify-between gap-3 text-left"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                    <Volume2 className="w-4 h-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-[var(--ink)]">Tactile Click Sounds</p>
-                    <p className="text-[11px] text-[var(--ink-muted)]">
-                      Subtle Web Audio key ticks &amp; chimes
-                    </p>
-                  </div>
-                </div>
-                <SpringSwitch checked={soundEnabled} />
-              </button>
-
-              <button
-                type="button"
-                role="switch"
-                aria-checked={hapticsEnabled}
-                onClick={() => {
-                  const next = !hapticsEnabled;
-                  setHapticsEnabled(next);
-                  setHapticsState(next);
-                  if (next) haptics.tap();
-                  flash(next ? 'Haptic vibration enabled' : 'Haptic vibration off');
-                }}
-                className="w-full min-h-[56px] px-4 py-3 flex items-center justify-between gap-3 text-left"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                    <Smartphone className="w-4 h-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-[var(--ink)]">Haptic Feedback</p>
-                    <p className="text-[11px] text-[var(--ink-muted)]">
-                      Tactile response on swipes &amp; saves
-                    </p>
-                  </div>
-                </div>
-                <SpringSwitch checked={hapticsEnabled} />
-              </button>
-
-              <div className="p-4 space-y-3">
-                {/* Segmented Light / OLED Dark */}
-                <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1">
-                  {(
-                    [
-                      { id: 'light', label: 'Light Canvas', icon: Sun },
-                      { id: 'dark', label: 'OLED Dark', icon: Moon },
-                    ] as const
-                  ).map((m) => {
-                    const Icon = m.icon;
-                    const active = appearance === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={async () => {
-                          haptics.tap();
-                          await onChangeAppearance(m.id);
-                          flash(`${m.label} active`);
-                        }}
-                        className={`relative min-h-[42px] rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 z-10 transition-colors ${
-                          active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
-                        }`}
-                      >
-                        {active && (
-                          <motion.span
-                            layoutId={prefersReducedMotion ? undefined : 'settingsAppearanceSeg'}
-                            transition={SEG_SPRING}
-                            className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
-                          />
-                        )}
-                        <Icon className="w-3.5 h-3.5 relative z-10" />
-                        <span className="relative z-10">{m.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {onSelectAccentTheme && (
-                  <div className="grid grid-cols-3 gap-2">
-                    {(
-                      [
-                        { id: 'sapphire', label: 'Sapphire', dot: 'bg-[#4F46E5]' },
-                        { id: 'rose', label: 'Rose', dot: 'bg-[#E11D48]' },
-                        { id: 'onyx', label: 'Onyx', dot: 'bg-[#09090B] ring-1 ring-white/40' },
-                      ] as const
-                    ).map((opt) => {
-                      const selected = activeTheme === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => {
-                            haptics.tap();
-                            void onSelectAccentTheme(opt.id);
-                          }}
-                          className={`min-h-[42px] px-3 rounded-xl flex items-center justify-between text-xs font-bold active:scale-95 transition ${
-                            selected
-                              ? 'bg-[var(--brand-tint)] ring-1 ring-[var(--brand)] text-[var(--brand-accent)]'
-                              : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
-                          }`}
-                        >
-                          <span className="flex items-center gap-2">
-                            <span className={`w-3.5 h-3.5 rounded-full ${opt.dot}`} />
-                            <span>{opt.label}</span>
-                          </span>
-                          {selected && <Check className="w-3.5 h-3.5" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
-        </div>
-
-        {/* Group 3: Privacy & Security */}
-        <div>
-          <InsetSectionLabel>Privacy &amp; Security</InsetSectionLabel>
-          <section className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
+          {onTogglePrivacyCurtain && (
             <button
               type="button"
+              role="switch"
+              aria-checked={privacyCurtainEnabled}
               onClick={() => {
+                const next = !privacyCurtainEnabled;
                 haptics.tap();
-                setSheetError('');
-                setPinInput('');
-                setActiveSheet('pin');
+                onTogglePrivacyCurtain(next);
+                flash(next ? 'Privacy Curtain on' : 'Privacy Curtain off');
               }}
-              className="w-full min-h-[56px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+              className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left"
             >
               <span className="flex items-center gap-3 min-w-0">
-                <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                  <KeyRound className="w-4 h-4" />
+                <span className="w-[29px] h-[29px] rounded-[8px] bg-[#FF9500] text-white flex items-center justify-center shrink-0">
+                  <EyeOff className="w-4 h-4" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-[var(--ink)]">
-                    4-Digit App Lock PIN
-                  </span>
-                  <span className="block text-[11px] text-[var(--ink-muted)]">
-                    {appLockPin ? 'Active · Locks app on launch' : 'Off · Protect counter screen'}
-                  </span>
+                <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                  Privacy Curtain
                 </span>
               </span>
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--ink-muted)] shrink-0">
-                <span className={appLockPin ? 'text-[var(--debit-green)]' : ''}>
-                  {appLockPin ? 'On' : 'Off'}
-                </span>
-                <ChevronRight className="w-4 h-4" />
-              </span>
+              <SpringSwitch checked={privacyCurtainEnabled} />
             </button>
-
-            {onChangeAutoLockSeconds && (
-              <div className="px-4 py-3 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                      <Timer className="w-4 h-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-[var(--ink)]">Idle Auto-Lock</p>
-                      <p className="text-[11px] text-[var(--ink-muted)] truncate">
-                        {appLockPin
-                          ? 'Re-locks PIN automatically after inactivity'
-                          : 'Set a 4-Digit App PIN to activate timer'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 gap-1.5 rounded-2xl bg-[var(--surface-subtle)] p-1">
-                  {(
-                    [
-                      { sec: 0, label: 'Off' },
-                      { sec: 60, label: '1m' },
-                      { sec: 300, label: '5m' },
-                      { sec: 900, label: '15m' },
-                    ] as const
-                  ).map((opt) => {
-                    const selected = autoLockSeconds === opt.sec;
-                    return (
-                      <button
-                        key={opt.sec}
-                        type="button"
-                        onClick={() => {
-                          haptics.tap();
-                          onChangeAutoLockSeconds(opt.sec);
-                          flash(opt.sec === 0 ? 'Auto-lock off' : `Auto-lock after ${opt.label}`);
-                        }}
-                        className={`min-h-[34px] rounded-xl text-xs font-extrabold transition ${
-                          selected
-                            ? 'bg-[var(--surface)] text-[var(--brand-accent)] shadow-xs'
-                            : 'text-[var(--ink-muted)]'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {onTogglePrivacyCurtain && (
-              <button
-                type="button"
-                role="switch"
-                aria-checked={privacyCurtainEnabled}
-                onClick={() => {
-                  const next = !privacyCurtainEnabled;
-                  haptics.tap();
-                  onTogglePrivacyCurtain(next);
-                  flash(next ? 'Tab Privacy Curtain on' : 'Tab Privacy Curtain off');
-                }}
-                className="w-full min-h-[56px] px-4 py-3 flex items-center justify-between gap-3 text-left"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                    <EyeOff className="w-4 h-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-[var(--ink)]">Tab Privacy Curtain</p>
-                    <p className="text-[11px] text-[var(--ink-muted)]">
-                      Shields numbers when switching tabs or minimizing
-                    </p>
-                  </div>
-                </div>
-                <SpringSwitch checked={privacyCurtainEnabled} />
-              </button>
-            )}
-
-            {webAuthnSupported && onTogglePasskey && (
-              <button
-                type="button"
-                role="switch"
-                aria-checked={passkeyEnabled}
-                disabled={busyAction === 'passkey'}
-                onClick={() =>
-                  void runSafely(
-                    'passkey',
-                    async () => {
-                      await onTogglePasskey(!passkeyEnabled);
-                    },
-                    passkeyEnabled ? 'Device Passkey removed' : 'Device Biometric Passkey enabled'
-                  )
-                }
-                className="w-full min-h-[56px] px-4 py-3 flex items-center justify-between gap-3 text-left disabled:opacity-60"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-8 h-8 rounded-xl bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
-                    <Fingerprint className="w-4 h-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-[var(--ink)]">Device Biometric Passkey</p>
-                    <p className="text-[11px] text-[var(--ink-muted)]">
-                      Unlock App PIN with Face ID, Touch ID, or fingerprint
-                    </p>
-                  </div>
-                </div>
-                <SpringSwitch checked={passkeyEnabled} />
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                setSheetError('');
-                setVaultPinInput('');
-                setRecoveryKeyValue('');
-                setRecoveryCopied(false);
-                setActiveSheet('e2ee');
-              }}
-              className="w-full min-h-[56px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-            >
-              <span className="flex items-center gap-3 min-w-0">
-                <span className="w-8 h-8 rounded-xl bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-4 h-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-[var(--ink)]">
-                    End-to-End Encryption Vault
-                  </span>
-                  <span className="block text-[11px] text-[var(--ink-muted)] truncate">
-                    AES-256-GCM ·{' '}
-                    {isGuestMode
-                      ? 'Device Key Active'
-                      : vaultMode === 'pin'
-                        ? 'Custom Sync Vault PIN'
-                        : 'Auto Device Key'}
-                  </span>
-                </span>
-              </span>
-              <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                setSheetError('');
-                setPhoneInput(mobileNumber);
-                setUpiInput(business.upiId || '');
-                setActiveSheet('payments');
-              }}
-              className="w-full min-h-[56px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-            >
-              <span className="flex items-center gap-3 min-w-0">
-                <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                  <QrCode className="w-4 h-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-[var(--ink)]">
-                    Shop Mobile &amp; UPI QR
-                  </span>
-                  <span className="block text-[11px] text-[var(--ink-muted)] truncate">
-                    {business.upiId || 'Configure VPA for reminder QR slips'}
-                  </span>
-                </span>
-              </span>
-              <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
-            </button>
-          </section>
-        </div>
-
+          )}
+        </section>
       </div>
 
-      {/* Group 5: Data, Backups & Danger Zone */}
+      {/* Group 3: Preferences */}
+      <div>
+        <InsetSectionLabel>Preferences</InsetSectionLabel>
+        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--surface-border)] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              setSheetError('');
+              setActiveSheet('appearance');
+            }}
+            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#5856D6] text-white flex items-center justify-center shrink-0">
+                {appearance === 'dark' ? (
+                  <Moon className="w-4 h-4" />
+                ) : (
+                  <Sun className="w-4 h-4" />
+                )}
+              </span>
+              <span className="text-sm font-semibold text-[var(--ink)] truncate">Appearance</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0">
+              <span>{appearanceRightValue}</span>
+              <ChevronRight className="w-4 h-4 shrink-0" />
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              setSheetError('');
+              setActiveSheet('sounds');
+            }}
+            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#FF2D55] text-white flex items-center justify-center shrink-0">
+                <Volume2 className="w-4 h-4" />
+              </span>
+              <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                Sounds &amp; Haptics
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0">
+              <span>{soundsRightValue}</span>
+              <ChevronRight className="w-4 h-4 shrink-0" />
+            </span>
+          </button>
+        </section>
+      </div>
+
+      {/* Group 4: Backups & Data */}
       <div>
         <InsetSectionLabel>Data &amp; Backups</InsetSectionLabel>
-        <section className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                onExportCsv();
-                flash('CSV exported');
-              }}
-              className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-            >
-              <span className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                  <FileSpreadsheet className="w-4 h-4" />
-                </span>
-                <span>
-                  <span className="block text-sm font-bold text-[var(--ink)]">
-                    Export CSV Statement
-                  </span>
-                  <span className="block text-[11px] text-[var(--ink-muted)]">
-                    Spreadsheet-safe formula protection enabled
-                  </span>
-                </span>
+        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--surface-border)] overflow-hidden">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              onExportCsv();
+              flash('CSV exported');
+            }}
+            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#34C759] text-white flex items-center justify-center shrink-0">
+                <FileSpreadsheet className="w-4 h-4" />
               </span>
-              <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                onExportJson();
-                flash('JSON backup downloaded');
-              }}
-              className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-            >
-              <span className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                  <Download className="w-4 h-4" />
-                </span>
-                <span>
-                  <span className="block text-sm font-bold text-[var(--ink)]">
-                    Download JSON Backup
-                  </span>
-                  <span className="block text-[11px] text-[var(--ink-muted)]">
-                    Full decrypted archive for safe keeping
-                  </span>
-                </span>
+              <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                Export CSV Statement
               </span>
-              <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
-            </button>
+            </span>
+            <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
+          </button>
 
-            <button
-              type="button"
-              onClick={() => restoreRef.current?.click()}
-              className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-            >
-              <span className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-xl bg-[var(--surface-subtle)] text-[var(--ink)] flex items-center justify-center shrink-0">
-                  <Upload className="w-4 h-4" />
-                </span>
-                <span>
-                  <span className="block text-sm font-bold text-[var(--ink)]">
-                    Restore JSON Backup
-                  </span>
-                  <span className="block text-[11px] text-[var(--ink-muted)]">
-                    Validated &amp; encrypted automatically on restore
-                  </span>
-                </span>
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              setSheetError('');
+              setActiveSheet('backup');
+            }}
+            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#007AFF] text-white flex items-center justify-center shrink-0">
+                <Download className="w-4 h-4" />
               </span>
-              <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
-            </button>
-            <input
-              ref={restoreRef}
-              type="file"
-              accept="application/json"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (!file) return;
-                await runSafely('restore', () => onRestoreJson(file), 'Backup restored cleanly');
-              }}
-              className="hidden"
-            />
+              <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                Backup &amp; Restore
+              </span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
+          </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              setSheetError('');
+              setActiveSheet('clear-data');
+            }}
+            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--credit-tint)]/35 transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#FF3B30] text-white flex items-center justify-center shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </span>
+              <span className="text-sm font-semibold text-[var(--credit-red)] truncate">
+                Reset Shop Data
+              </span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-[var(--credit-red)] shrink-0" />
+          </button>
+
+          {!isGuestMode && (
             <button
               type="button"
               onClick={() => {
                 haptics.tap();
                 setSheetError('');
-                setActiveSheet('clear-data');
+                setActiveSheet('delete-account');
               }}
-              className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--credit-tint)]/40 transition"
+              className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--credit-tint)]/35 transition"
             >
-              <span className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-xl bg-[var(--credit-tint)] text-[var(--credit-red)] flex items-center justify-center shrink-0">
-                  <Trash2 className="w-4 h-4" />
+              <span className="flex items-center gap-3 min-w-0">
+                <span className="w-[29px] h-[29px] rounded-[8px] bg-[#FF3B30] text-white flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4" />
                 </span>
-                <span className="text-sm font-bold text-[var(--credit-red)]">
-                  Clear All Shop Data
+                <span className="text-sm font-semibold text-[var(--credit-red)] truncate">
+                  Delete Cloud Account
                 </span>
               </span>
               <ChevronRight className="w-4 h-4 text-[var(--credit-red)] shrink-0" />
             </button>
-
-            {!isGuestMode && (
-              <button
-                type="button"
-                onClick={() => {
-                  haptics.tap();
-                  setSheetError('');
-                  setActiveSheet('delete-account');
-                }}
-                className="w-full min-h-[52px] px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--credit-tint)]/40 transition"
-              >
-                <span className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-xl bg-[var(--credit-tint)] text-[var(--credit-red)] flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-4 h-4" />
-                  </span>
-                  <span className="text-sm font-bold text-[var(--credit-red)]">
-                    Delete Cloud Account Permanently
-                  </span>
-                </span>
-                <ChevronRight className="w-4 h-4 text-[var(--credit-red)] shrink-0" />
-              </button>
-            )}
-          </section>
+          )}
+        </section>
       </div>
 
-      {/* Group 6: Compliance & Support Footer */}
-      <section className="ios27-inset-group rounded-[26px] p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="font-display text-sm font-extrabold text-[var(--ink)]">
-              Ucred — Ledger &amp; Cashbook OS
-            </p>
-            <p className="text-[11px] text-[var(--ink-muted)]">
-              DPDP 2023 Compliant · Support: naitik.webstudio45@gmail.com
-            </p>
-          </div>
-          <PWAInstallButton compact />
-        </div>
-
-        <p className="text-[10px] text-[var(--ink-muted)] leading-relaxed">
-          Trust Score is an internal merchant recovery indicator only (not a statutory credit bureau
-          score under CICRA/RBI). Verify GSTIN and HSN rates before tax filing.
-        </p>
-
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-0.5 text-xs font-bold text-[var(--brand-accent)]">
-          <Link href="/privacy" className="hover:underline">
-            Privacy Policy
+      {/* Minimal Footer */}
+      <footer className="px-2 pt-1 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-[var(--ink-muted)]">
+          <span className="font-bold text-[var(--ink)]">Ucred</span>
+          <Link href="/privacy" className="hover:text-[var(--ink)] transition">
+            Privacy
           </Link>
-          <Link href="/terms" className="hover:underline">
-            Terms of Service
+          <Link href="/terms" className="hover:text-[var(--ink)] transition">
+            Terms
           </Link>
-          <Link href="/delete-account" className="hover:underline">
+          <Link href="/delete-account" className="hover:text-[var(--ink)] transition">
             Account Deletion
           </Link>
+          <a
+            href="mailto:naitik.webstudio45@gmail.com"
+            className="hover:text-[var(--ink)] transition"
+          >
+            Support
+          </a>
         </div>
-      </section>
+        <PWAInstallButton compact />
+      </footer>
 
-      {/* Detent Sub-Sheet 1: 4-Digit App Lock PIN */}
+      {/* Sheet 1: Cloud Account & Recovery (Quietly holds Recovery Key + Sign Out) */}
       <DetentSheetOverlay
-        open={activeSheet === 'pin'}
+        open={activeSheet === 'account'}
         onClose={() => setActiveSheet(null)}
-        title="4-Digit App Lock PIN"
-        subtitle={appLockPin ? 'Currently Active' : 'Currently Off'}
+        title="Cloud Account"
+        subtitle={verifiedPhone || business.name}
         initialDetent="peek"
         allowDetentToggle={false}
       >
         <div className="space-y-4">
-          <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
-            Require a 4-digit PIN whenever Ucred opens on this device or browser.
-          </p>
-          <input
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            value={pinInput}
-            onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
-            placeholder={appLockPin ? 'Enter new 4-digit PIN' : 'e.g. 1234'}
-            className="w-full min-h-[50px] rounded-2xl bg-[var(--surface-subtle)] px-4 text-center text-2xl font-extrabold font-tabular tracking-[0.4em] text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-          />
-          {sheetError && <p className="text-xs font-bold text-[var(--credit-red)]">{sheetError}</p>}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={busyAction === 'pin'}
-              onClick={() => {
-                if (pinInput.length !== 4) {
-                  setSheetError('PIN must be exactly 4 digits.');
-                  return;
-                }
-                void runSafely(
-                  'pin',
-                  async () => {
-                    await onSavePin(pinInput);
-                    setPinInput('');
-                  },
-                  '4-Digit PIN secured',
-                  true
-                );
-              }}
-              className="flex-1 min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60"
-            >
-              {busyAction === 'pin' ? 'Saving...' : appLockPin ? 'Update PIN' : 'Enable App PIN'}
-            </button>
-            {appLockPin && (
-              <button
-                type="button"
-                disabled={busyAction === 'pin'}
-                onClick={() =>
-                  void runSafely(
-                    'pin',
-                    async () => {
-                      await onSavePin('');
-                      setPinInput('');
-                    },
-                    'App PIN disabled',
-                    true
-                  )
-                }
-                className="min-h-[48px] px-4 rounded-2xl bg-[var(--credit-tint)] text-[var(--credit-red)] font-extrabold text-xs"
-              >
-                Disable
-              </button>
-            )}
-          </div>
-        </div>
-      </DetentSheetOverlay>
-
-      {/* Detent Sub-Sheet 2: End-to-End Encryption Vault */}
-      <DetentSheetOverlay
-        open={activeSheet === 'e2ee'}
-        onClose={() => setActiveSheet(null)}
-        title="End-to-End Encryption Vault"
-        subtitle="AES-256-GCM Zero-Knowledge Protection"
-        initialDetent="peek"
-      >
-        <div className="space-y-4">
-          <div className="rounded-2xl bg-[var(--debit-tint)] p-3.5 flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-[var(--debit-green)] shrink-0 mt-0.5" />
-            <div className="text-xs text-[var(--ink)] space-y-1">
-              <p className="font-extrabold text-[var(--debit-green)]">
-                Active · All Ledger Records Encrypted
-              </p>
-              <p className="text-[var(--ink-muted)] leading-relaxed">
-                Party names, phone numbers, notes, bills, cashbook descriptions, and stock titles
-                are encrypted with a 256-bit AES-GCM key on your device before saving locally or
-                syncing to Cloud Firestore.
-              </p>
-            </div>
-          </div>
-
           {onGetRecoveryKey && (
             <div className="rounded-2xl bg-[var(--app-bg)] p-3.5 space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <p className="text-xs font-extrabold text-[var(--ink)]">
-                    256-Bit Vault Recovery Key
-                  </p>
+                  <p className="text-xs font-extrabold text-[var(--ink)]">Recovery Key</p>
                   <p className="text-[11px] text-[var(--ink-muted)]">
-                    Keep a private offline copy for emergency recovery
+                    Keep offline for multi-device account restore
                   </p>
                 </div>
                 <button
@@ -1032,7 +707,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   className="min-h-[36px] px-3 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 active:scale-95 transition"
                 >
                   {recoveryCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{recoveryCopied ? 'Copied' : recoveryKeyValue ? 'Copy Key' : 'Reveal & Copy'}</span>
+                  <span>{recoveryCopied ? 'Copied' : recoveryKeyValue ? 'Copy' : 'Reveal'}</span>
                 </button>
               </div>
               {recoveryKeyValue && (
@@ -1043,113 +718,472 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           )}
 
-          {!isGuestMode && onConfigureVaultMode ? (
-            <div className="space-y-3">
-              <p className="text-xs font-bold text-[var(--ink-muted)] uppercase tracking-wider">
-                Cloud Key Recovery Mode
-              </p>
-
-              <div className="ios27-inset-group rounded-2xl divide-y divide-[var(--surface-border)] overflow-hidden">
-                <button
-                  type="button"
-                  disabled={busyAction === 'e2ee'}
-                  onClick={() =>
-                    void runSafely(
-                      'e2ee',
-                      () => onConfigureVaultMode('auto'),
-                      'Auto device key active',
-                      true
-                    )
-                  }
-                  className="w-full p-3.5 flex items-center justify-between gap-3 text-left"
+          {!isGuestMode && onConfigureVaultMode && (
+            <div className="ios27-inset-group rounded-2xl divide-y divide-[var(--surface-border)] overflow-hidden">
+              <button
+                type="button"
+                disabled={busyAction === 'e2ee'}
+                onClick={() =>
+                  void runSafely(
+                    'e2ee',
+                    () => onConfigureVaultMode('auto'),
+                    'Auto device key active',
+                    true
+                  )
+                }
+                className="w-full p-3.5 flex items-center justify-between gap-3 text-left"
+              >
+                <div>
+                  <p className="text-sm font-bold text-[var(--ink)]">Auto Sync Device Key</p>
+                  <p className="text-[11px] text-[var(--ink-muted)]">
+                    Instant unlock on signed-in devices
+                  </p>
+                </div>
+                <span
+                  className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                    vaultMode === 'auto'
+                      ? 'bg-[var(--brand)] text-white'
+                      : 'border-2 border-[var(--surface-border)]'
+                  }`}
                 >
+                  {vaultMode === 'auto' && <Check className="w-3 h-3 stroke-[3]" />}
+                </span>
+              </button>
+
+              <div className="p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-bold text-[var(--ink)]">Auto Sync Device Key</p>
+                    <p className="text-sm font-bold text-[var(--ink)]">Cloud Sync Vault PIN</p>
                     <p className="text-[11px] text-[var(--ink-muted)]">
-                      Instant unlock on your signed-in account across devices
+                      Require a 4+ char secret PIN on new devices
                     </p>
                   </div>
-                  <span
-                    className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                      vaultMode === 'auto'
-                        ? 'bg-[var(--brand)] text-white'
-                        : 'border-2 border-[var(--surface-border)]'
-                    }`}
+                  {vaultMode === 'pin' && (
+                    <span className="w-5 h-5 rounded-full bg-[var(--brand)] text-white flex items-center justify-center shrink-0">
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={vaultPinInput}
+                    onChange={(e) => setVaultPinInput(e.target.value)}
+                    placeholder="Enter 4+ char PIN"
+                    className="flex-1 min-h-[42px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                  />
+                  <button
+                    type="button"
+                    disabled={busyAction === 'e2ee'}
+                    onClick={() => {
+                      if (vaultPinInput.trim().length < 4) {
+                        setSheetError('Vault PIN must be at least 4 characters or digits.');
+                        return;
+                      }
+                      void runSafely(
+                        'e2ee',
+                        async () => {
+                          await onConfigureVaultMode('pin', vaultPinInput.trim());
+                          setVaultPinInput('');
+                        },
+                        'Vault PIN enabled',
+                        true
+                      );
+                    }}
+                    className="min-h-[42px] px-4 rounded-xl bg-[var(--brand)] text-white text-xs font-extrabold disabled:opacity-60"
                   >
-                    {vaultMode === 'auto' && <Check className="w-3 h-3 stroke-[3]" />}
-                  </span>
-                </button>
-
-                <div className="p-3.5 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-bold text-[var(--ink)]">
-                        Custom Cloud Sync Vault PIN
-                      </p>
-                      <p className="text-[11px] text-[var(--ink-muted)]">
-                        Wrap your encryption key with a secret PIN (min 4 characters)
-                      </p>
-                    </div>
-                    {vaultMode === 'pin' && (
-                      <span className="w-5 h-5 rounded-full bg-[var(--brand)] text-white flex items-center justify-center shrink-0">
-                        <Check className="w-3 h-3 stroke-[3]" />
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={vaultPinInput}
-                      onChange={(e) => setVaultPinInput(e.target.value)}
-                      placeholder="Enter 4+ char secret PIN"
-                      className="flex-1 min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                    />
-                    <button
-                      type="button"
-                      disabled={busyAction === 'e2ee'}
-                      onClick={() => {
-                        if (vaultPinInput.trim().length < 4) {
-                          setSheetError('Vault PIN must be at least 4 characters or digits.');
-                          return;
-                        }
-                        void runSafely(
-                          'e2ee',
-                          async () => {
-                            await onConfigureVaultMode('pin', vaultPinInput.trim());
-                            setVaultPinInput('');
-                          },
-                          'Vault locked with custom PIN',
-                          true
-                        );
-                      }}
-                      className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-white text-xs font-extrabold disabled:opacity-60"
-                    >
-                      {busyAction === 'e2ee' ? '...' : 'Set Vault PIN'}
-                    </button>
-                  </div>
+                    {busyAction === 'e2ee' ? '...' : 'Save'}
+                  </button>
                 </div>
               </div>
-              {sheetError && (
-                <p className="text-xs font-bold text-[var(--credit-red)]">{sheetError}</p>
-              )}
             </div>
-          ) : (
-            <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
-              Your Guest Vault key is stored inside IndexedDB on this browser. Connect free Cloud
-              Backup anytime to migrate and sync encrypted records across devices.
-            </p>
+          )}
+
+          {sheetError && <p className="text-xs font-bold text-[var(--credit-red)]">{sheetError}</p>}
+
+          {!isGuestMode && (
+            <button
+              type="button"
+              onClick={() =>
+                void runSafely('logout', onLogout, 'Signed out to Guest Vault', true)
+              }
+              className="w-full min-h-[48px] rounded-2xl bg-[var(--credit-tint)] text-[var(--credit-red)] text-sm font-extrabold inline-flex items-center justify-center gap-2 active:scale-[0.98] transition"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
           )}
         </div>
       </DetentSheetOverlay>
 
-      {/* Detent Sub-Sheet 3: Shop Mobile & UPI QR */}
+      {/* Sheet 2: Unified Passcode, Auto-Lock & Biometrics */}
+      <DetentSheetOverlay
+        open={activeSheet === 'security'}
+        onClose={() => setActiveSheet(null)}
+        title="Passcode & Biometrics"
+        subtitle={appLockPin ? 'Passcode Active' : 'Passcode Off'}
+        initialDetent="peek"
+        allowDetentToggle={false}
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-[var(--ink-muted)]">
+              4-Digit App Passcode
+            </label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder={appLockPin ? 'Enter new 4-digit PIN' : 'e.g. 1234'}
+              className="w-full min-h-[50px] rounded-2xl bg-[var(--surface-subtle)] px-4 text-center text-2xl font-extrabold font-tabular tracking-[0.4em] text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={busyAction === 'pin'}
+                onClick={() => {
+                  if (pinInput.length !== 4) {
+                    setSheetError('PIN must be exactly 4 digits.');
+                    return;
+                  }
+                  void runSafely(
+                    'pin',
+                    async () => {
+                      await onSavePin(pinInput);
+                      setPinInput('');
+                    },
+                    '4-Digit PIN saved',
+                    true
+                  );
+                }}
+                className="flex-1 min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60"
+              >
+                {busyAction === 'pin' ? 'Saving...' : appLockPin ? 'Update PIN' : 'Enable PIN'}
+              </button>
+              {appLockPin && (
+                <button
+                  type="button"
+                  disabled={busyAction === 'pin'}
+                  onClick={() =>
+                    void runSafely(
+                      'pin',
+                      async () => {
+                        await onSavePin('');
+                        setPinInput('');
+                      },
+                      'App PIN disabled',
+                      true
+                    )
+                  }
+                  className="min-h-[46px] px-4 rounded-2xl bg-[var(--credit-tint)] text-[var(--credit-red)] font-extrabold text-xs"
+                >
+                  Turn Off
+                </button>
+              )}
+            </div>
+          </div>
+
+          {onChangeAutoLockSeconds && (
+            <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-2 text-xs font-bold text-[var(--ink)]">
+                  <Timer className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
+                  <span>Idle Auto-Lock</span>
+                </span>
+                <span className="text-[11px] font-semibold text-[var(--ink-muted)]">
+                  {appLockPin ? autoLockLabel : 'Requires PIN'}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-1.5 rounded-2xl bg-[var(--surface-subtle)] p-1">
+                {(
+                  [
+                    { sec: 0, label: 'Off' },
+                    { sec: 60, label: '1m' },
+                    { sec: 300, label: '5m' },
+                    { sec: 900, label: '15m' },
+                  ] as const
+                ).map((opt) => {
+                  const selected = autoLockSeconds === opt.sec;
+                  return (
+                    <button
+                      key={opt.sec}
+                      type="button"
+                      onClick={() => {
+                        haptics.tap();
+                        onChangeAutoLockSeconds(opt.sec);
+                        flash(opt.sec === 0 ? 'Auto-lock off' : `Auto-lock ${opt.label}`);
+                      }}
+                      className={`min-h-[36px] rounded-xl text-xs font-extrabold transition ${
+                        selected
+                          ? 'bg-[var(--surface)] text-[var(--brand-accent)] shadow-xs'
+                          : 'text-[var(--ink-muted)]'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {webAuthnSupported && onTogglePasskey && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={passkeyEnabled}
+              disabled={busyAction === 'passkey'}
+              onClick={() =>
+                void runSafely(
+                  'passkey',
+                  async () => {
+                    await onTogglePasskey(!passkeyEnabled);
+                  },
+                  passkeyEnabled ? 'Biometric Passkey removed' : 'Biometric Passkey enabled'
+                )
+              }
+              className="w-full pt-3 border-t border-[var(--surface-border)] flex items-center justify-between gap-3 text-left disabled:opacity-60"
+            >
+              <span className="flex items-center gap-2.5 min-w-0">
+                <Fingerprint className="w-4 h-4 text-[var(--debit-green)] shrink-0" />
+                <span className="text-sm font-bold text-[var(--ink)]">
+                  Face ID / Touch ID Passkey
+                </span>
+              </span>
+              <SpringSwitch checked={passkeyEnabled} />
+            </button>
+          )}
+
+          {sheetError && <p className="text-xs font-bold text-[var(--credit-red)]">{sheetError}</p>}
+        </div>
+      </DetentSheetOverlay>
+
+      {/* Sheet 3: Appearance */}
+      <DetentSheetOverlay
+        open={activeSheet === 'appearance'}
+        onClose={() => setActiveSheet(null)}
+        title="Appearance"
+        initialDetent="peek"
+        allowDetentToggle={false}
+      >
+        <div className="space-y-4">
+          <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1">
+            {(
+              [
+                { id: 'light', label: 'Light Canvas', icon: Sun },
+                { id: 'dark', label: 'OLED Dark', icon: Moon },
+              ] as const
+            ).map((m) => {
+              const Icon = m.icon;
+              const active = appearance === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={async () => {
+                    haptics.tap();
+                    await onChangeAppearance(m.id);
+                    flash(`${m.label} active`);
+                  }}
+                  className={`relative min-h-[44px] rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 z-10 transition-colors ${
+                    active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId={prefersReducedMotion ? undefined : 'settingsAppearanceSeg'}
+                      transition={SEG_SPRING}
+                      className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
+                    />
+                  )}
+                  <Icon className="w-3.5 h-3.5 relative z-10" />
+                  <span className="relative z-10">{m.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {onSelectAccentTheme && (
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { id: 'sapphire', label: 'Sapphire', dot: 'bg-[#4F46E5]' },
+                  { id: 'rose', label: 'Rose', dot: 'bg-[#E11D48]' },
+                  { id: 'onyx', label: 'Onyx', dot: 'bg-[#09090B] ring-1 ring-white/40' },
+                ] as const
+              ).map((opt) => {
+                const selected = activeTheme === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      haptics.tap();
+                      void onSelectAccentTheme(opt.id);
+                    }}
+                    className={`min-h-[44px] px-3 rounded-xl flex items-center justify-between text-xs font-bold active:scale-95 transition ${
+                      selected
+                        ? 'bg-[var(--brand-tint)] ring-1 ring-[var(--brand)] text-[var(--brand-accent)]'
+                        : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className={`w-3.5 h-3.5 rounded-full ${opt.dot}`} />
+                      <span>{opt.label}</span>
+                    </span>
+                    {selected && <Check className="w-3.5 h-3.5" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </DetentSheetOverlay>
+
+      {/* Sheet 4: Sounds & Haptics */}
+      <DetentSheetOverlay
+        open={activeSheet === 'sounds'}
+        onClose={() => setActiveSheet(null)}
+        title="Sounds & Haptics"
+        initialDetent="peek"
+        allowDetentToggle={false}
+      >
+        <div className="ios27-inset-group rounded-2xl divide-y divide-[var(--surface-border)] overflow-hidden">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={soundEnabled}
+            onClick={() => {
+              const next = !soundEnabled;
+              setSoundEnabled(next);
+              setSoundState(next);
+              if (next) haptics.tap();
+            }}
+            className="w-full min-h-[54px] px-4 py-3 flex items-center justify-between gap-3 text-left"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <Volume2 className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
+              <span className="text-sm font-bold text-[var(--ink)]">Tactile Click Sounds</span>
+            </span>
+            <SpringSwitch checked={soundEnabled} />
+          </button>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={hapticsEnabled}
+            onClick={() => {
+              const next = !hapticsEnabled;
+              setHapticsEnabled(next);
+              setHapticsState(next);
+              if (next) haptics.tap();
+            }}
+            className="w-full min-h-[54px] px-4 py-3 flex items-center justify-between gap-3 text-left"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <Smartphone className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
+              <span className="text-sm font-bold text-[var(--ink)]">Haptic Feedback</span>
+            </span>
+            <SpringSwitch checked={hapticsEnabled} />
+          </button>
+        </div>
+      </DetentSheetOverlay>
+
+      {/* Sheet 5: Backup & Restore */}
+      <DetentSheetOverlay
+        open={activeSheet === 'backup'}
+        onClose={() => setActiveSheet(null)}
+        title="Backup & Restore"
+        subtitle={business.name}
+        initialDetent="peek"
+        allowDetentToggle={false}
+      >
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              onExportJson();
+              flash('JSON backup downloaded');
+              setActiveSheet(null);
+            }}
+            className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm inline-flex items-center justify-center gap-2 tactile-key-primary"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download JSON Backup</span>
+          </button>
+
+          <div className="pt-3 border-t border-[var(--surface-border)] space-y-2.5">
+            <p className="text-xs font-bold text-[var(--ink-muted)]">Restore Mode</p>
+            <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-[var(--surface-subtle)] p-1">
+              {(
+                [
+                  { id: 'merge', label: 'Merge with Current' },
+                  { id: 'replace', label: 'Replace Shop Data' },
+                ] as const
+              ).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    haptics.tap();
+                    setRestoreMode(m.id);
+                  }}
+                  className={`min-h-[38px] rounded-xl text-xs font-extrabold transition ${
+                    restoreMode === m.id
+                      ? 'bg-[var(--surface)] text-[var(--ink)] shadow-xs'
+                      : 'text-[var(--ink-muted)]'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              disabled={busyAction === 'restore'}
+              onClick={() => restoreRef.current?.click()}
+              className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] text-[var(--ink)] font-extrabold text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              <Upload className="w-4 h-4" />
+              <span>
+                {busyAction === 'restore' ? 'Restoring...' : 'Select Backup JSON File'}
+              </span>
+            </button>
+            <input
+              ref={restoreRef}
+              type="file"
+              accept="application/json"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (!file) return;
+                await runSafely(
+                  'restore',
+                  () => onRestoreJson(file, { mode: restoreMode }),
+                  `Backup restored (${restoreMode})`,
+                  true
+                );
+              }}
+              className="hidden"
+            />
+          </div>
+          {sheetError && <p className="text-xs font-bold text-[var(--credit-red)]">{sheetError}</p>}
+        </div>
+      </DetentSheetOverlay>
+
+      {/* Sheet 6: Shop Mobile & UPI QR */}
       <DetentSheetOverlay
         open={activeSheet === 'payments'}
         onClose={() => setActiveSheet(null)}
         title="Shop Mobile & UPI QR"
         subtitle="Used on reminder slips and GST bills"
         initialDetent="peek"
+        allowDetentToggle={false}
       >
         <div className="space-y-4">
           <div className="space-y-1.5">
@@ -1227,7 +1261,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   {business.upiId}
                 </p>
                 <p className="text-[11px] text-[var(--ink-muted)] leading-snug mt-0.5">
-                  Included automatically on WhatsApp payment reminders &amp; printed bills.
+                  Included automatically on WhatsApp reminders &amp; bills.
                 </p>
               </div>
             </div>
@@ -1237,19 +1271,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </DetentSheetOverlay>
 
-      {/* Detent Sub-Sheet 4: Confirm Clear Shop Data */}
+      {/* Sheet 7: Confirm Reset Shop Data */}
       <DetentSheetOverlay
         open={activeSheet === 'clear-data'}
         onClose={() => setActiveSheet(null)}
-        title="Clear All Shop Data"
+        title="Reset Shop Data"
         subtitle={business.name}
         initialDetent="peek"
         allowDetentToggle={false}
       >
         <div className="space-y-4">
           <div className="rounded-2xl bg-[var(--credit-tint)] p-4 text-xs font-bold text-[var(--credit-red)] leading-relaxed">
-            This will permanently erase all parties, ledger transactions, bills, Galla cashbook,
-            staff logs, and inventory items for {business.name}. Download a JSON backup first.
+            This will permanently erase all parties, transactions, bills, cashbook, staff logs, and
+            inventory items for {business.name}. Download a JSON backup first.
           </div>
           {sheetError && <p className="text-xs font-bold text-[var(--credit-red)]">{sheetError}</p>}
           <div className="grid grid-cols-2 gap-2.5">
@@ -1261,7 +1295,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               }
               className="min-h-[48px] rounded-2xl bg-[var(--credit-red)] text-white text-xs font-extrabold disabled:opacity-60"
             >
-              {busyAction === 'clear' ? 'Clearing...' : 'Yes, Clear All'}
+              {busyAction === 'clear' ? 'Clearing...' : 'Yes, Reset'}
             </button>
             <button
               type="button"
@@ -1274,7 +1308,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </DetentSheetOverlay>
 
-      {/* Detent Sub-Sheet 5: Confirm Delete Cloud Account */}
+      {/* Sheet 8: Confirm Delete Cloud Account */}
       <DetentSheetOverlay
         open={activeSheet === 'delete-account'}
         onClose={() => setActiveSheet(null)}
@@ -1285,8 +1319,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       >
         <div className="space-y-4">
           <div className="rounded-2xl bg-[var(--credit-tint)] p-4 text-xs font-bold text-[var(--credit-red)] leading-relaxed">
-            Permanently deletes ALL shops, encrypted vaults, ledger entries, and cloud account data.
-            Export a JSON backup before proceeding.
+            Permanently deletes ALL shops, vaults, ledger entries, and cloud account data. Export a
+            JSON backup before proceeding.
           </div>
           {sheetError && <p className="text-xs font-bold text-[var(--credit-red)]">{sheetError}</p>}
           <div className="grid grid-cols-2 gap-2.5">
@@ -2003,7 +2037,7 @@ export const PinLockOverlay: React.FC<{
   const [entered, setEntered] = useState('');
   const [error, setError] = useState('');
   const [cooldownSec, setCooldownSec] = useState(() => getPinCooldownSeconds());
-  const [shakeCount, setShakeCount] = useState(0);
+  const [shaking, setShaking] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
 
@@ -2032,7 +2066,8 @@ export const PinLockOverlay: React.FC<{
         onUnlock();
       } else {
         const res = recordPinFailure();
-        setShakeCount((c) => c + 1);
+        setShaking(true);
+        window.setTimeout(() => setShaking(false), 320);
         haptics.tap();
         if (res.cooldownSeconds > 0) {
           setCooldownSec(res.cooldownSeconds);
@@ -2060,11 +2095,10 @@ export const PinLockOverlay: React.FC<{
                 opacity: 1,
                 scale: 1,
                 y: 0,
-                x: shakeCount > 0 ? [0, -8, 8, -5, 5, 0] : 0,
+                x: shaking ? [0, -10, 10, -6, 6, 0] : 0,
               }
         }
         transition={{ duration: 0.3 }}
-        key={`pin-card-${shakeCount}`}
         className="w-full max-w-xs rounded-[28px] spatial-hero p-6 text-center space-y-5"
       >
         <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
