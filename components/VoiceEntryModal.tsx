@@ -13,7 +13,6 @@ import {
   Pause,
   Play,
   Repeat,
-  Sparkles,
   Undo2,
   Volume2,
   X,
@@ -33,7 +32,7 @@ import {
   speakHinglish,
   stopSpeaking,
 } from '@/lib/i18n';
-import { haptic } from '@/lib/haptic';
+import { haptic } from '@/utils/haptics';
 import { getPersonaAdaptation, type PersonaAdaptation } from '@/lib/persona';
 import type {
   AccountKind,
@@ -263,7 +262,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       });
       const json = (await res.json()) as Partial<HybridVoiceParseResult> & { error?: string };
       if (!res.ok) {
-        throw new Error(json.error || 'Smart AI voice parse failed.');
+        throw new Error(json.error || 'Cloud voice parser could not understand that.');
       }
 
       setParseSource('ai');
@@ -324,7 +323,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         setRawPhrase(phrase);
         setConfirmError('');
         setStage('batch');
-        speakHinglish(`${aiEntries.length} entries AI se samajh aayi hain.`, language);
+        speakHinglish(`${aiEntries.length} entries samajh aayi hain.`, language);
         return;
       }
 
@@ -347,12 +346,12 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         return;
       }
 
-      setVoiceError('AI could not extract an amount from that speech. Tap any field below to edit.');
+      setVoiceError('Could not extract an amount from that speech. Tap any field below to edit.');
       setStage('confirm');
       setActiveField('amount');
     } catch (err) {
       setVoiceError(
-        err instanceof Error ? err.message : 'Smart AI parse failed. Tap any field below to edit.'
+        err instanceof Error ? err.message : 'Cloud parse failed. Tap any field below to edit.'
       );
       setStage('confirm');
       setActiveField('amount');
@@ -790,7 +789,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                         {continuousMode ? 'Hands-Free Counter Mode' : 'Speak to Save'}
                       </h2>
                       <p className="text-[11px] font-semibold text-[var(--ink-muted)] truncate">
-                        {aiParsing ? 'Smart AI parsing your speech...' : statusText}
+                        {aiParsing ? 'Analyzing spoken entry...' : statusText}
                       </p>
                     </div>
                   </div>
@@ -852,7 +851,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                         >
                           <div className="min-w-0">
                             <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
-                              <Sparkles className="w-3 h-3" />
+                              <Mic className="w-3 h-3" />
                               <span>Live Draft</span>
                             </span>
                             <p className="text-sm font-extrabold text-[var(--ink)] truncate">
@@ -1066,7 +1065,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       Confirm Voice Entry
                     </h2>
                     <p className="text-[11px] font-medium text-[var(--ink-muted)]">
-                      {parseSource === 'ai' ? 'Hybrid Gemini AI' : 'Instant Offline Parser'} · Tap any
+                      {parseSource === 'ai' ? 'Cloud Speech Parser' : 'Instant Offline Parser'} · Tap any
                       row to edit
                     </p>
                   </div>
@@ -1078,8 +1077,8 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                         onClick={() => applyAiFallback(rawPhrase)}
                         className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold active:scale-95 transition"
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>{aiParsing ? 'Parsing...' : 'AI Parse'}</span>
+                        <Mic className="w-3.5 h-3.5" />
+                        <span>{aiParsing ? 'Parsing...' : 'Cloud Parse'}</span>
                       </button>
                     )}
                     <button

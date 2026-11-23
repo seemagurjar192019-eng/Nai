@@ -5,7 +5,7 @@ import { ArrowLeft, FileText } from 'lucide-react';
 export const metadata: Metadata = {
   title: 'Terms of Service',
   description:
-    'Terms of Service for Ucred Smart Voice Ledger, Receipt Scanner, Cashbook, GST billing aid, stock tracking, and UPI collection tools.',
+    'Terms of Service for Ucred Voice Ledger, Receipt Scanner, Cashbook, GST billing aid, stock tracking, and UPI collection tools.',
   alternates: { canonical: '/terms' },
 };
 
@@ -39,10 +39,10 @@ export default function TermsOfServicePage() {
 
         <section className="space-y-2">
           <h2 className="font-display text-base font-bold text-[var(--ink)]">
-            1. Bookkeeping, AI Scans &amp; GST Rule 46 Compliance
+            1. Bookkeeping, Receipt Scans &amp; GST Rule 46 Compliance
           </h2>
           <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-            Ucred is a digital bookkeeping, AI receipt assistance, and invoice preparation aid. It is not a substitute for certified accounting or statutory GST e-invoicing portals. You remain solely responsible for verifying spoken voice amounts, AI-scanned receipt line items, customer balances, HSN/SAC details, GST rates, and Rule 46 invoice requirements before issuing tax invoices or filing GST/income tax returns.
+            Ucred is a digital bookkeeping, receipt scanning, and invoice preparation aid. It is not a substitute for certified accounting or statutory GST e-invoicing portals. You remain solely responsible for verifying spoken voice amounts, scanned receipt line items, customer balances, HSN/SAC details, GST rates, and Rule 46 invoice requirements before issuing tax invoices or filing GST/income tax returns.
           </p>
         </section>
 

@@ -1,3 +1,5 @@
+export type { VaultKeyEnvelope } from './e2ee';
+
 export type LanguageCode =
   | 'en'
   | 'hi'

@@ -1,27 +1,30 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import Image from 'next/image';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowRight,
   Check,
   CloudUpload,
+  Lock,
   Mail,
+  Mic,
   Package,
+  Receipt,
   Scale,
   ShieldCheck,
   Smartphone,
-  Sparkles,
   Store,
   User,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { UCRED_LOGO_PATH } from '@/lib/i18n';
 import {
   PERSONA_OPTIONS,
   type PersonaCategoryId,
   type PersonaPrefs,
 } from '@/lib/persona';
-import { MunimVoiceOrb } from './voice/MunimVoiceOrb';
 
 interface PersonaOnboardingSheetProps {
   initialPrefs: PersonaPrefs;
@@ -44,13 +47,14 @@ const PERSONA_ICONS: Record<PersonaCategoryId, React.ComponentType<{ className?:
   wholesale: Package,
 };
 
-const SPRING_TACTILE = { type: 'spring' as const, stiffness: 460, damping: 26 };
+const SPRING_TACTILE = { type: 'spring' as const, stiffness: 460, damping: 28 };
+const STEP_EASE = [0.16, 1, 0.3, 1] as const;
 
 /**
- * iOS 27 3-Screen Launch Sequence:
- * 1. Clean English Welcome (breathing Royal Indigo Voice Orb + Get Started + Skip)
- * 2. Zero-Cost Multi-Auth Screen: Google (Gmail), Passwordless Email Link, optional +91 OTP, or Skip as Guest
- * 3. Workspace Mode Multi-Select (Personal, Retail Store, Mandi, Wholesale -> Launch Ucred)
+ * Apple iOS 27 3-Step Launch Sequence:
+ * 1. Minimalist Apple Hero Welcome (squircle mark, headline, 3 unboxed capabilities, Get Started + Skip)
+ * 2. Optional Cloud Backup Sign-In (Google, Passwordless Email Link, +91 OTP, or Skip as Guest)
+ * 3. Grouped Inset Workspace Mode Selection (Personal, Retail Store, Mandi, Wholesale -> Launch Ucred)
  */
 export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
   initialPrefs,
@@ -65,6 +69,7 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
   onOpenPhoneSignIn,
   onComplete,
 }) => {
+  const prefersReducedMotion = useReducedMotion();
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [emailInput, setEmailInput] = useState('');
@@ -111,148 +116,191 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Welcome to Ucred"
-      className="absolute inset-0 z-50 bg-[var(--app-bg)] flex flex-col justify-between p-6 overflow-y-auto no-scrollbar select-none"
+      className="fixed inset-0 z-50 bg-[var(--app-bg)] overflow-y-auto no-scrollbar select-none"
     >
-      {/* Top Bar: 3-Step Pill + Instant Skip */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          {([1, 2, 3] as const).map((s) => (
-            <span
-              key={s}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                step === s ? 'w-6 bg-[var(--brand)]' : 'w-2 bg-[var(--surface-subtle)]'
-              }`}
-            />
-          ))}
+      <div className="min-h-full max-w-[440px] mx-auto w-full flex flex-col justify-between px-6 py-6">
+        {/* Top Bar: Step Progress Indicator + Instant Skip */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5" aria-label={`Step ${step} of 3`}>
+            {([1, 2, 3] as const).map((s) => (
+              <span
+                key={s}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  step === s ? 'w-7 bg-[var(--brand)]' : 'w-2 bg-[var(--surface-border)]'
+                }`}
+              />
+            ))}
+          </div>
+
+          <motion.button
+            whileTap={prefersReducedMotion ? undefined : { scale: 0.95 }}
+            transition={SPRING_TACTILE}
+            type="button"
+            onClick={() => finishOnboarding(selected)}
+            className="min-h-[38px] px-3.5 rounded-xl bg-[var(--surface)] border border-[var(--surface-border)] text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] transition cursor-pointer"
+          >
+            Skip
+          </motion.button>
         </div>
 
-        <motion.button
-          whileTap={{ scale: 0.94, y: 1 }}
-          transition={SPRING_TACTILE}
-          type="button"
-          onClick={() => finishOnboarding(selected)}
-          className="min-h-[36px] px-3.5 rounded-full bg-[var(--surface)] shadow-[var(--spatial-shadow)] text-xs font-extrabold text-[var(--ink-muted)] hover:text-[var(--ink)]"
-        >
-          Skip
-        </motion.button>
-      </div>
+        {/* Main Step Viewport */}
+        <AnimatePresence mode="wait">
+          {step === 1 ? (
+            <motion.div
+              key="onboarding-step-1"
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -20 }}
+              transition={{ duration: 0.26, ease: STEP_EASE }}
+              className="flex-1 flex flex-col items-center justify-center py-8 space-y-8"
+            >
+              <div className="flex flex-col items-center text-center space-y-5">
+                <motion.div
+                  initial={prefersReducedMotion ? undefined : { scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ ...SPRING_TACTILE, delay: 0.04 }}
+                  className="w-[84px] h-[84px] rounded-[24px] overflow-hidden shadow-[var(--spatial-shadow-lg)] border border-[var(--surface-border)] bg-[var(--surface)]"
+                >
+                  <Image
+                    src={UCRED_LOGO_PATH}
+                    alt="Ucred"
+                    width={84}
+                    height={84}
+                    priority
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                </motion.div>
 
-      {/* Main Content */}
-      <AnimatePresence mode="wait">
-        {step === 1 ? (
-          <motion.div
-            key="onboarding-step-1"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="flex-1 flex flex-col items-center justify-center text-center py-6 space-y-6"
-          >
-            <MunimVoiceOrb
-              size="hero"
-              onClick={() => setStep(2)}
-              ariaLabel="Start Ucred setup"
-            />
-
-            <div className="space-y-3 max-w-[320px]">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Offline Voice Ledger &amp; Cashbook</span>
+                <div className="space-y-2.5 max-w-[340px]">
+                  <h1 className="font-display text-[30px] font-extrabold text-[var(--ink)] leading-[1.12] tracking-tight text-balance">
+                    Your business ledger, reimagined.
+                  </h1>
+                  <p className="text-[14px] font-medium text-[var(--ink-muted)] leading-relaxed">
+                    Voice khata in English &amp; Hinglish, receipt scanning, GST billing, and
+                    zero-knowledge encrypted sync.
+                  </p>
+                </div>
               </div>
 
-              <h1 className="font-display text-[28px] font-extrabold text-[var(--ink)] leading-tight tracking-tight">
-                Your Smart Voice Ledger
-              </h1>
-
-              <p className="text-sm font-medium text-[var(--ink-muted)] leading-relaxed">
-                Speak entries in English or Hinglish, scan handwritten receipts, track overdue dues, and issue bills — private on your device or synced to your cloud.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-center gap-2 text-xs font-bold text-[var(--debit-green)] bg-[var(--debit-tint)] px-3.5 py-2 rounded-2xl">
-              <ShieldCheck className="w-4 h-4 shrink-0" />
-              <span>Private On-Device Vault · Optional Cloud Backup</span>
-            </div>
-          </motion.div>
-        ) : step === 2 ? (
-          <motion.div
-            key="onboarding-step-2-signin"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="flex-1 flex flex-col items-center justify-center text-center py-4 space-y-5"
-          >
-            <div className="w-16 h-16 rounded-[22px] bg-[var(--surface)] text-[var(--brand-accent)] flex items-center justify-center shadow-[var(--spatial-shadow)]">
-              <CloudUpload className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-2 max-w-[320px]">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
-                Optional Cloud Backup
-              </p>
-              <h2 className="font-display text-[24px] font-extrabold text-[var(--ink)] leading-tight">
-                {isSignedIn ? 'Cloud Backup Connected' : 'Sync safely or skip for now'}
-              </h2>
-              <p className="text-xs font-medium text-[var(--ink-muted)] leading-relaxed">
-                {isSignedIn
-                  ? `Connected to ${verifiedIdentity || 'your cloud account'}. Your ledger syncs automatically.`
-                  : 'Sign in for free with Google or Email Link so you never lose records, or continue offline in Guest Mode.'}
-              </p>
-            </div>
-
-            <div className="w-full max-w-[340px] rounded-[24px] bg-[var(--surface)] shadow-[var(--spatial-shadow)] p-4 space-y-2.5 text-left">
-              {isSignedIn ? (
-                <div className="min-h-[48px] px-4 rounded-2xl bg-[var(--debit-tint)] text-[var(--debit-green)] font-extrabold text-sm flex items-center justify-center gap-2">
-                  <Check className="w-4 h-4" />
-                  <span className="truncate">Signed In · {verifiedIdentity || 'Synced'}</span>
+              {/* 3 Clean Unboxed Capabilities */}
+              <div className="w-full divide-y divide-[var(--surface-border)] border-y border-[var(--surface-border)]">
+                <div className="py-3.5 flex items-center gap-3.5">
+                  <span className="w-9 h-9 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                    <Mic className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-bold text-[var(--ink)] leading-snug">
+                      Voice Munim in Hinglish &amp; English
+                    </p>
+                    <p className="text-xs text-[var(--ink-muted)] leading-snug mt-0.5">
+                      Speak entries naturally — hands-free at your counter
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <>
-                  {/* 1. Primary Zero-Cost Google (Gmail) Sign-In */}
-                  <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    transition={SPRING_TACTILE}
-                    type="button"
-                    disabled={authBusy}
-                    onClick={() => {
-                      haptics.tap();
-                      setLocalError('');
-                      void onGoogleSignIn?.();
-                    }}
-                    className="tactile-key-primary w-full min-h-[50px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-display font-extrabold text-sm flex items-center justify-center gap-2.5 disabled:opacity-60 cursor-pointer"
-                  >
-                    <span className="w-5 h-5 rounded-full bg-white text-[#4F46E5] font-black text-xs flex items-center justify-center">
-                      G
-                    </span>
-                    <span>{authBusy ? 'Connecting...' : 'Continue with Google (Gmail)'}</span>
-                  </motion.button>
 
-                  {/* 2. Passwordless Email Verification Link */}
-                  {!showEmailForm ? (
+                <div className="py-3.5 flex items-center gap-3.5">
+                  <span className="w-9 h-9 rounded-xl bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
+                    <Receipt className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-bold text-[var(--ink)] leading-snug">
+                      Receipt Scan, Bills &amp; Stock Sync
+                    </p>
+                    <p className="text-xs text-[var(--ink-muted)] leading-snug mt-0.5">
+                      Scan handwritten parchi notes &amp; issue 58mm or GST bills
+                    </p>
+                  </div>
+                </div>
+
+                <div className="py-3.5 flex items-center gap-3.5">
+                  <span className="w-9 h-9 rounded-xl bg-[var(--surface-subtle)] text-[var(--ink)] flex items-center justify-center shrink-0">
+                    <Lock className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-bold text-[var(--ink)] leading-snug">
+                      Zero-Knowledge AES-256 Encryption
+                    </p>
+                    <p className="text-xs text-[var(--ink-muted)] leading-snug mt-0.5">
+                      Your records stay encrypted on this device and in your vault
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : step === 2 ? (
+            <motion.div
+              key="onboarding-step-2-signin"
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -20 }}
+              transition={{ duration: 0.26, ease: STEP_EASE }}
+              className="flex-1 flex flex-col items-center justify-center py-6 space-y-6"
+            >
+              <div className="flex flex-col items-center text-center space-y-3 max-w-[330px]">
+                <div className="w-14 h-14 rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] text-[var(--brand-accent)] flex items-center justify-center shadow-[var(--spatial-shadow)]">
+                  <CloudUpload className="w-7 h-7" />
+                </div>
+                <h2 className="font-display text-[24px] font-extrabold text-[var(--ink)] leading-tight text-balance">
+                  {isSignedIn ? 'Encrypted Cloud Connected' : 'Back up your ledger for free'}
+                </h2>
+                <p className="text-xs font-medium text-[var(--ink-muted)] leading-relaxed">
+                  {isSignedIn
+                    ? `Signed in as ${verifiedIdentity || 'your account'}. All ledger records are end-to-end encrypted.`
+                    : 'Sign in with Google or Email Link for multi-device encrypted sync, or continue offline on this device.'}
+                </p>
+              </div>
+
+              <div className="w-full ios27-inset-group rounded-[26px] p-4 space-y-2.5 text-left">
+                {isSignedIn ? (
+                  <div className="min-h-[48px] px-4 rounded-2xl bg-[var(--debit-tint)] text-[var(--debit-green)] font-extrabold text-sm flex items-center justify-center gap-2">
+                    <Check className="w-4 h-4" />
+                    <span className="truncate">Signed In · {verifiedIdentity || 'Synced'}</span>
+                  </div>
+                ) : (
+                  <>
                     <motion.button
-                      whileTap={{ scale: 0.97 }}
+                      whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
                       transition={SPRING_TACTILE}
                       type="button"
                       disabled={authBusy}
                       onClick={() => {
                         haptics.tap();
                         setLocalError('');
-                        setShowEmailForm(true);
+                        void onGoogleSignIn?.();
                       }}
-                      className="w-full min-h-[46px] px-4 rounded-2xl bg-[var(--app-bg)] text-[var(--ink)] font-display font-bold text-sm flex items-center justify-center gap-2"
+                      className="tactile-key-primary w-full min-h-[50px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-display font-extrabold text-sm flex items-center justify-center gap-2.5 disabled:opacity-60 cursor-pointer"
                     >
-                      <Mail className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
-                      <span>Continue with Email Link</span>
+                      <span className="w-5 h-5 rounded-full bg-white text-[#4F46E5] font-black text-xs flex items-center justify-center">
+                        G
+                      </span>
+                      <span>{authBusy ? 'Connecting...' : 'Continue with Google (Gmail)'}</span>
                     </motion.button>
-                  ) : (
-                    <div className="rounded-2xl bg-[var(--app-bg)] p-3 space-y-2">
-                      {emailLinkSentTo ? (
-                        <div className="text-xs font-bold text-[var(--debit-green)] bg-[var(--debit-tint)] rounded-xl p-2.5 text-center">
-                          Sign-in link sent to <span className="underline">{emailLinkSentTo}</span>. Open that email on this browser to finish connecting.
-                        </div>
-                      ) : (
-                        <>
+
+                    {!showEmailForm ? (
+                      <motion.button
+                        whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                        transition={SPRING_TACTILE}
+                        type="button"
+                        disabled={authBusy}
+                        onClick={() => {
+                          haptics.tap();
+                          setLocalError('');
+                          setShowEmailForm(true);
+                        }}
+                        className="w-full min-h-[46px] px-4 rounded-2xl bg-[var(--app-bg)] text-[var(--ink)] font-display font-bold text-sm flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Mail className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
+                        <span>Continue with Email Link</span>
+                      </motion.button>
+                    ) : (
+                      <div className="rounded-2xl bg-[var(--app-bg)] p-3 space-y-2">
+                        {emailLinkSentTo ? (
+                          <div className="text-xs font-bold text-[var(--debit-green)] bg-[var(--debit-tint)] rounded-xl p-2.5 text-center">
+                            Sign-in link sent to <span className="underline">{emailLinkSentTo}</span>.
+                            Open it on this device to connect.
+                          </div>
+                        ) : (
                           <div className="flex gap-2">
                             <input
                               type="email"
@@ -262,7 +310,7 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                                 if (e.key === 'Enter' && !authBusy) void handleEmailSubmit();
                               }}
                               placeholder="you@gmail.com"
-                              className="flex-1 min-h-[42px] rounded-xl bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                              className="flex-1 min-h-[44px] rounded-xl bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                             />
                             <button
                               type="button"
@@ -271,178 +319,178 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                                 haptics.tap();
                                 void handleEmailSubmit();
                               }}
-                              className="min-h-[42px] px-3.5 rounded-xl bg-[var(--brand)] text-white text-xs font-extrabold disabled:opacity-60"
+                              className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-white text-xs font-extrabold disabled:opacity-60"
                             >
                               {authBusy ? '...' : 'Send'}
                             </button>
                           </div>
-                        </>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    )}
 
-                  {/* 3. Optional +91 Mobile OTP */}
-                  <button
+                    <button
+                      type="button"
+                      disabled={authBusy}
+                      onClick={() => {
+                        haptics.tap();
+                        onOpenPhoneSignIn?.();
+                      }}
+                      className="w-full min-h-[44px] px-3 rounded-xl text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center gap-1.5 transition"
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Or verify with +91 Mobile OTP</span>
+                    </button>
+
+                    {combinedError && (
+                      <p
+                        role="alert"
+                        className="rounded-xl bg-[var(--credit-tint)] px-3 py-2 text-xs font-bold text-[var(--credit-red)]"
+                      >
+                        {combinedError}
+                      </p>
+                    )}
+                  </>
+                )}
+
+                <div className="pt-1 border-t border-[var(--surface-border)]">
+                  <motion.button
+                    whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
+                    transition={SPRING_TACTILE}
                     type="button"
-                    disabled={authBusy}
                     onClick={() => {
                       haptics.tap();
-                      onOpenPhoneSignIn?.();
+                      setStep(3);
                     }}
-                    className="w-full min-h-[42px] px-3 rounded-xl text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center gap-1.5"
+                    className="w-full min-h-[46px] px-4 rounded-2xl bg-[var(--surface-subtle)] text-[var(--ink)] font-display font-extrabold text-sm flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <Smartphone className="w-3.5 h-3.5" />
-                    <span>Or verify with +91 Mobile OTP</span>
-                  </button>
+                    <span>{isSignedIn ? 'Choose Workspace Mode' : 'Skip & Continue as Guest'}</span>
+                    <ArrowRight className="w-4 h-4 text-[var(--ink-muted)]" />
+                  </motion.button>
+                </div>
+              </div>
 
-                  {combinedError && (
-                    <p
-                      role="alert"
-                      className="rounded-xl bg-[var(--credit-tint)] px-3 py-2 text-xs font-bold text-[var(--credit-red)]"
-                    >
-                      {combinedError}
-                    </p>
-                  )}
-                </>
-              )}
-
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                transition={SPRING_TACTILE}
-                type="button"
-                onClick={() => {
-                  haptics.tap();
-                  setStep(3);
-                }}
-                className="w-full min-h-[46px] px-4 rounded-2xl bg-[var(--surface-subtle)] text-[var(--ink)] font-display font-extrabold text-sm flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span>{isSignedIn ? 'Choose Workspace Mode' : 'Skip & Continue as Guest'}</span>
-                <ArrowRight className="w-4 h-4 text-[var(--ink-muted)]" />
-              </motion.button>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="onboarding-step-3"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="flex-1 flex flex-col justify-center py-4 space-y-4"
-          >
-            <div className="space-y-1 text-center">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
-                Workspace Modes
+              <p className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[var(--ink-muted)]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[var(--debit-green)] shrink-0" />
+                <span>End-to-end AES-256 encrypted before leaving your device</span>
               </p>
-              <h2 className="font-display text-2xl font-extrabold text-[var(--ink)]">
-                How will you use Ucred?
-              </h2>
-              <p className="text-xs font-semibold text-[var(--ink-muted)]">
-                Select one or more workspaces — you can switch anytime from the top bar.
-              </p>
-            </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="onboarding-step-3"
+              initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -14 }}
+              transition={{ duration: 0.26, ease: STEP_EASE }}
+              className="flex-1 flex flex-col justify-center py-6 space-y-5"
+            >
+              <div className="space-y-1.5 text-center">
+                <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
+                  Workspace Setup
+                </p>
+                <h2 className="font-display text-2xl font-extrabold text-[var(--ink)]">
+                  How will you use Ucred?
+                </h2>
+                <p className="text-xs font-medium text-[var(--ink-muted)]">
+                  Select one or more modes — switch anytime from the top bar.
+                </p>
+              </div>
 
-            <div className="grid grid-cols-1 gap-3">
-              {PERSONA_OPTIONS.map((opt, index) => {
-                const Icon = PERSONA_ICONS[opt.id];
-                const isSelected = selected.includes(opt.id);
-                return (
-                  <motion.button
-                    key={opt.id}
-                    type="button"
-                    aria-label={`${opt.title}: ${opt.subtitle}`}
-                    aria-pressed={isSelected}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...SPRING_TACTILE, delay: index * 0.04 }}
-                    whileTap={{ scale: 0.97, y: 1 }}
-                    onClick={() => toggleCategory(opt.id)}
-                    className={`w-full rounded-[22px] p-4 flex items-center justify-between gap-3 text-left transition-colors ${
-                      isSelected
-                        ? 'bg-[var(--surface)] ring-2 ring-[var(--brand)] shadow-[var(--spatial-shadow)]'
-                        : 'bg-[var(--surface)] opacity-85 shadow-[var(--spatial-shadow)]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <span
-                        style={{
-                          backgroundColor: isSelected ? opt.accentHex : opt.tintBg,
-                          color: isSelected ? '#FFFFFF' : opt.accentHex,
-                        }}
-                        className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors"
-                      >
-                        <Icon className="w-5 h-5" />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-display text-sm font-extrabold text-[var(--ink)] leading-snug">
-                          {opt.title}
-                        </p>
-                        <p className="text-[11px] font-semibold text-[var(--ink-muted)] leading-snug mt-0.5">
-                          {opt.subtitle}
-                        </p>
-                      </div>
-                    </div>
-
-                    <motion.span
-                      animate={{ scale: isSelected ? 1.06 : 0.94 }}
-                      transition={SPRING_TACTILE}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-                        isSelected
-                          ? 'bg-[var(--debit-green)] text-white shadow-sm'
-                          : 'bg-[var(--surface-subtle)] text-transparent'
+              <div className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
+                {PERSONA_OPTIONS.map((opt) => {
+                  const Icon = PERSONA_ICONS[opt.id];
+                  const isSelected = selected.includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      aria-label={`${opt.title}: ${opt.subtitle}`}
+                      aria-pressed={isSelected}
+                      onClick={() => toggleCategory(opt.id)}
+                      className={`w-full min-h-[68px] px-4 py-3.5 flex items-center justify-between gap-3 text-left transition-colors active:bg-[var(--surface-subtle)] ${
+                        isSelected ? 'bg-[var(--brand-tint)]/40' : 'bg-transparent'
                       }`}
                     >
-                      <Check className="w-4 h-4 stroke-[3]" />
-                    </motion.span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <span
+                          style={{
+                            backgroundColor: isSelected ? opt.accentHex : opt.tintBg,
+                            color: isSelected ? '#FFFFFF' : opt.accentHex,
+                          }}
+                          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors"
+                        >
+                          <Icon className="w-5 h-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-display text-sm font-extrabold text-[var(--ink)] leading-snug">
+                            {opt.title}
+                          </p>
+                          <p className="text-[11px] font-medium text-[var(--ink-muted)] leading-snug mt-0.5">
+                            {opt.subtitle}
+                          </p>
+                        </div>
+                      </div>
 
-      {/* Bottom 3D Tactile CTA */}
-      <div className="pt-3 pb-safe space-y-2">
-        {step === 1 ? (
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.96, y: 1 }}
-            transition={SPRING_TACTILE}
-            onClick={() => {
-              haptics.tap();
-              setStep(2);
-            }}
-            style={{ background: 'var(--munim-gradient)' }}
-            className="tactile-key-primary w-full min-h-[54px] rounded-full text-white font-display font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <span>Get Started</span>
-            <ArrowRight className="w-5 h-5" />
-          </motion.button>
-        ) : step === 2 ? (
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              setStep(3);
-            }}
-            className="w-full min-h-[42px] text-xs font-extrabold text-[var(--ink-muted)] hover:text-[var(--ink)] transition"
-          >
-            Skip Sign-In &amp; Choose Workspace &rarr;
-          </button>
-        ) : (
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.96, y: 1 }}
-            transition={SPRING_TACTILE}
-            onClick={() => finishOnboarding(selected)}
-            style={{ background: 'var(--munim-gradient)' }}
-            className="tactile-key-primary w-full min-h-[54px] rounded-full text-white font-display font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <span>Launch Ucred ({selected.length})</span>
-            <ArrowRight className="w-5 h-5" />
-          </motion.button>
-        )}
+                      <motion.span
+                        animate={
+                          prefersReducedMotion ? undefined : { scale: isSelected ? 1 : 0.88 }
+                        }
+                        transition={SPRING_TACTILE}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected
+                            ? 'bg-[var(--brand)] text-white'
+                            : 'border-2 border-[var(--surface-border)] text-transparent'
+                        }`}
+                      >
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </motion.span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Bottom Tactile CTA */}
+        <div className="pt-3 pb-safe space-y-2">
+          {step === 1 ? (
+            <motion.button
+              type="button"
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+              transition={SPRING_TACTILE}
+              onClick={() => {
+                haptics.tap();
+                setStep(2);
+              }}
+              className="tactile-key-primary w-full min-h-[54px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-display font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Get Started</span>
+              <ArrowRight className="w-5 h-5" />
+            </motion.button>
+          ) : step === 2 ? (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                setStep(3);
+              }}
+              className="w-full min-h-[44px] text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] transition"
+            >
+              Skip Sign-In &amp; Choose Workspace &rarr;
+            </button>
+          ) : (
+            <motion.button
+              type="button"
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+              transition={SPRING_TACTILE}
+              onClick={() => finishOnboarding(selected)}
+              className="tactile-key-primary w-full min-h-[54px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-display font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Launch Ucred ({selected.length})</span>
+              <ArrowRight className="w-5 h-5" />
+            </motion.button>
+          )}
+        </div>
       </div>
     </div>
   );

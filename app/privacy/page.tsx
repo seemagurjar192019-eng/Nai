@@ -33,24 +33,24 @@ export default function PrivacyPolicyPage() {
             Ucred Privacy Policy
           </h1>
           <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-            Ucred (&ldquo;Smart Voice Ledger &amp; Cashbook&rdquo;), operated by Naitik Web Studio, helps merchants and individuals manage credits, payments, bills, inventory, cashbook records, and counter logs. You can use Instant Guest Mode immediately on-device or optionally sign in via Google, Email Verification Link, or +91 Mobile OTP for private cloud backup.
+            Ucred (&ldquo;Voice Ledger &amp; Cashbook OS&rdquo;), operated by Naitik Web Studio, helps merchants and individuals manage credits, payments, bills, inventory, cashbook records, and counter logs. You can use Instant Guest Mode immediately on-device or optionally sign in via Google, Email Verification Link, or +91 Mobile OTP for zero-knowledge encrypted cloud backup.
           </p>
         </header>
 
         <section className="space-y-2.5">
           <h2 className="font-display text-base font-bold text-[var(--ink)] flex items-center gap-2">
             <Database className="h-4 w-4 text-[var(--brand-accent)]" />
-            1. Local Guest Storage &amp; Optional Cloud Accounts
+            1. Zero-Knowledge Local &amp; Cloud Vault Storage
           </h2>
           <ul className="list-disc pl-5 text-sm text-[var(--ink-muted)] space-y-1.5 leading-relaxed">
             <li>
-              <strong className="text-[var(--ink)]">Instant Guest Mode (On-Device):</strong> When used without signing in, your workspace, contacts, transactions, cashbook, stock, and bills stay strictly on your device via browser local storage. Zero phone number or email is required to start.
+              <strong className="text-[var(--ink)]">Instant Guest Mode (AES-256-GCM On-Device):</strong> When used without signing in, your workspace, contacts, transactions, cashbook, stock, and bills stay strictly on your device encrypted with a 256-bit AES-GCM device key stored inside browser IndexedDB.
             </li>
             <li>
-              <strong className="text-[var(--ink)]">Optional Authentication (Google, Email Link, or +91 OTP):</strong> If you choose Cloud Sync, Firebase Authentication verifies your Gmail address, email verification link, or +91 mobile number solely to scope, merge, and safeguard your ledger across devices.
+              <strong className="text-[var(--ink)]">Optional Authentication (Google, Email Link, or +91 OTP):</strong> If you choose Cloud Sync, Firebase Authentication verifies your Gmail address, email verification link, or +91 mobile number solely to scope, merge, and safeguard your encrypted ledger across devices.
             </li>
             <li>
-              <strong className="text-[var(--ink)]">Ledger &amp; Merchant Records:</strong> Business profile, GSTIN, UPI ID, customer/supplier accounts, promise-to-pay dates, transactions, GST bills, stock inventory, cashbook entries, counter staff profiles/logs, and receipt images you attach.
+              <strong className="text-[var(--ink)]">On-Device Screen Protections:</strong> Optional 4-digit App Lock PIN (salted PBKDF2-SHA256 with persistent lockout protection), Device Biometric Passkey (WebAuthn), Idle Auto-Lock Timer, and Window Privacy Curtain never transmit biometric data off your device.
             </li>
             <li>
               <strong className="text-[var(--ink)]">Merchant Responsibility for Contact Details:</strong> Under India&apos;s Digital Personal Data Protection (DPDP) Act 2023, you represent that you have a lawful basis and customer consent to store party names, phone numbers, and ledger balances for legitimate business accounting.
@@ -64,7 +64,7 @@ export default function PrivacyPolicyPage() {
             2. Microphone &amp; Camera Access (Just-In-Time Only)
           </h2>
           <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-            <strong className="text-[var(--ink)]">Microphone:</strong> Activated only when you tap the Speak-to-Save orb or Counter Mode. Standard English, Hindi, and Hinglish entries parse offline on your device. Only complex spoken text transcripts are transmitted securely over HTTPS to our Gemini AI parsing endpoint—never raw audio files and never for advertising.
+            <strong className="text-[var(--ink)]">Microphone:</strong> Activated only when you tap Speak to Save or Hands-Free Counter Mode. Standard English, Hindi, and Hinglish entries parse offline on your device. Only complex spoken text transcripts are transmitted securely over HTTPS to our cloud parsing endpoint—never raw audio files and never for advertising.
           </p>
           <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
             <strong className="text-[var(--ink)]">Camera &amp; Photos:</strong> Activated only when you tap &ldquo;Take Photo&rdquo; or &ldquo;Upload&rdquo; inside the Receipt Scanner or attach a receipt to an entry. Compressed slip images are sent over HTTPS solely to extract party names, items, and totals into your ledger.
@@ -74,11 +74,11 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-2.5">
           <h2 className="font-display text-base font-bold text-[var(--ink)] flex items-center gap-2">
             <Lock className="h-4 w-4 text-[var(--brand-accent)]" />
-            3. Cloud Infrastructure, Security &amp; Third-Party Services
+            3. Zero-Knowledge Encryption &amp; Third-Party Services
           </h2>
           <ul className="list-disc pl-5 text-sm text-[var(--ink-muted)] space-y-1.5 leading-relaxed">
             <li>
-              <strong className="text-[var(--ink)]">Google Cloud Firestore &amp; Gemini API:</strong> Signed-in cloud records are stored inside Google Cloud Firestore scoped strictly to your authenticated UID, and salted SHA-256 hashes protect any 4-digit App Lock or Staff PINs. AI parsing and receipt OCR utilize Google Gemini servers securely over TLS.
+              <strong className="text-[var(--ink)]">Client-Side AES-256-GCM + PBKDF2-SHA256:</strong> Party names, mobile numbers, transaction notes, receipt attachments, bill details, and cashbook descriptions are encrypted on your device before syncing to Cloud Firestore scoped strictly to your authenticated UID. App Lock and Staff PINs are hashed with salted PBKDF2-SHA256.
             </li>
             <li>
               <strong className="text-[var(--ink)]">No Data Selling &amp; No Ads:</strong> Ucred never sells, rents, or shares your customer phone numbers, credit balances, or sales with advertisers, brokers, or credit bureaus.
@@ -97,8 +97,7 @@ export default function PrivacyPolicyPage() {
           <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
             <strong className="text-[var(--ink)]">Data Fiduciary / Developer:</strong> Naitik Web Studio (Ucred).<br />
             <strong className="text-[var(--ink)]">Grievance Officer &amp; Privacy Contact:</strong>{' '}
-            <span className="font-bold text-[var(--ink)]">naitik.webstudio45@gmail.com</span> /{' '}
-            <span className="font-bold text-[var(--ink)]">support@ucred.app</span>. Requests regarding access, correction, or erasure are addressed promptly within 7 business days.
+            <span className="font-bold text-[var(--ink)]">naitik.webstudio45@gmail.com</span>. Requests regarding access, correction, or erasure are addressed promptly within 7 business days.
           </p>
         </section>
 

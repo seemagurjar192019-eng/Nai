@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   deleteUser,
@@ -26,6 +26,7 @@ import {
   CloudUpload,
   Edit2,
   KeyRound,
+  Lock,
   Mail,
   Package,
   Plus,
@@ -38,6 +39,20 @@ import {
   X,
 } from 'lucide-react';
 import { indianMobileSchema, otpCodeSchema } from '@/lib/design-system';
+import {
+  base64ToBytes,
+  bytesToBase64,
+  clearDeviceDekBytes,
+  generateDekBytes,
+  getOrCreateDeviceDekBytes,
+  importDekKey,
+  persistDeviceDekBytes,
+  unwrapDekAutoForUid,
+  unwrapDekWithPin,
+  wrapDekAutoForUid,
+  wrapDekWithPin,
+  type VaultKeyEnvelope,
+} from '@/lib/e2ee';
 import { auth, testConnection } from '@/lib/firebase';
 import {
   addCashbookEntry,
@@ -55,12 +70,14 @@ import {
   deleteTransactionAtomic,
   deleteUserAccountCascade,
   getUserProfile,
+  getVaultKeyEnvelope,
   recordActivityLog,
   restoreBusinessBackup,
   restoreTransactionAtomic,
   saveBillDocument,
   saveStaffMember,
   saveStockItem,
+  saveVaultKeyEnvelope,
   subscribeAccounts,
   subscribeActivityLogs,
   subscribeBills,
@@ -76,6 +93,7 @@ import {
 } from '@/lib/firestore-service';
 import {
   GUEST_OWNER_ID,
+  GUEST_VAULT_STORAGE_KEY,
   applyAddCashbookEntry,
   applyAddTransactionAtomic,
   applyClearBusinessData,
@@ -90,7 +108,6 @@ import {
   applyDeleteStockItem,
   applyDeleteTransactionAtomic,
   applyRecordActivityLog,
-  applyRestoreBusinessBackup,
   applyRestoreTransactionAtomic,
   applySaveBillDocument,
   applySaveStaffMember,
@@ -99,9 +116,11 @@ import {
   applyUpdateBusiness,
   applyUpdateTransactionAtomic,
   clearGuestVault,
+  createInitialGuestVault,
   hasGuestRecordsToSync,
+  loadEncryptedGuestVault,
   loadGuestVault,
-  saveGuestVault,
+  saveEncryptedGuestVault,
   type GuestVaultState,
 } from '@/lib/guest-store';
 import {
@@ -145,8 +164,10 @@ import type {
   UserProfile,
 } from '@/lib/types';
 import type { MainTab } from '@/types';
+import { useLedgerBackup } from '@/hooks/useLedgerBackup';
 import { usePersonaGate } from '@/hooks/usePersonaGate';
 import { useSpatialMotion } from '@/hooks/useSpatialMotion';
+import { useVaultSecurity } from '@/hooks/useVaultSecurity';
 import { haptics } from '@/utils/haptics';
 import {
   getPersonaCapabilities,
@@ -179,6 +200,7 @@ import {
 } from './SecondaryViews';
 import { StaffAuditView } from './StaffAuditView';
 import { StockView } from './StockView';
+import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
 import { VoiceMunimSheet } from './voice/VoiceMunimSheet';
 
 type NotifPrefsMap = Record<string, { read?: boolean; fav?: boolean }>;
@@ -210,22 +232,70 @@ function needsRecentSignIn(lastSignInTime?: string): boolean {
 }
 
 function BolBahiAppInner() {
-  // Instant Guest Vault loaded synchronously on client mount (zero forced login wall)
-  const [guestVault, setGuestVault] = useState<GuestVaultState>(() =>
-    loadGuestVault(readPreloginPrefs())
-  );
+  // Instant Guest Vault loaded synchronously (migrating into AES-256-GCM encrypted vault on mount)
+  const [guestVault, setGuestVault] = useState<GuestVaultState>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        if (window.localStorage.getItem(GUEST_VAULT_STORAGE_KEY)) {
+          return loadGuestVault(readPreloginPrefs());
+        }
+      } catch {
+        // Ignore storage inspection error
+      }
+    }
+    return createInitialGuestVault(readPreloginPrefs());
+  });
   const guestVaultRef = useRef<GuestVaultState>(guestVault);
+  const guestDekRef = useRef<CryptoKey | null>(null);
+  const guestDekPromiseRef = useRef<Promise<CryptoKey | null> | null>(null);
 
-  const updateGuestVault = (updater: (prev: GuestVaultState) => GuestVaultState): GuestVaultState => {
-    const next = saveGuestVault(updater(guestVaultRef.current));
-    guestVaultRef.current = next;
-    setGuestVault(next);
-    return next;
-  };
+  const ensureGuestDek = useCallback(async (): Promise<CryptoKey | null> => {
+    if (guestDekRef.current) return guestDekRef.current;
+    if (!guestDekPromiseRef.current) {
+      guestDekPromiseRef.current = (async () => {
+        try {
+          const bytes = await getOrCreateDeviceDekBytes('guest');
+          const key = await importDekKey(bytes);
+          guestDekRef.current = key;
+          return key;
+        } catch {
+          return null;
+        }
+      })();
+    }
+    return guestDekPromiseRef.current;
+  }, []);
 
-  // Firebase Auth & Cloud state (completely optional)
+  const commitGuestVault = useCallback(
+    (next: GuestVaultState): GuestVaultState => {
+      guestVaultRef.current = next;
+      setGuestVault(next);
+      void ensureGuestDek().then((dek) => saveEncryptedGuestVault(dek, next));
+      return next;
+    },
+    [ensureGuestDek]
+  );
+
+  const updateGuestVault = useCallback(
+    (updater: (prev: GuestVaultState) => GuestVaultState): GuestVaultState => {
+      const next = updater(guestVaultRef.current);
+      return commitGuestVault(next);
+    },
+    [commitGuestVault]
+  );
+
+  // Firebase Auth & E2EE Cloud Vault state (completely optional)
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [cloudDek, setCloudDek] = useState<CryptoKey | null>(null);
+  const cloudDekBytesRef = useRef<Uint8Array | null>(null);
+  const [vaultEnvelope, setVaultEnvelope] = useState<VaultKeyEnvelope | null>(null);
+  const [vaultMode, setVaultMode] = useState<'auto' | 'pin'>('auto');
+  const [dekResolvedForUid, setDekResolvedForUid] = useState<string | null>(null);
+  const [cloudVaultUnlockOpen, setCloudVaultUnlockOpen] = useState(false);
+  const [vaultUnlockPin, setVaultUnlockPin] = useState('');
+  const [vaultUnlockError, setVaultUnlockError] = useState('');
+  const [vaultUnlockBusy, setVaultUnlockBusy] = useState(false);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [businessesLoadedForUid, setBusinessesLoadedForUid] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<LedgerAccount[]>([]);
@@ -253,8 +323,7 @@ function BolBahiAppInner() {
   const [authError, setAuthError] = useState('');
   const [syncSuccessMsg, setSyncSuccessMsg] = useState('');
 
-  // PIN lock & OTP re-auth state
-  const [pinUnlocked, setPinUnlocked] = useState(true);
+  // OTP re-auth state
   const [reauthOtpTarget, setReauthOtpTarget] = useState<'delete-account' | 'forgot-pin' | null>(
     null
   );
@@ -293,7 +362,7 @@ function BolBahiAppInner() {
   const [personaOnboardingStep, setPersonaOnboardingStep] = useState<1 | 2 | 3>(1);
   const [showAllModes, setShowAllModes] = useState(false);
 
-  // Voice, Counter Mode, AI Parchi Scanner & Bill Drafts
+  // Voice, Counter Mode, Receipt Scanner & Bill Drafts
   const [hideBalance, setHideBalance] = useState(false);
   const [accentTheme, setAccentTheme] = useState<ThemeAccentId>(() => {
     if (typeof window === 'undefined') return 'sapphire';
@@ -365,6 +434,28 @@ function BolBahiAppInner() {
       : profile?.activeBusinessId;
     return activeBusinesses.find((b) => b.id === targetId) || activeBusinesses[0];
   }, [isGuestMode, guestVault.profile.activeBusinessId, profile?.activeBusinessId, activeBusinesses]);
+
+  const {
+    pinUnlocked,
+    setPinUnlocked,
+    autoLockSeconds,
+    changeAutoLockSeconds,
+    privacyCurtainEnabled,
+    privacyCurtainVisible,
+    togglePrivacyCurtain,
+    dismissPrivacyCurtain,
+    webAuthnSupported,
+    passkeyEnabled,
+    togglePasskey,
+    verifyPasskeyUnlock,
+    getRecoveryKeyBase64,
+    resetDeviceSecurityState,
+  } = useVaultSecurity({
+    appLockPin,
+    activeLabel: currentBusiness?.name || 'Ucred Shop Owner',
+    cloudDekBytesRef,
+    isGuestMode,
+  });
 
   const activeAccounts = useMemo(
     () =>
@@ -469,13 +560,102 @@ function BolBahiAppInner() {
     };
   }, []);
 
-  // Merge local guest records into Firestore when authenticating
+  // Hydrate encrypted Guest Vault on mount (migrating legacy plaintext vaults transparently)
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const dek = await ensureGuestDek();
+      const hydrated = await loadEncryptedGuestVault(dek, readPreloginPrefs());
+      if (cancelled) return;
+      guestVaultRef.current = hydrated;
+      setGuestVault(hydrated);
+      if (hydrated.profile.appLockPin) {
+        setPinUnlocked(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ensureGuestDek, setPinUnlocked]);
+
+  // Resolve or bootstrap zero-knowledge E2EE Data Encryption Key (DEK) for signed-in users
+  const resolveCloudDekForUid = async (
+    uid: string
+  ): Promise<{ dek: CryptoKey | null; needsPin: boolean }> => {
+    const env = await getVaultKeyEnvelope(uid);
+    if (!env) {
+      const bytes = await generateDekBytes();
+      const autoEnv = await wrapDekAutoForUid(bytes, uid);
+      await saveVaultKeyEnvelope(uid, autoEnv);
+      await persistDeviceDekBytes(uid, bytes);
+      const key = await importDekKey(bytes);
+      cloudDekBytesRef.current = bytes;
+      setCloudDek(key);
+      setVaultEnvelope(autoEnv);
+      setVaultMode('auto');
+      setDekResolvedForUid(uid);
+      setCloudVaultUnlockOpen(false);
+      return { dek: key, needsPin: false };
+    }
+
+    if (env.mode === 'auto') {
+      const bytes = await unwrapDekAutoForUid(env, uid);
+      await persistDeviceDekBytes(uid, bytes);
+      const key = await importDekKey(bytes);
+      cloudDekBytesRef.current = bytes;
+      setCloudDek(key);
+      setVaultEnvelope(env);
+      setVaultMode('auto');
+      setDekResolvedForUid(uid);
+      setCloudVaultUnlockOpen(false);
+      return { dek: key, needsPin: false };
+    }
+
+    // Custom Cloud Sync Vault PIN mode: check active browser tab session cache first
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedB64 = window.sessionStorage.getItem(`ucred_vault_session_${uid}`);
+        if (cachedB64) {
+          const bytes = base64ToBytes(cachedB64);
+          if (bytes.byteLength === 32) {
+            const key = await importDekKey(bytes);
+            cloudDekBytesRef.current = bytes;
+            setCloudDek(key);
+            setVaultEnvelope(env);
+            setVaultMode('pin');
+            setDekResolvedForUid(uid);
+            setCloudVaultUnlockOpen(false);
+            return { dek: key, needsPin: false };
+          }
+        }
+      } catch {
+        // Ignore invalid cached key
+      }
+    }
+
+    cloudDekBytesRef.current = null;
+    setCloudDek(null);
+    setVaultEnvelope(env);
+    setVaultMode('pin');
+    setDekResolvedForUid(null);
+    setVaultUnlockPin('');
+    setVaultUnlockError('');
+    setCloudVaultUnlockOpen(true);
+    return { dek: null, needsPin: true };
+  };
+
+  // Merge local guest records into Firestore when authenticating (encrypting with user DEK)
   const mergeGuestVaultIntoFirestore = async (
     uid: string,
     phoneDigits: string,
-    existingProfile: UserProfile | null
+    existingProfile: UserProfile | null,
+    dek: CryptoKey | null
   ): Promise<UserProfile> => {
-    const localSnapshot = loadGuestVault();
+    const gDek = await ensureGuestDek();
+    const localSnapshot =
+      guestVaultRef.current.accounts.length > 0 || guestVaultRef.current.transactions.length > 0
+        ? guestVaultRef.current
+        : await loadEncryptedGuestVault(gDek, readPreloginPrefs());
     const hasRecords = hasGuestRecordsToSync(localSnapshot);
     let mergedActiveBizId = existingProfile?.activeBusinessId || '';
 
@@ -503,11 +683,15 @@ function BolBahiAppInner() {
 
         if (isUntouchedStarter) continue;
 
-        const createdBiz = await createBusiness(uid, {
-          name: guestBiz.name || 'My Store',
-          phone: guestBiz.phone || phoneDigits,
-          upiId: guestBiz.upiId,
-        });
+        const createdBiz = await createBusiness(
+          uid,
+          {
+            name: guestBiz.name || 'My Store',
+            phone: guestBiz.phone || phoneDigits,
+            upiId: guestBiz.upiId,
+          },
+          dek
+        );
 
         if (
           guestBiz.gstNumber ||
@@ -517,14 +701,18 @@ function BolBahiAppInner() {
           guestBiz.email ||
           guestBiz.about
         ) {
-          await updateBusiness(createdBiz.id, {
-            gstNumber: guestBiz.gstNumber,
-            businessType: guestBiz.businessType,
-            category: guestBiz.category,
-            address: guestBiz.address,
-            email: guestBiz.email,
-            about: guestBiz.about,
-          });
+          await updateBusiness(
+            createdBiz.id,
+            {
+              gstNumber: guestBiz.gstNumber,
+              businessType: guestBiz.businessType,
+              category: guestBiz.category,
+              address: guestBiz.address,
+              email: guestBiz.email,
+              about: guestBiz.about,
+            },
+            dek
+          );
         }
 
         if (
@@ -534,13 +722,18 @@ function BolBahiAppInner() {
           bizStock.length > 0 ||
           bizCb.length > 0
         ) {
-          await restoreBusinessBackup(uid, createdBiz.id, {
-            accounts: bizAccs,
-            transactions: bizTxs,
-            bills: bizBills,
-            stockItems: bizStock,
-            cashbookEntries: bizCb,
-          });
+          await restoreBusinessBackup(
+            uid,
+            createdBiz.id,
+            {
+              accounts: bizAccs,
+              transactions: bizTxs,
+              bills: bizBills,
+              stockItems: bizStock,
+              cashbookEntries: bizCb,
+            },
+            dek
+          );
         }
 
         for (const st of bizStaff) {
@@ -552,6 +745,7 @@ function BolBahiAppInner() {
             phone: st.phone,
             pinHash: st.pinHash,
             active: st.active,
+            dek,
           });
         }
 
@@ -570,14 +764,85 @@ function BolBahiAppInner() {
     });
 
     clearGuestVault();
-    const freshGuest = loadGuestVault({
+    const freshGuest = createInitialGuestVault({
       language: saved.language,
       appearance: saved.appearance,
       mobileNumber: saved.mobileNumber,
     });
-    guestVaultRef.current = freshGuest;
-    setGuestVault(freshGuest);
+    commitGuestVault(freshGuest);
     return saved;
+  };
+
+  const handleUnlockCloudVault = async () => {
+    if (!user || !vaultEnvelope) return;
+    const cleanPin = vaultUnlockPin.trim();
+    if (cleanPin.length < 4) {
+      setVaultUnlockError('Enter your 4+ character Vault PIN.');
+      return;
+    }
+    setVaultUnlockError('');
+    setVaultUnlockBusy(true);
+    try {
+      const bytes = await unwrapDekWithPin(vaultEnvelope, cleanPin);
+      const key = await importDekKey(bytes);
+      cloudDekBytesRef.current = bytes;
+      if (typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.setItem(`ucred_vault_session_${user.uid}`, bytesToBase64(bytes));
+        } catch {
+          // Ignore session storage errors
+        }
+      }
+      setCloudDek(key);
+      setDekResolvedForUid(user.uid);
+      setCloudVaultUnlockOpen(false);
+      setVaultUnlockPin('');
+      if (hasGuestRecordsToSync(guestVaultRef.current)) {
+        const existing = await getUserProfile(user.uid);
+        const saved = await mergeGuestVaultIntoFirestore(user.uid, mobileNumber, existing, key);
+        setProfile(saved);
+      }
+    } catch {
+      setVaultUnlockError('Incorrect Vault PIN. Zero-knowledge encryption cannot be bypassed.');
+    } finally {
+      setVaultUnlockBusy(false);
+    }
+  };
+
+  const handleConfigureVaultMode = async (mode: 'auto' | 'pin', vaultPin?: string) => {
+    if (!user) {
+      throw new Error('Sign in with free Cloud Backup first to manage Cloud Sync Vault PIN.');
+    }
+    const bytes = cloudDekBytesRef.current || (await generateDekBytes());
+    if (mode === 'pin') {
+      const env = await wrapDekWithPin(bytes, vaultPin || '');
+      await saveVaultKeyEnvelope(user.uid, env);
+      cloudDekBytesRef.current = bytes;
+      if (typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.setItem(`ucred_vault_session_${user.uid}`, bytesToBase64(bytes));
+        } catch {
+          // Ignore sessionStorage failures
+        }
+      }
+      setVaultEnvelope(env);
+      setVaultMode('pin');
+      return;
+    }
+
+    const autoEnv = await wrapDekAutoForUid(bytes, user.uid);
+    await saveVaultKeyEnvelope(user.uid, autoEnv);
+    await persistDeviceDekBytes(user.uid, bytes);
+    cloudDekBytesRef.current = bytes;
+    if (typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.removeItem(`ucred_vault_session_${user.uid}`);
+      } catch {
+        // Ignore sessionStorage cleanup error
+      }
+    }
+    setVaultEnvelope(autoEnv);
+    setVaultMode('auto');
   };
 
   // Register Service Worker, hydrate notification prefs, and capture PWA shortcut params
@@ -637,13 +902,20 @@ function BolBahiAppInner() {
               }
               window.history.replaceState(null, '', '/');
               const existing = await getUserProfile(cred.user.uid);
-              const saved = await mergeGuestVaultIntoFirestore(
-                cred.user.uid,
-                mobileNumber,
-                existing
-              );
-              setProfile(saved);
-              if (!saved.appLockPin) setPinUnlocked(true);
+              const { dek, needsPin } = await resolveCloudDekForUid(cred.user.uid);
+              if (!needsPin) {
+                const saved = await mergeGuestVaultIntoFirestore(
+                  cred.user.uid,
+                  mobileNumber,
+                  existing,
+                  dek
+                );
+                setProfile(saved);
+                if (!saved.appLockPin) setPinUnlocked(true);
+              } else if (existing) {
+                setProfile(existing);
+                if (!existing.appLockPin) setPinUnlocked(true);
+              }
               setPersonaOnboardingStep((prev) => (prev === 2 ? 3 : prev));
             })
             .catch((err) => {
@@ -680,6 +952,12 @@ function BolBahiAppInner() {
       setUser(fbUser);
       if (!fbUser) {
         setProfile(null);
+        setCloudDek(null);
+        cloudDekBytesRef.current = null;
+        setVaultEnvelope(null);
+        setVaultMode('auto');
+        setDekResolvedForUid(null);
+        setCloudVaultUnlockOpen(false);
         setBusinesses([]);
         setBusinessesLoadedForUid(null);
         setAccounts([]);
@@ -705,52 +983,66 @@ function BolBahiAppInner() {
       try {
         setAuthError('');
         const existing = await getUserProfile(fbUser.uid);
+        const { dek, needsPin } = await resolveCloudDekForUid(fbUser.uid);
         if (existing && existing.onboardingDone) {
           setProfile(existing);
           if (!existing.appLockPin) setPinUnlocked(true);
           else setPinUnlocked(false);
-        } else {
+        } else if (!needsPin) {
           const merged = await mergeGuestVaultIntoFirestore(
             fbUser.uid,
             authPhoneDigits,
-            existing
+            existing,
+            dek
           );
           setProfile(merged);
           setPinUnlocked(!merged.appLockPin);
+        } else if (existing) {
+          setProfile(existing);
+          setPinUnlocked(!existing.appLockPin);
         }
       } catch (err) {
         setAuthError(err instanceof Error ? err.message : 'Unable to sync cloud profile.');
       }
     });
     return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Subscribe to user's Firestore businesses when signed in
+  // Subscribe to user's Firestore businesses once E2EE DEK is unlocked
   useEffect(() => {
-    if (!user) return;
-    const unsub = subscribeBusinesses(user.uid, async (rows) => {
-      if (rows.length === 0) {
-        try {
-          const created = await createBusiness(user.uid, {
-            name: guestVaultRef.current.businesses[0]?.name || 'My Store',
-            phone: mobileNumber,
-          });
-          const updated = await upsertUserProfile(user.uid, {
-            activeBusinessId: created.id,
-            onboardingDone: true,
-          });
-          setProfile(updated);
-          return;
-        } catch {
-          // Wait for retry
+    if (!user || dekResolvedForUid !== user.uid) return;
+    const unsub = subscribeBusinesses(
+      user.uid,
+      async (rows) => {
+        if (rows.length === 0) {
+          try {
+            const created = await createBusiness(
+              user.uid,
+              {
+                name: guestVaultRef.current.businesses[0]?.name || 'My Store',
+                phone: mobileNumber,
+              },
+              cloudDek
+            );
+            const updated = await upsertUserProfile(user.uid, {
+              activeBusinessId: created.id,
+              onboardingDone: true,
+            });
+            setProfile(updated);
+            return;
+          } catch {
+            // Wait for retry
+          }
         }
-      }
-      setBusinesses(rows);
-      setBusinessesLoadedForUid(user.uid);
-    });
+        setBusinesses(rows);
+        setBusinessesLoadedForUid(user.uid);
+      },
+      cloudDek
+    );
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, dekResolvedForUid, cloudDek]);
 
   const cloudActiveBusiness: Business | null = useMemo(() => {
     if (!isCloudReady) return null;
@@ -758,17 +1050,17 @@ function BolBahiAppInner() {
     return matched || businesses[0] || null;
   }, [isCloudReady, businesses, profile?.activeBusinessId]);
 
-  // Subscribe to active Firestore business collections when Cloud Ready
+  // Subscribe to active Firestore business collections when Cloud Ready & DEK unlocked
   useEffect(() => {
-    if (!user || !cloudActiveBusiness?.id) return;
+    if (!user || !cloudActiveBusiness?.id || dekResolvedForUid !== user.uid) return;
     const bizId = cloudActiveBusiness.id;
-    const u1 = subscribeAccounts(user.uid, bizId, setAccounts);
-    const u2 = subscribeTransactions(user.uid, bizId, setTransactions);
-    const u3 = subscribeBills(user.uid, bizId, setBills);
-    const u4 = subscribeStockItems(user.uid, bizId, setStockItems);
-    const u5 = subscribeCashbookEntries(user.uid, bizId, setCashbookEntries);
-    const u6 = subscribeStaffMembers(user.uid, bizId, setStaffMembers);
-    const u7 = subscribeActivityLogs(user.uid, bizId, setActivityLogs);
+    const u1 = subscribeAccounts(user.uid, bizId, setAccounts, cloudDek);
+    const u2 = subscribeTransactions(user.uid, bizId, setTransactions, cloudDek);
+    const u3 = subscribeBills(user.uid, bizId, setBills, cloudDek);
+    const u4 = subscribeStockItems(user.uid, bizId, setStockItems, cloudDek);
+    const u5 = subscribeCashbookEntries(user.uid, bizId, setCashbookEntries, cloudDek);
+    const u6 = subscribeStaffMembers(user.uid, bizId, setStaffMembers, cloudDek);
+    const u7 = subscribeActivityLogs(user.uid, bizId, setActivityLogs, cloudDek);
     return () => {
       u1();
       u2();
@@ -778,7 +1070,7 @@ function BolBahiAppInner() {
       u6();
       u7();
     };
-  }, [user, cloudActiveBusiness?.id]);
+  }, [user, cloudActiveBusiness?.id, dekResolvedForUid, cloudDek]);
 
   // Deterministic Intelligence Computations
   const trustScoresByAccount = useMemo<Record<string, CustomerTrustScore>>(() => {
@@ -826,38 +1118,65 @@ function BolBahiAppInner() {
     }
   };
 
-  const logActivity = (
-    actionType: ActivityLog['actionType'],
-    summary: string,
-    targetName?: string,
-    amount?: number
-  ) => {
-    if (isGuestMode) {
-      updateGuestVault((prev) =>
-        applyRecordActivityLog(prev, {
-          businessId: currentBusiness.id,
-          actorName: activeOperator.name,
-          actorRole: activeOperator.role,
-          actionType,
-          summary,
-          targetName,
-          amount,
-        })
-      );
-      return;
-    }
-    if (!user || !currentBusiness) return;
-    recordActivityLog({
-      ownerId: user.uid,
-      businessId: currentBusiness.id,
-      actorName: activeOperator.name,
-      actorRole: activeOperator.role,
-      actionType,
-      summary,
-      targetName,
-      amount,
-    }).catch(() => {});
-  };
+  const logActivity = useCallback(
+    (
+      actionType: ActivityLog['actionType'],
+      summary: string,
+      targetName?: string,
+      amount?: number
+    ) => {
+      if (isGuestMode) {
+        updateGuestVault((prev) =>
+          applyRecordActivityLog(prev, {
+            businessId: currentBusiness.id,
+            actorName: activeOperator.name,
+            actorRole: activeOperator.role,
+            actionType,
+            summary,
+            targetName,
+            amount,
+          })
+        );
+        return;
+      }
+      if (!user || !currentBusiness) return;
+      recordActivityLog({
+        ownerId: user.uid,
+        businessId: currentBusiness.id,
+        actorName: activeOperator.name,
+        actorRole: activeOperator.role,
+        actionType,
+        summary,
+        targetName,
+        amount,
+        dek: cloudDek,
+      }).catch(() => {});
+    },
+    [
+      isGuestMode,
+      currentBusiness,
+      activeOperator.name,
+      activeOperator.role,
+      user,
+      cloudDek,
+      updateGuestVault,
+    ]
+  );
+
+  const { handleExportCsv, handleExportJson, handleRestoreJson } = useLedgerBackup({
+    currentBusiness,
+    activeAccounts,
+    activeTransactions,
+    activeBills,
+    activeStockItems,
+    activeCashbookEntries,
+    activeStaffMembers,
+    isGuestMode,
+    user,
+    cloudDek,
+    updateGuestVault,
+    logActivity,
+  });
 
   const handleSelectLanguage = async (lang: LanguageCode) => {
     persistPrelogin({ language: lang });
@@ -1029,12 +1348,18 @@ function BolBahiAppInner() {
         syncPhoneInput ||
         mobileNumber;
       const existing = await getUserProfile(fbUser.uid);
-      const saved = await mergeGuestVaultIntoFirestore(fbUser.uid, phoneDigits, existing);
-      setProfile(saved);
+      const { dek, needsPin } = await resolveCloudDekForUid(fbUser.uid);
+      if (!needsPin) {
+        const saved = await mergeGuestVaultIntoFirestore(fbUser.uid, phoneDigits, existing, dek);
+        setProfile(saved);
+        if (!saved.appLockPin) setPinUnlocked(true);
+      } else if (existing) {
+        setProfile(existing);
+        if (!existing.appLockPin) setPinUnlocked(true);
+      }
       setOtpSentTo(null);
       setOtpInput('');
       confirmationResultRef.current = null;
-      if (!saved.appLockPin) setPinUnlocked(true);
       setSyncSuccessMsg('Cloud Synced! All local entries safely backed up.');
       setTimeout(() => {
         setSyncSheetOpen(false);
@@ -1072,9 +1397,15 @@ function BolBahiAppInner() {
         syncPhoneInput ||
         mobileNumber;
       const existing = await getUserProfile(fbUser.uid);
-      const saved = await mergeGuestVaultIntoFirestore(fbUser.uid, phoneDigits, existing);
-      setProfile(saved);
-      if (!saved.appLockPin) setPinUnlocked(true);
+      const { dek, needsPin } = await resolveCloudDekForUid(fbUser.uid);
+      if (!needsPin) {
+        const saved = await mergeGuestVaultIntoFirestore(fbUser.uid, phoneDigits, existing, dek);
+        setProfile(saved);
+        if (!saved.appLockPin) setPinUnlocked(true);
+      } else if (existing) {
+        setProfile(existing);
+        if (!existing.appLockPin) setPinUnlocked(true);
+      }
       setSyncSuccessMsg('Google Cloud Sync connected!');
       setTimeout(() => {
         setSyncSheetOpen(false);
@@ -1145,9 +1476,15 @@ function BolBahiAppInner() {
       const cred = await signInWithEmailLink(auth, cleanEmail, window.location.href);
       window.history.replaceState(null, '', '/');
       const existing = await getUserProfile(cred.user.uid);
-      const saved = await mergeGuestVaultIntoFirestore(cred.user.uid, mobileNumber, existing);
-      setProfile(saved);
-      if (!saved.appLockPin) setPinUnlocked(true);
+      const { dek, needsPin } = await resolveCloudDekForUid(cred.user.uid);
+      if (!needsPin) {
+        const saved = await mergeGuestVaultIntoFirestore(cred.user.uid, mobileNumber, existing, dek);
+        setProfile(saved);
+        if (!saved.appLockPin) setPinUnlocked(true);
+      } else if (existing) {
+        setProfile(existing);
+        if (!existing.appLockPin) setPinUnlocked(true);
+      }
       setEmailConfirmPrompt(false);
       setEmailConfirmInput('');
       setPersonaOnboardingStep((prev) => (prev === 2 ? 3 : prev));
@@ -1209,15 +1546,22 @@ function BolBahiAppInner() {
       }
 
       if (target === 'delete-account') {
-        await deleteUserAccountCascade(user.uid);
+        const deletedUid = user.uid;
+        await deleteUserAccountCascade(deletedUid);
         await deleteUser(user);
+        await clearDeviceDekBytes(deletedUid);
         clearGuestVault();
+        resetDeviceSecurityState();
         try {
+          window.sessionStorage.removeItem(`ucred_vault_session_${deletedUid}`);
           localStorage.removeItem('ucred_prelogin_prefs');
           localStorage.removeItem('ucred_notif_prefs');
         } catch {
           // Ignore storage removal errors
         }
+        setCloudDek(null);
+        cloudDekBytesRef.current = null;
+        setDekResolvedForUid(null);
         setReauthOtpTarget(null);
         setSecondaryRoute(null);
         setSelectedAccountId(null);
@@ -1264,10 +1608,14 @@ function BolBahiAppInner() {
         return;
       }
       if (!user) return;
-      const created = await createBusiness(user.uid, {
-        name: newBizName.trim(),
-        phone: mobileNumber,
-      });
+      const created = await createBusiness(
+        user.uid,
+        {
+          name: newBizName.trim(),
+          phone: mobileNumber,
+        },
+        cloudDek
+      );
       const updated = await upsertUserProfile(user.uid, { activeBusinessId: created.id });
       setProfile(updated);
       setNewBizName('');
@@ -1337,6 +1685,7 @@ function BolBahiAppInner() {
               tx: current.tx,
               account: liveAccount,
               remainingForAccount: remaining,
+              dek: cloudDek,
             });
           }
         }
@@ -1357,6 +1706,7 @@ function BolBahiAppInner() {
             tx: current.tx,
             account: liveAccount,
             existingForAccount: existing,
+            dek: cloudDek,
           });
         }
         logActivity(
@@ -1468,7 +1818,7 @@ function BolBahiAppInner() {
     if (capabilities.focus !== 'personal') {
       items.push({
         id: 'tip-parchi-scanner',
-        title: 'Scan Handwritten Receipt with AI',
+        title: 'Scan Handwritten Receipt',
         bullets: [
           'Snap any handwritten slip or supplier bill to auto-extract party, items & ₹ total.',
         ],
@@ -1476,7 +1826,7 @@ function BolBahiAppInner() {
         targetAction: 'parchi',
         read: Boolean(notifPrefs['tip-parchi-scanner']?.read),
         fav: Boolean(notifPrefs['tip-parchi-scanner']?.fav),
-        timeLabel: 'Ucred AI',
+        timeLabel: 'Receipt Scanner',
       });
     }
 
@@ -1484,8 +1834,8 @@ function BolBahiAppInner() {
       id: 'tip-voice-entry',
       title:
         capabilities.focus === 'personal'
-          ? 'Voice Munim · Hands-Free Voice'
-          : 'Hands-Free Counter Mode & AI Voice Bills',
+          ? 'Speak to Save · Hands-Free Voice'
+          : 'Hands-Free Counter Mode & Voice Bills',
       bullets: [
         capabilities.focus === 'personal'
           ? 'Say "Rahul 500 udhaar aur Amit 300 mila" to record instantly.'
@@ -1495,7 +1845,7 @@ function BolBahiAppInner() {
       targetAction: 'voice',
       read: Boolean(notifPrefs['tip-voice-entry']?.read),
       fav: Boolean(notifPrefs['tip-voice-entry']?.fav),
-      timeLabel: 'Voice Munim',
+      timeLabel: 'Speak to Save',
     });
 
     return items;
@@ -1687,8 +2037,7 @@ function BolBahiAppInner() {
         targetName: entry.customerName,
         amount: entry.amount,
       });
-      guestVaultRef.current = saveGuestVault(finalVault);
-      setGuestVault(guestVaultRef.current);
+      commitGuestVault(finalVault);
       haptics.success();
       triggerAccountHighlight(res.accountId);
       showActionToast({
@@ -1715,6 +2064,7 @@ function BolBahiAppInner() {
       voiceRaw: entry.voiceRaw,
       createdByName: activeOperator.name,
       createdByRole: activeOperator.role,
+      dek: cloudDek,
     });
     const accSnapshot: LedgerAccount = match
       ? { ...match, balance: res.newBalance }
@@ -1772,6 +2122,7 @@ function BolBahiAppInner() {
       tx: liveTx,
       account: liveAcc,
       remainingForAccount: remaining,
+      dek: cloudDek,
     });
     logActivity(
       'ledger',
@@ -1813,8 +2164,7 @@ function BolBahiAppInner() {
         targetName: account.name,
         amount: payload.amount,
       });
-      guestVaultRef.current = saveGuestVault(finalVault);
-      setGuestVault(guestVaultRef.current);
+      commitGuestVault(finalVault);
       haptics.success();
       triggerAccountHighlight(account.id);
       showActionToast({
@@ -1841,6 +2191,7 @@ function BolBahiAppInner() {
       createdByName: activeOperator.name,
       createdByRole: activeOperator.role,
       syncToGalla: capabilities.showGalla ? payload.syncToGalla : null,
+      dek: cloudDek,
     });
     haptics.success();
     triggerAccountHighlight(account.id);
@@ -1859,76 +2210,98 @@ function BolBahiAppInner() {
     );
   };
 
-  const handleExportCsv = () => {
-    if (!currentBusiness) return;
-    const rows: string[] = [
-      ['Type', 'Account Name', 'Phone', 'Direction', 'Amount (INR)', 'Date', 'Note', 'Operator'].join(
-        ','
-      ),
-    ];
-    const accMap = new Map(activeAccounts.map((a) => [a.id, a]));
-    for (const tx of activeTransactions) {
-      const acc = accMap.get(tx.accountId);
-      const escape = (v: string) => `"${String(v || '').replace(/"/g, '""')}"`;
-      rows.push(
-        [
-          escape(acc?.kind || 'customer'),
-          escape(acc?.name || 'Customer'),
-          escape(acc?.phone || ''),
-          escape(tx.direction),
-          String(tx.amount),
-          escape(tx.billDate),
-          escape(tx.note || tx.voiceRaw),
-          escape(tx.createdByName || 'Shop Owner'),
-        ].join(',')
-      );
-    }
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${currentBusiness.name.replace(/\s+/g, '_')}_ucred_ledger.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const handleInlineQuickAdd = async (payload: {
+    customerName: string;
+    direction: TxDirection;
+    amount: number;
+    kind: AccountKind;
+    note?: string;
+  }) => {
+    const cleanName = payload.customerName.trim();
+    const resolvedKind: AccountKind = capabilities.showSuppliers ? payload.kind : 'customer';
+    const match =
+      scopedAccounts.find((a) => a.name.toLowerCase() === cleanName.toLowerCase()) || null;
 
-  const handleExportJson = () => {
-    if (!currentBusiness) return;
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      app: 'Ucred',
-      business: currentBusiness,
-      accounts: activeAccounts,
-      transactions: activeTransactions,
-      bills: activeBills,
-      stockItems: activeStockItems,
-      cashbookEntries: activeCashbookEntries,
-      staffMembers: activeStaffMembers,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${currentBusiness.name.replace(/\s+/g, '_')}_ucred_backup.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleRestoreJson = async (file: File) => {
-    const text = await file.text();
-    const parsed: unknown = JSON.parse(text);
     if (isGuestMode) {
-      updateGuestVault(
-        (prev) => applyRestoreBusinessBackup(prev, currentBusiness.id, parsed).vault
-      );
-      logActivity('account', 'Restored JSON local backup');
+      const res = applyAddTransactionAtomic(guestVaultRef.current, {
+        businessId: currentBusiness.id,
+        existingAccount: match,
+        customerName: cleanName,
+        kind: match?.kind || resolvedKind,
+        personaContext: match?.personaContext || personaAdaptation.activeFocus,
+        direction: payload.direction,
+        amount: payload.amount,
+        note: payload.note || '',
+        createdByName: activeOperator.name,
+        createdByRole: activeOperator.role,
+      });
+      const finalVault = applyRecordActivityLog(res.vault, {
+        businessId: currentBusiness.id,
+        actorName: activeOperator.name,
+        actorRole: activeOperator.role,
+        actionType: 'ledger',
+        summary: `Quick ${payload.direction === 'given' ? 'Credit' : 'Received'} ₹${payload.amount} for ${cleanName}`,
+        targetName: cleanName,
+        amount: payload.amount,
+      });
+      commitGuestVault(finalVault);
+      haptics.success();
+      triggerAccountHighlight(res.accountId);
+      showActionToast({
+        kind: 'added',
+        tx: res.tx,
+        account: res.account,
+        newBalance: res.newBalance,
+        accountCreated: res.accountCreated,
+      });
       return;
     }
+
     if (!user) return;
-    await restoreBusinessBackup(user.uid, currentBusiness.id, parsed);
-    logActivity('account', 'Restored JSON cloud backup');
+    const res = await addTransactionAtomic({
+      ownerId: user.uid,
+      businessId: currentBusiness.id,
+      existingAccount: match,
+      customerName: cleanName,
+      kind: match?.kind || resolvedKind,
+      personaContext: match?.personaContext || personaAdaptation.activeFocus,
+      direction: payload.direction,
+      amount: payload.amount,
+      note: payload.note || '',
+      createdByName: activeOperator.name,
+      createdByRole: activeOperator.role,
+      dek: cloudDek,
+    });
+    const accSnapshot: LedgerAccount = match
+      ? { ...match, balance: res.newBalance }
+      : {
+          id: res.accountId,
+          ownerId: user.uid,
+          businessId: currentBusiness.id,
+          kind: resolvedKind,
+          personaContext: personaAdaptation.activeFocus,
+          name: cleanName,
+          phone: '',
+          dueDate: '',
+          balance: res.newBalance,
+          lastNote: res.tx.note,
+          lastActivityAt: res.tx.billDate,
+        };
+    haptics.success();
+    triggerAccountHighlight(res.accountId);
+    showActionToast({
+      kind: 'added',
+      tx: res.tx,
+      account: accSnapshot,
+      newBalance: res.newBalance,
+      accountCreated: res.accountCreated,
+    });
+    logActivity(
+      'ledger',
+      `Quick ${payload.direction === 'given' ? 'Credit' : 'Received'} ₹${payload.amount} for ${cleanName}`,
+      cleanName,
+      payload.amount
+    );
   };
 
   const handleDeleteAccount = async () => {
@@ -1946,7 +2319,8 @@ function BolBahiAppInner() {
         );
       }
     }
-    await deleteUserAccountCascade(user.uid);
+    const deletedUid = user.uid;
+    await deleteUserAccountCascade(deletedUid);
     try {
       await deleteUser(user);
     } catch (err) {
@@ -1967,13 +2341,19 @@ function BolBahiAppInner() {
         throw err;
       }
     }
+    await clearDeviceDekBytes(deletedUid);
     clearGuestVault();
+    resetDeviceSecurityState();
     try {
+      window.sessionStorage.removeItem(`ucred_vault_session_${deletedUid}`);
       localStorage.removeItem('ucred_prelogin_prefs');
       localStorage.removeItem('ucred_notif_prefs');
     } catch {
       // Ignore storage removal errors
     }
+    setCloudDek(null);
+    cloudDekBytesRef.current = null;
+    setDekResolvedForUid(null);
     setSecondaryRoute(null);
     setSelectedAccountId(null);
   };
@@ -1982,11 +2362,11 @@ function BolBahiAppInner() {
   const activeOwnerUid = isGuestMode ? GUEST_OWNER_ID : user!.uid;
 
   const subNavigationTabs = useMemo(() => {
-    const tabs: Array<{ id: 'bills' | 'stock' | 'activity' | 'more'; label: string }> = [];
+    const tabs: Array<{ id: 'bills' | 'stock' | 'staff-audit' | 'activity'; label: string }> = [];
     if (capabilities.showGstBills) tabs.push({ id: 'bills', label: 'Bills' });
     if (capabilities.showStock) tabs.push({ id: 'stock', label: 'Stock' });
+    if (capabilities.focus !== 'personal') tabs.push({ id: 'staff-audit', label: 'Staff' });
     if (capabilities.focus === 'personal') tabs.push({ id: 'activity', label: 'Activity' });
-    tabs.push({ id: 'more', label: 'Tools' });
     return tabs;
   }, [capabilities.showGstBills, capabilities.showStock, capabilities.focus]);
 
@@ -1997,6 +2377,8 @@ function BolBahiAppInner() {
         <PinLockOverlay
           expectedPin={appLockPin}
           uid={activeOwnerUid}
+          hasPasskey={passkeyEnabled}
+          onVerifyPasskey={verifyPasskeyUnlock}
           onUnlock={() => setPinUnlocked(true)}
           onForgotPin={async () => {
             if (isGuestMode) {
@@ -2007,7 +2389,22 @@ function BolBahiAppInner() {
               setPinUnlocked(true);
               return;
             }
-            await startOtpReauthFlow('forgot-pin');
+            if (!user) return;
+            const hasGoogle = user.providerData.some((p) => p.providerId === 'google.com');
+            if (hasGoogle) {
+              await reauthenticateWithPopup(user, new GoogleAuthProvider());
+              const updated = await upsertUserProfile(user.uid, { appLockPin: '' });
+              setProfile(updated);
+              setPinUnlocked(true);
+              return;
+            }
+            if (user.phoneNumber) {
+              await startOtpReauthFlow('forgot-pin');
+              return;
+            }
+            throw new Error(
+              'For security, please clear browser session or sign in again via Email Verification Link to reset App Lock PIN.'
+            );
           }}
         />
         <div
@@ -2111,7 +2508,7 @@ function BolBahiAppInner() {
   const hasForegroundOverlay = Boolean(selectedAccount || effectiveSecondaryRoute);
 
   return (
-    <div className="w-full max-w-[460px] lg:max-w-[1040px] mx-auto h-dvh overflow-hidden relative shadow-2xl flex flex-col select-none spatial-shell-bg native-app-shell text-[var(--ink)]">
+    <div className="w-full max-w-[460px] lg:max-w-[1200px] mx-auto h-dvh overflow-hidden relative shadow-2xl flex flex-col select-none spatial-shell-bg native-app-shell text-[var(--ink)]">
       <OfflineIndicator />
 
       {/* Scroll-Linked Living Matte Dynamic Island Header */}
@@ -2186,7 +2583,9 @@ function BolBahiAppInner() {
               <div className="flex items-center gap-1 rounded-full bg-[var(--surface-subtle)] p-1">
                 {subNavigationTabs.map((sub) => {
                   const subActive =
-                    sub.id === 'activity' ? false : effectiveMainTab === sub.id;
+                    sub.id === 'activity' || sub.id === 'staff-audit'
+                      ? false
+                      : effectiveMainTab === sub.id;
                   return (
                     <button
                       key={sub.id}
@@ -2195,6 +2594,8 @@ function BolBahiAppInner() {
                         haptics.tap();
                         if (sub.id === 'activity') {
                           setSecondaryRoute('account-summary');
+                        } else if (sub.id === 'staff-audit') {
+                          setSecondaryRoute('staff-audit');
                         } else {
                           setSecondaryRoute(null);
                           setMainTab(sub.id);
@@ -2264,8 +2665,7 @@ function BolBahiAppInner() {
                   summary: `Added ${safeKind} ${payload.name}`,
                   targetName: payload.name,
                 });
-                guestVaultRef.current = saveGuestVault(finalVault);
-                setGuestVault(guestVaultRef.current);
+                commitGuestVault(finalVault);
                 triggerAccountHighlight(res.created.id);
                 setSelectedAccountId(res.created.id);
                 return;
@@ -2280,6 +2680,7 @@ function BolBahiAppInner() {
                 phone: payload.phone,
                 dueDate: payload.dueDate,
                 creditLimit: payload.creditLimit,
+                dek: cloudDek,
               });
               logActivity('account', `Added ${safeKind} ${payload.name}`, payload.name);
               triggerAccountHighlight(created.id);
@@ -2292,16 +2693,7 @@ function BolBahiAppInner() {
               setVoiceCounterMode(false);
               setVoiceModalOpen(true);
             }}
-            onRunVoiceDemo={() => {
-              void handleVoiceSave({
-                customerName: 'Ramesh',
-                direction: 'given',
-                amount: 500,
-                note: 'Voice Demo Entry',
-                voiceRaw: 'Ramesh 500 credit',
-                kind: 'customer',
-              });
-            }}
+            onInlineQuickAdd={handleInlineQuickAdd}
             onOpenCounterMode={() => {
               setVoicePrefillName('');
               setVoiceCounterMode(true);
@@ -2329,7 +2721,7 @@ function BolBahiAppInner() {
               if (isGuestMode) {
                 updateGuestVault((prev) => applyUpdateAccountMeta(prev, accountId, { dueDate }));
               } else {
-                await updateAccountMeta(accountId, { dueDate });
+                await updateAccountMeta(accountId, { dueDate }, cloudDek);
               }
               const target = activeAccounts.find((a) => a.id === accountId);
               logActivity(
@@ -2343,7 +2735,7 @@ function BolBahiAppInner() {
                 updateGuestVault((prev) => applyUpdateBusiness(prev, currentBusiness.id, { upiId }));
                 return;
               }
-              await updateBusiness(currentBusiness.id, { upiId });
+              await updateBusiness(currentBusiness.id, { upiId }, cloudDek);
             }}
             onOpenAccount={(acc) => {
               setSelectedAccountId(acc.id);
@@ -2445,8 +2837,7 @@ function BolBahiAppInner() {
                   targetName: payload.customerName,
                   amount: netBill,
                 });
-                guestVaultRef.current = saveGuestVault(loggedVault);
-                setGuestVault(guestVaultRef.current);
+                commitGuestVault(loggedVault);
                 return { deductedCount: billRes.deductedCount };
               }
 
@@ -2476,6 +2867,7 @@ function BolBahiAppInner() {
                   billDate: payload.billDate,
                   createdByName: activeOperator.name,
                   createdByRole: activeOperator.role,
+                  dek: cloudDek,
                 });
                 linkedTxId = txRes.txId;
               }
@@ -2485,6 +2877,7 @@ function BolBahiAppInner() {
                 stockItems: activeStockItems,
                 linkedTxId,
                 createdByName: activeOperator.name,
+                dek: cloudDek,
                 ...payload,
               });
               logActivity(
@@ -2511,8 +2904,7 @@ function BolBahiAppInner() {
                   targetName: quote.customerName,
                   amount: quote.totalAmount,
                 });
-                guestVaultRef.current = saveGuestVault(loggedVault);
-                setGuestVault(guestVaultRef.current);
+                commitGuestVault(loggedVault);
                 return { billNumber: newBillNumber, deductedCount: conv.deductedCount };
               }
               const deductedCount = await convertQuoteToBill({
@@ -2561,6 +2953,7 @@ function BolBahiAppInner() {
                 await saveStockItem({
                   ownerId: user.uid,
                   businessId: currentBusiness.id,
+                  dek: cloudDek,
                   ...payload,
                 });
               }
@@ -2589,34 +2982,28 @@ function BolBahiAppInner() {
             accentTheme={accentTheme}
             mobileNumber={mobileNumber}
             verifiedPhone={verifiedPhoneDisplay}
-            activeOperatorName={activeOperator.name}
             workspaceBadge={personaAdaptation.focusBadge}
             business={currentBusiness}
             appLockPin={appLockPin}
+            vaultMode={vaultMode}
             isGuestMode={isGuestMode}
             showBackButton={false}
-            capabilities={capabilities}
+            autoLockSeconds={autoLockSeconds}
+            privacyCurtainEnabled={privacyCurtainEnabled}
+            webAuthnSupported={webAuthnSupported}
+            passkeyEnabled={passkeyEnabled}
             onOpenCloudSync={openCloudSyncSheet}
             onOpenWorkspaces={() => {
               setPersonaOnboardingStep(3);
               setPersonaOnboardingOpen(true);
             }}
             onOpenBusinessProfile={() => setSecondaryRoute('business-profile')}
-            onOpenStaffAudit={() => setSecondaryRoute('staff-audit')}
-            onOpenGalla={
-              capabilities.showGalla ? () => setSecondaryRoute('galla') : undefined
-            }
-            onOpenStock={
-              capabilities.showStock
-                ? () => {
-                    setSecondaryRoute(null);
-                    setMainTab('stock');
-                  }
-                : undefined
-            }
-            onOpenHelp={() => setSecondaryRoute('help-support')}
             onChangeAppearance={handleSetAppearance}
             onSelectAccentTheme={(theme) => void handleSelectAccentTheme(theme)}
+            onChangeAutoLockSeconds={changeAutoLockSeconds}
+            onTogglePrivacyCurtain={togglePrivacyCurtain}
+            onTogglePasskey={togglePasskey}
+            onGetRecoveryKey={getRecoveryKeyBase64}
             onSaveMobile={async (phone) => {
               persistPrelogin({ mobileNumber: phone });
               if (isGuestMode) {
@@ -2632,7 +3019,7 @@ function BolBahiAppInner() {
               if (!user) return;
               const updated = await upsertUserProfile(user.uid, { mobileNumber: phone });
               setProfile(updated);
-              await updateBusiness(currentBusiness.id, { phone });
+              await updateBusiness(currentBusiness.id, { phone }, cloudDek);
             }}
             onSaveUpiId={async (upiId) => {
               if (isGuestMode) {
@@ -2641,7 +3028,7 @@ function BolBahiAppInner() {
                 );
                 return;
               }
-              await updateBusiness(currentBusiness.id, { upiId });
+              await updateBusiness(currentBusiness.id, { upiId }, cloudDek);
             }}
             onSavePin={async (pin) => {
               if (isGuestMode) {
@@ -2659,6 +3046,7 @@ function BolBahiAppInner() {
               setProfile(updated);
               setPinUnlocked(true);
             }}
+            onConfigureVaultMode={handleConfigureVaultMode}
             onExportCsv={handleExportCsv}
             onExportJson={handleExportJson}
             onRestoreJson={handleRestoreJson}
@@ -2674,7 +3062,18 @@ function BolBahiAppInner() {
             }}
             onDeleteAccount={handleDeleteAccount}
             onLogout={async () => {
+              const prevUid = user?.uid;
               await signOut(auth);
+              if (prevUid && typeof window !== 'undefined') {
+                try {
+                  window.sessionStorage.removeItem(`ucred_vault_session_${prevUid}`);
+                } catch {
+                  // Ignore sessionStorage cleanup error
+                }
+              }
+              setCloudDek(null);
+              cloudDekBytesRef.current = null;
+              setDekResolvedForUid(null);
               setSecondaryRoute(null);
               setSelectedAccountId(null);
               setMainTab('ledger');
@@ -2728,8 +3127,7 @@ function BolBahiAppInner() {
                     targetName: selectedAccount.name,
                     amount: payload.amount,
                   });
-                  guestVaultRef.current = saveGuestVault(finalVault);
-                  setGuestVault(guestVaultRef.current);
+                  commitGuestVault(finalVault);
                   showActionToast({
                     kind: 'added',
                     tx: res.tx,
@@ -2755,6 +3153,7 @@ function BolBahiAppInner() {
                   createdByName: activeOperator.name,
                   createdByRole: activeOperator.role,
                   syncToGalla: capabilities.showGalla ? payload.syncToGalla : null,
+                  dek: cloudDek,
                 });
                 showActionToast({
                   kind: 'added',
@@ -2783,6 +3182,7 @@ function BolBahiAppInner() {
                       (item) => item.accountId === selectedAccount.id
                     ),
                     patch,
+                    dek: cloudDek,
                   });
                 }
                 logActivity(
@@ -2805,6 +3205,7 @@ function BolBahiAppInner() {
                     tx,
                     account: selectedAccount,
                     remainingForAccount: remaining,
+                    dek: cloudDek,
                   });
                 }
                 showActionToast({
@@ -2823,7 +3224,7 @@ function BolBahiAppInner() {
                 if (isGuestMode) {
                   updateGuestVault((prev) => applyUpdateAccountMeta(prev, selectedAccount.id, patch));
                 } else {
-                  await updateAccountMeta(selectedAccount.id, patch);
+                  await updateAccountMeta(selectedAccount.id, patch, cloudDek);
                 }
                 logActivity(
                   'account',
@@ -2912,6 +3313,7 @@ function BolBahiAppInner() {
                         note: payload.note,
                         entryDate: payload.entryDate,
                         actorName: activeOperator.name,
+                        dek: cloudDek,
                       });
                     }
                     logActivity(
@@ -2956,6 +3358,7 @@ function BolBahiAppInner() {
                       await saveStaffMember({
                         ownerId: user.uid,
                         businessId: currentBusiness.id,
+                        dek: cloudDek,
                         ...payload,
                       });
                     }
@@ -2988,13 +3391,16 @@ function BolBahiAppInner() {
                   accentTheme={accentTheme}
                   mobileNumber={mobileNumber}
                   verifiedPhone={verifiedPhoneDisplay}
-                  activeOperatorName={activeOperator.name}
                   workspaceBadge={personaAdaptation.focusBadge}
                   business={currentBusiness}
                   appLockPin={appLockPin}
+                  vaultMode={vaultMode}
                   isGuestMode={isGuestMode}
                   showBackButton
-                  capabilities={capabilities}
+                  autoLockSeconds={autoLockSeconds}
+                  privacyCurtainEnabled={privacyCurtainEnabled}
+                  webAuthnSupported={webAuthnSupported}
+                  passkeyEnabled={passkeyEnabled}
                   onOpenCloudSync={openCloudSyncSheet}
                   onOpenWorkspaces={() => {
                     setSecondaryRoute(null);
@@ -3002,14 +3408,13 @@ function BolBahiAppInner() {
                     setPersonaOnboardingOpen(true);
                   }}
                   onOpenBusinessProfile={() => setSecondaryRoute('business-profile')}
-                  onOpenStaffAudit={() => setSecondaryRoute('staff-audit')}
-                  onOpenGalla={
-                    capabilities.showGalla ? () => setSecondaryRoute('galla') : undefined
-                  }
-                  onOpenHelp={() => setSecondaryRoute('help-support')}
                   onBack={() => setSecondaryRoute(null)}
                   onChangeAppearance={handleSetAppearance}
                   onSelectAccentTheme={(theme) => void handleSelectAccentTheme(theme)}
+                  onChangeAutoLockSeconds={changeAutoLockSeconds}
+                  onTogglePrivacyCurtain={togglePrivacyCurtain}
+                  onTogglePasskey={togglePasskey}
+                  onGetRecoveryKey={getRecoveryKeyBase64}
                   onSaveMobile={async (phone) => {
                     persistPrelogin({ mobileNumber: phone });
                     if (isGuestMode) {
@@ -3025,7 +3430,7 @@ function BolBahiAppInner() {
                     if (!user) return;
                     const updated = await upsertUserProfile(user.uid, { mobileNumber: phone });
                     setProfile(updated);
-                    await updateBusiness(currentBusiness.id, { phone });
+                    await updateBusiness(currentBusiness.id, { phone }, cloudDek);
                   }}
                   onSaveUpiId={async (upiId) => {
                     if (isGuestMode) {
@@ -3034,7 +3439,7 @@ function BolBahiAppInner() {
                       );
                       return;
                     }
-                    await updateBusiness(currentBusiness.id, { upiId });
+                    await updateBusiness(currentBusiness.id, { upiId }, cloudDek);
                   }}
                   onSavePin={async (pin) => {
                     if (isGuestMode) {
@@ -3052,6 +3457,7 @@ function BolBahiAppInner() {
                     setProfile(updated);
                     setPinUnlocked(true);
                   }}
+                  onConfigureVaultMode={handleConfigureVaultMode}
                   onExportCsv={handleExportCsv}
                   onExportJson={handleExportJson}
                   onRestoreJson={handleRestoreJson}
@@ -3067,7 +3473,18 @@ function BolBahiAppInner() {
                   }}
                   onDeleteAccount={handleDeleteAccount}
                   onLogout={async () => {
+                    const prevUid = user?.uid;
                     await signOut(auth);
+                    if (prevUid && typeof window !== 'undefined') {
+                      try {
+                        window.sessionStorage.removeItem(`ucred_vault_session_${prevUid}`);
+                      } catch {
+                        // Ignore sessionStorage cleanup error
+                      }
+                    }
+                    setCloudDek(null);
+                    cloudDekBytesRef.current = null;
+                    setDekResolvedForUid(null);
                     setSecondaryRoute(null);
                     setSelectedAccountId(null);
                   }}
@@ -3086,7 +3503,7 @@ function BolBahiAppInner() {
                         applyUpdateBusiness(prev, currentBusiness.id, patch)
                       );
                     } else {
-                      await updateBusiness(currentBusiness.id, patch);
+                      await updateBusiness(currentBusiness.id, patch, cloudDek);
                     }
                     logActivity(
                       'account',
@@ -3852,7 +4269,7 @@ function BolBahiAppInner() {
         />
       )}
 
-      {/* AI Parchi & Receipt Scanner Modal */}
+      {/* Receipt Scanner Modal */}
       <ParchiScannerModal
         open={parchiScannerOpen}
         onClose={() => setParchiScannerOpen(false)}
@@ -3878,7 +4295,7 @@ function BolBahiAppInner() {
               personaContext: match?.personaContext || personaAdaptation.activeFocus,
               direction: payload.direction,
               amount: payload.amount,
-              note: payload.note || 'AI Receipt Scan',
+              note: payload.note || 'Receipt Scan',
               billDate: payload.billDate,
               billImage: payload.billImage,
               createdByName: activeOperator.name,
@@ -3899,8 +4316,7 @@ function BolBahiAppInner() {
               targetName: payload.customerName,
               amount: payload.amount,
             });
-            guestVaultRef.current = saveGuestVault(logged);
-            setGuestVault(guestVaultRef.current);
+            commitGuestVault(logged);
             showActionToast({
               kind: 'added',
               tx: res.tx,
@@ -3925,14 +4341,15 @@ function BolBahiAppInner() {
             personaContext: match?.personaContext || personaAdaptation.activeFocus,
             direction: payload.direction,
             amount: payload.amount,
-            note: payload.note || 'AI Receipt Scan',
+            note: payload.note || 'Receipt Scan',
             billDate: payload.billDate,
             billImage: payload.billImage,
             createdByName: activeOperator.name,
             createdByRole: activeOperator.role,
+            dek: cloudDek,
           });
           if (!match && payload.phone) {
-            await updateAccountMeta(res.accountId, { phone: payload.phone }).catch(() => {});
+            await updateAccountMeta(res.accountId, { phone: payload.phone }, cloudDek).catch(() => {});
           }
           const accSnapshot: LedgerAccount = match
             ? { ...match, balance: res.newBalance }
@@ -4066,6 +4483,99 @@ function BolBahiAppInner() {
           </div>
         </div>
       )}
+      {/* Zero-Knowledge Cloud Sync Vault PIN Unlock Sheet */}
+      <DetentSheetOverlay
+        open={Boolean(user && cloudVaultUnlockOpen)}
+        onClose={() => {
+          if (!vaultUnlockBusy) setCloudVaultUnlockOpen(false);
+        }}
+        title="Unlock Encrypted Cloud Vault"
+        subtitle="AES-256-GCM Zero-Knowledge Sync"
+        initialDetent="peek"
+        allowDetentToggle={false}
+      >
+        <div className="space-y-4 pb-safe">
+          <div className="rounded-2xl bg-[var(--brand-tint)] px-3.5 py-3 flex items-start gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-[var(--brand-accent)] shrink-0 mt-0.5" />
+            <p className="text-xs font-semibold text-[var(--ink)] leading-relaxed">
+              Your cloud ledger is protected with a custom Vault Sync PIN. Enter it once to
+              decrypt records cleanly on this device.
+            </p>
+          </div>
+          <input
+            type="password"
+            value={vaultUnlockPin}
+            onChange={(e) => setVaultUnlockPin(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !vaultUnlockBusy) {
+                void handleUnlockCloudVault();
+              }
+            }}
+            placeholder="Enter Vault Sync PIN"
+            className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] px-4 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+          />
+          {vaultUnlockError && (
+            <p role="alert" className="text-xs font-bold text-[var(--credit-red)]">
+              {vaultUnlockError}
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              disabled={vaultUnlockBusy}
+              onClick={async () => {
+                await signOut(auth);
+                setCloudVaultUnlockOpen(false);
+              }}
+              className="min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)] active:scale-95 transition"
+            >
+              Use Guest Mode
+            </button>
+            <button
+              type="button"
+              disabled={vaultUnlockBusy || vaultUnlockPin.trim().length < 4}
+              onClick={() => void handleUnlockCloudVault()}
+              className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold disabled:opacity-50 active:scale-95 transition"
+            >
+              {vaultUnlockBusy ? 'Decrypting...' : 'Unlock Vault'}
+            </button>
+          </div>
+        </div>
+      </DetentSheetOverlay>
+
+      {/* Solid Matte Tab Privacy Curtain Veil */}
+      {privacyCurtainVisible && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Screen Protected"
+          className="fixed inset-0 z-[70] bg-[var(--app-bg)] flex flex-col items-center justify-center p-6"
+        >
+          <div className="w-full max-w-xs rounded-[28px] spatial-hero p-6 text-center space-y-4">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
+              <Lock className="w-7 h-7" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-extrabold text-[var(--ink)]">
+                Screen Protected
+              </h2>
+              <p className="text-xs text-[var(--ink-muted)] mt-1">
+                {currentBusiness.name} ledger balances are hidden while tab is inactive.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                dismissPrivacyCurtain();
+              }}
+              className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold tactile-key-primary active:scale-95 transition"
+            >
+              Tap to Resume
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -4083,7 +4593,7 @@ export const BolBahiApp: React.FC = () => {
     return (
       <div
         suppressHydrationWarning
-        className="w-full max-w-[460px] lg:max-w-[1040px] mx-auto h-dvh overflow-hidden shadow-2xl spatial-shell-bg native-app-shell"
+        className="w-full max-w-[460px] lg:max-w-[1200px] mx-auto h-dvh overflow-hidden shadow-2xl spatial-shell-bg native-app-shell"
       />
     );
   }

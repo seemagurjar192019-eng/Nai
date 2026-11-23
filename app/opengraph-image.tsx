@@ -3,7 +3,7 @@ import { ImageResponse } from 'next/og';
 export const runtime = 'edge';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const alt = 'Ucred — Smart Voice Khata, AI Parchi & Galla OS';
+export const alt = 'Ucred — Voice Ledger, Receipt Scanner & Cashbook OS';
 
 export default function OpenGraphImage() {
   return new ImageResponse(
@@ -49,17 +49,17 @@ export default function OpenGraphImage() {
               Ucred
             </span>
             <span style={{ fontSize: '18px', color: '#CBD5E1' }}>
-              Smart Voice Khata · AI Parchi · Live Galla OS
+              Voice Ledger · Receipt Scanner · Live Cashbook OS
             </span>
           </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '900px' }}>
           <div style={{ fontSize: '54px', fontWeight: 800, lineHeight: 1.14, color: '#FFFFFF' }}>
-            Hands-Free Counter Khata, AI Parchi &amp; Daily Galla Pulse.
+            Hands-Free Counter Ledger, Receipt Scanner &amp; Daily Cashbook.
           </div>
           <div style={{ fontSize: '25px', color: '#CBD5E1', lineHeight: 1.4 }}>
-            Hybrid Hindi/Hinglish voice ledger, photo-to-bill scanner, customer trust scores, GST billing, and 1-Click UPI Vasooli.
+            Offline-first Hindi/Hinglish voice ledger, photo-to-bill scanner, customer trust scores, GST billing, and 1-Click UPI Collection.
           </div>
         </div>
 

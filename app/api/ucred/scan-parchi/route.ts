@@ -6,6 +6,7 @@ import {
   getGeminiServerClient,
 } from '@/lib/gemini-server';
 import { checkRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit';
+import { hasValidImageMagicBytes, verifyApiRequestBoundary } from '@/lib/security';
 
 export const runtime = 'nodejs';
 
@@ -15,6 +16,14 @@ interface ScanParchiBody {
 
 export async function POST(req: NextRequest) {
   try {
+    const boundary = verifyApiRequestBoundary(req.headers);
+    if (!boundary.ok) {
+      return NextResponse.json(
+        { error: boundary.reason || 'Request rejected by security boundary.' },
+        { status: 403 }
+      );
+    }
+
     const clientIp = getClientIpFromHeaders(req.headers);
     const minuteLimit = checkRateLimit(`parchi:min:${clientIp}`, {
       windowMs: 60_000,
@@ -35,7 +44,7 @@ export async function POST(req: NextRequest) {
     });
     if (!hourLimit.allowed) {
       return NextResponse.json(
-        { error: 'Hourly AI receipt scan limit reached. You can still attach receipt photos manually.' },
+        { error: 'Hourly receipt scan limit reached. You can still attach receipt photos manually.' },
         {
           status: 429,
           headers: { 'Retry-After': String(hourLimit.retryAfterSeconds) },
@@ -65,11 +74,17 @@ export async function POST(req: NextRequest) {
 
     const mimeType = match[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : match[1].toLowerCase();
     const base64Data = match[2];
+    if (!hasValidImageMagicBytes(base64Data, mimeType)) {
+      return NextResponse.json(
+        { error: 'Image signature mismatch. Please upload a valid JPG, PNG, or WebP photo.' },
+        { status: 400 }
+      );
+    }
 
     const ai = getGeminiServerClient();
 
     const systemInstruction = [
-      'You are Ucred AI Parchi & Receipt OCR specialist for Indian shopkeepers.',
+      'You are Ucred Receipt & Parchi OCR parser for Indian shopkeepers.',
       'Extract handwritten kirana slips (parchi), supplier bills, or printed invoices into strict JSON.',
       'Rules:',
       '- partyName: customer or supplier name shown at top/bottom (or "Walk-in Party" if illegible).',

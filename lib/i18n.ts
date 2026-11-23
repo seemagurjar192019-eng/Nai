@@ -1,7 +1,6 @@
 import type { LanguageCode } from './types';
 
-export const UCRED_LOGO_PATH =
-  '/assets/aistudio/Meta_AI_917045015_1478484944227547_3671959198306789604_n_20261118_173633_2bf77e53.webp';
+export const UCRED_LOGO_PATH = '/brand/ucred-mark.webp';
 
 export interface LanguageOption {
   code: LanguageCode;
@@ -369,31 +368,76 @@ async function sha256Salted(saltPrefix: string, pin: string, uid: string): Promi
   return `sha256:${hex}`;
 }
 
-/** Salted SHA-256 hash for 4-digit App Lock PIN scoped to Firebase UID. */
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.trim();
+  const out = new Uint8Array(Math.floor(clean.length / 2));
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16) || 0;
+  }
+  return out;
+}
+
+async function pbkdf2PinHash(pin: string, uid: string, saltHex: string, iterations = 100_000): Promise<string> {
+  const subtle = globalThis.crypto.subtle;
+  const baseKey = await subtle.importKey(
+    'raw',
+    new TextEncoder().encode(`ucred:pin:${uid}:${pin}`),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  const saltBytes = hexToBytes(saltHex);
+  const saltBuf = new Uint8Array(saltBytes.byteLength);
+  saltBuf.set(saltBytes);
+  const bits = await subtle.deriveBits(
+    { name: 'PBKDF2', salt: saltBuf.buffer, iterations, hash: 'SHA-256' },
+    baseKey,
+    256
+  );
+  return `pbkdf2:${iterations}:${saltHex}:${bytesToHex(new Uint8Array(bits))}`;
+}
+
+/** Salted PBKDF2-SHA256 hash for App Lock PIN scoped to Firebase UID (fits 128-char Firestore limit). */
 export async function hashPinForUid(pin: string, uid: string): Promise<string> {
   const cleanPin = pin.trim();
   if (!cleanPin) return '';
   if (typeof globalThis === 'undefined' || !globalThis.crypto?.subtle) {
     return cleanPin;
   }
-  return sha256Salted('ucred', cleanPin, uid);
+  const salt = new Uint8Array(12);
+  globalThis.crypto.getRandomValues(salt);
+  return pbkdf2PinHash(cleanPin, uid, bytesToHex(salt), 100_000);
 }
 
-/** Verify entered PIN against stored salted SHA-256 hash (supports Ucred + legacy BolBahi hashes). */
+/** Verify entered PIN against stored PBKDF2 or legacy salted SHA-256 hash. */
 export async function verifyStoredPin(
   enteredPin: string,
   storedPin: string,
   uid: string
 ): Promise<boolean> {
   if (!storedPin) return true;
+  const cleanPin = enteredPin.trim();
+  if (storedPin.startsWith('pbkdf2:') && typeof globalThis !== 'undefined' && globalThis.crypto?.subtle) {
+    const parts = storedPin.split(':');
+    if (parts.length !== 4) return false;
+    const iterations = Math.max(10_000, Math.min(300_000, Number(parts[1]) || 100_000));
+    const saltHex = parts[2];
+    const derived = await pbkdf2PinHash(cleanPin, uid, saltHex, iterations);
+    return derived === storedPin;
+  }
   if (storedPin.startsWith('sha256:') && typeof globalThis !== 'undefined' && globalThis.crypto?.subtle) {
-    const cleanPin = enteredPin.trim();
     const ucredHash = await sha256Salted('ucred', cleanPin, uid);
     if (ucredHash === storedPin) return true;
     const legacyHash = await sha256Salted('bolbahi', cleanPin, uid);
     return legacyHash === storedPin;
   }
-  return enteredPin === storedPin;
+  return cleanPin === storedPin;
 }
 
 export function isValidUpiId(upi: string): boolean {

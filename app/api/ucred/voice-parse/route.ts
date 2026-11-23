@@ -6,6 +6,7 @@ import {
   getGeminiServerClient,
 } from '@/lib/gemini-server';
 import { checkRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit';
+import { verifyApiRequestBoundary } from '@/lib/security';
 
 export const runtime = 'nodejs';
 
@@ -18,6 +19,14 @@ interface VoiceParseRequestBody {
 
 export async function POST(req: NextRequest) {
   try {
+    const boundary = verifyApiRequestBoundary(req.headers);
+    if (!boundary.ok) {
+      return NextResponse.json(
+        { error: boundary.reason || 'Request rejected by security boundary.' },
+        { status: 403 }
+      );
+    }
+
     const clientIp = getClientIpFromHeaders(req.headers);
     const minuteLimit = checkRateLimit(`voice:min:${clientIp}`, {
       windowMs: 60_000,
@@ -25,7 +34,7 @@ export async function POST(req: NextRequest) {
     });
     if (!minuteLimit.allowed) {
       return NextResponse.json(
-        { error: 'Too many voice AI requests. Please wait a moment and try again.' },
+        { error: 'Too many voice parse requests. Please wait a moment and try again.' },
         {
           status: 429,
           headers: { 'Retry-After': String(minuteLimit.retryAfterSeconds) },
@@ -38,7 +47,7 @@ export async function POST(req: NextRequest) {
     });
     if (!hourLimit.allowed) {
       return NextResponse.json(
-        { error: 'Hourly AI parsing quota reached. Offline voice parsing still works seamlessly.' },
+        { error: 'Hourly voice parsing quota reached. Offline voice parsing still works seamlessly.' },
         {
           status: 429,
           headers: { 'Retry-After': String(hourLimit.retryAfterSeconds) },

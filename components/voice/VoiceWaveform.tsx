@@ -14,7 +14,7 @@ const IDLE_LEVELS = [6, 8, 11, 14, 11, 8, 6];
 /**
  * 7-Bar Real-Time Audio-Reactive SVG Equalizer (`AnalyserNode` backed).
  * Smoothly modulates heights to real mic RMS amplitude when `active` and mic permission is granted,
- * with zero-cost fallback pulse during typing/AI parsing or unsupported headless browsers.
+ * with zero-cost fallback pulse during typing/cloud parsing or unsupported headless browsers.
  */
 export const VoiceWaveform: React.FC<VoiceWaveformProps> = ({
   active,

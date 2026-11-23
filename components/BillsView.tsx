@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   FileCheck,
   FileText,
@@ -11,11 +12,12 @@ import {
   Printer,
   Receipt,
   Search,
-  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { haptics } from '@/utils/haptics';
+import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
 import {
   buildBillShareMessage,
   buildUpiUri,
@@ -95,6 +97,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
   onConvertQuote,
   onDeleteBill,
 }) => {
+  const prefersReducedMotion = useReducedMotion();
   const [docTypeFilter, setDocTypeFilter] = useState<BillDocType>('bill');
   const [searchQuery, setSearchQuery] = useState('');
   const [creating, setCreating] = useState(Boolean(prefillCustomer || externalDraft));
@@ -590,18 +593,18 @@ export const BillsView: React.FC<BillsViewProps> = ({
 
   return (
     <div className="space-y-4 pb-32">
-      {/* AI Voice Bill Hero Card */}
+      {/* Voice Bill Hero Card */}
       <div className="rounded-[28px] spatial-hero p-4.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div
             style={{ background: 'var(--munim-gradient)' }}
             className="w-12 h-12 rounded-2xl text-white flex items-center justify-center shrink-0 tactile-key-primary"
           >
-            <Sparkles className="w-6 h-6" />
+            <Mic className="w-6 h-6" />
           </div>
           <div className="min-w-0">
             <h2 className="font-display text-base font-extrabold text-[var(--ink)] leading-tight">
-              AI Voice Bill Builder
+              Voice Bill Builder
             </h2>
             <p className="text-xs text-[var(--ink-muted)] leading-snug mt-0.5">
               Speak items like &quot;Verma ka 2 atta 480 aur 1 oil 175 bill&quot;
@@ -622,30 +625,35 @@ export const BillsView: React.FC<BillsViewProps> = ({
         </button>
       </div>
 
-      {/* Sliding Pill Bills/Quotes Tabs + Create CTA */}
+      {/* iOS 27 Segmented Bills/Quotes Tabs + Create CTA */}
       <div className="flex items-center justify-between gap-2.5">
-        <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 shadow-inner flex-1 max-w-[205px]">
-          <span
-            aria-hidden="true"
-            className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl spatial-card transition-transform duration-200 ease-out ${
-              docTypeFilter === 'quote' ? 'translate-x-full' : 'translate-x-0'
-            }`}
-          />
-          {(['bill', 'quote'] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => {
-                setDocTypeFilter(tab);
-                setArmedDeleteId(null);
-              }}
-              className={`relative z-10 min-h-[38px] px-3 rounded-xl text-xs font-extrabold capitalize transition-colors active:scale-95 ${
-                docTypeFilter === tab ? 'text-[var(--brand-accent)]' : 'text-[var(--ink-muted)]'
-              }`}
-            >
-              {tab === 'bill' ? 'Bills' : 'Quotes'}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 flex-1 max-w-[215px]">
+          {(['bill', 'quote'] as const).map((tab) => {
+            const active = docTypeFilter === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => {
+                  haptics.tap();
+                  setDocTypeFilter(tab);
+                  setArmedDeleteId(null);
+                }}
+                className={`relative min-h-[38px] px-3 rounded-xl text-xs font-extrabold capitalize transition-colors ${
+                  active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
+                }`}
+              >
+                {active && (
+                  <motion.span
+                    layoutId={prefersReducedMotion ? undefined : 'billsDocTypeSeg'}
+                    transition={{ type: 'spring', stiffness: 460, damping: 32 }}
+                    className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
+                  />
+                )}
+                <span className="relative z-10">{tab === 'bill' ? 'Bills' : 'Quotes'}</span>
+              </button>
+            );
+          })}
         </div>
 
         <button
@@ -744,396 +752,394 @@ export const BillsView: React.FC<BillsViewProps> = ({
           </button>
         </div>
       ) : (
-        <div className="space-y-2.5">
-          {filteredBills.map((b, idx) => {
-            const armed = armedDeleteId === b.id;
-            const isUnpaid = b.docType === 'bill' && b.paymentStatus === 'unpaid';
-            return (
-              <div
-                key={b.id}
-                style={{ animationDelay: `${Math.min(idx, 12) * 35}ms` }}
-                className="stagger-fade-up rounded-[22px] spatial-card p-3.5 flex items-center justify-between gap-2.5"
-              >
-                <button
-                  type="button"
-                  onClick={() => setPreviewBill(b)}
-                  className="text-left min-w-0 flex-1 flex items-center gap-3 active:scale-[0.98] transition"
+        <div className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {filteredBills.map((b, idx) => {
+              const armed = armedDeleteId === b.id;
+              const isUnpaid = b.docType === 'bill' && b.paymentStatus === 'unpaid';
+              return (
+                <motion.div
+                  layout={!prefersReducedMotion}
+                  key={b.id}
+                  initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 420,
+                    damping: 30,
+                    delay: Math.min(idx, 10) * 0.02,
+                  }}
+                  className="px-4 py-3.5 flex items-center justify-between gap-2.5 hover:bg-[var(--app-bg)]/45 transition-colors"
                 >
-                  <span className="w-10 h-10 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                    <FileText className="w-4 h-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-extrabold text-sm text-[var(--ink)] leading-snug truncate">
-                      {b.billNumber} · {b.customerName}
-                    </p>
-                    <p className="text-[11px] font-medium text-[var(--ink-muted)] mt-0.5 leading-snug truncate">
-                      {b.items.length} item(s) · {formatDateTime(b.billDate)}
-                      {b.createdByName ? ` · ${b.createdByName}` : ''}
-                    </p>
-                  </div>
-                </button>
-
-                <div className="flex items-center gap-1 shrink-0">
-                  <div className="text-right pr-1">
-                    <span className="block font-extrabold font-tabular text-sm text-[var(--ink)]">
-                      {formatINR(b.totalAmount)}
-                    </span>
-                    {b.docType === 'bill' && (
-                      <span
-                        className={`inline-block px-1.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
-                          isUnpaid
-                            ? 'bg-[var(--credit-tint)] text-[var(--credit-red)]'
-                            : 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
-                        }`}
-                      >
-                        {isUnpaid ? 'Credit' : 'Paid'}
-                      </span>
-                    )}
-                  </div>
-                  {b.docType === 'quote' && (
-                    <button
-                      type="button"
-                      disabled={convertingId === b.id}
-                      onClick={() => handleConvert(b)}
-                      title="Convert Quote to Bill"
-                      aria-label="Convert Quote to Bill"
-                      className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-[var(--alert-amber)] hover:bg-[var(--alert-tint)] active:scale-95 transition"
-                    >
-                      <FileCheck className="w-4 h-4" />
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={() => {
-                      if (armed) {
-                        void handleSafeDelete(b.id);
-                      } else {
-                        setArmedDeleteId(b.id);
-                      }
+                      haptics.tap();
+                      setPreviewBill(b);
                     }}
-                    aria-label={`Delete ${b.billNumber}`}
-                    className={`min-w-[44px] min-h-[44px] px-2 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
-                      armed
-                        ? 'bg-[var(--credit-red)] text-white shadow-sm'
-                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
-                    }`}
+                    className="text-left min-w-0 flex-1 flex items-center gap-3 active:scale-[0.985] transition"
                   >
-                    {armed ? 'Confirm?' : <Trash2 className="w-4 h-4" />}
+                    <span className="w-10 h-10 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                      <FileText className="w-4 h-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-extrabold text-sm text-[var(--ink)] leading-snug truncate">
+                        {b.billNumber} · {b.customerName}
+                      </p>
+                      <p className="text-[11px] font-medium text-[var(--ink-muted)] mt-0.5 leading-snug truncate">
+                        {b.items.length} item(s) · {formatDateTime(b.billDate)}
+                        {b.createdByName ? ` · ${b.createdByName}` : ''}
+                      </p>
+                    </div>
                   </button>
-                </div>
-              </div>
-            );
-          })}
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <div className="text-right pr-1">
+                      <span className="block font-extrabold font-tabular text-sm text-[var(--ink)]">
+                        {formatINR(b.totalAmount)}
+                      </span>
+                      {b.docType === 'bill' && (
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
+                            isUnpaid
+                              ? 'bg-[var(--credit-tint)] text-[var(--credit-red)]'
+                              : 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
+                          }`}
+                        >
+                          {isUnpaid ? 'Credit' : 'Paid'}
+                        </span>
+                      )}
+                    </div>
+                    {b.docType === 'quote' && (
+                      <button
+                        type="button"
+                        disabled={convertingId === b.id}
+                        onClick={() => handleConvert(b)}
+                        title="Convert Quote to Bill"
+                        aria-label="Convert Quote to Bill"
+                        className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-[var(--alert-amber)] hover:bg-[var(--alert-tint)] active:scale-95 transition"
+                      >
+                        <FileCheck className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.tap();
+                        if (armed) {
+                          void handleSafeDelete(b.id);
+                        } else {
+                          setArmedDeleteId(b.id);
+                        }
+                      }}
+                      aria-label={`Delete ${b.billNumber}`}
+                      className={`min-w-[44px] min-h-[44px] px-2 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
+                        armed
+                          ? 'bg-[var(--credit-red)] text-white shadow-sm'
+                          : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
+                      }`}
+                    >
+                      {armed ? 'Confirm?' : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
 
-      {/* Create Bill Builder Bottom Sheet */}
-      {creating && (
-        <div
-          onClick={() => {
-            if (!saving) {
-              setCreating(false);
-              if (onClearPrefill) onClearPrefill();
-            }
-          }}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-5 pt-3 space-y-4 max-h-[92dvh] overflow-y-auto pb-safe"
-          >
-            <div className="mx-auto w-10 h-1 rounded-full bg-[var(--surface-subtle)]" />
+      {/* Create Bill Builder Detent Sheet */}
+      <DetentSheetOverlay
+        open={creating}
+        onClose={() => {
+          if (!saving) {
+            setCreating(false);
+            if (onClearPrefill) onClearPrefill();
+          }
+        }}
+        title={`New ${docTypeFilter === 'bill' ? 'Bill' : 'Quote'}`}
+        subtitle={
+          docTypeFilter === 'bill'
+            ? 'Itemized invoice · Auto-deducts stock when linked'
+            : 'Customer price estimate'
+        }
+        initialDetent="full"
+      >
+        <div className="space-y-4 pb-safe">
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Customer Name
+              </label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Ramesh"
+                className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Mobile Number
+              </label>
+              <input
+                type="tel"
+                maxLength={10}
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                placeholder="9876543210"
+                className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              />
+            </div>
+          </div>
 
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                New {docTypeFilter === 'bill' ? 'Bill' : 'Quote'}
-              </h3>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-xs font-bold text-[var(--ink-muted)] uppercase">
+                Items {docTypeFilter === 'bill' ? '· Auto-deducts Stock' : ''}
+              </span>
               <button
                 type="button"
-                onClick={() => {
-                  setCreating(false);
-                  if (onClearPrefill) onClearPrefill();
-                }}
-                aria-label="Close bill builder"
-                className="min-w-[44px] min-h-[44px] rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition"
+                onClick={() =>
+                  setItems((prev) => [...prev, { name: '', qty: 1, rate: 0, gstRate: 0 }])
+                }
+                className="min-h-[36px] px-2.5 rounded-lg text-xs font-extrabold text-[var(--brand-accent)] bg-[var(--brand-tint)] active:scale-95 transition"
               >
-                <X className="w-5 h-5" />
+                + Add Item
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              <div>
-                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                  Customer Name
-                </label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Ramesh"
-                  className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                  Mobile Number
-                </label>
-                <input
-                  type="tel"
-                  maxLength={10}
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="9876543210"
-                  className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-xs font-bold text-[var(--ink-muted)] uppercase">
-                  Items {docTypeFilter === 'bill' ? '· Auto-deducts Stock' : ''}
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setItems((prev) => [...prev, { name: '', qty: 1, rate: 0, gstRate: 0 }])
-                  }
-                  className="min-h-[36px] px-2.5 rounded-lg text-xs font-extrabold text-[var(--brand-accent)] bg-[var(--brand-tint)] active:scale-95 transition"
+            {stockItems.length > 0 && (
+              <div className="flex items-center gap-2 rounded-xl bg-[var(--surface-subtle)] px-3 py-2.5">
+                <Package className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
+                <select
+                  aria-label="Pick item from stock"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const picked = stockItems.find((s) => s.id === e.target.value);
+                    if (picked) {
+                      setItems((prev) => [
+                        ...prev.filter((row) => row.name !== 'Grocery Item' || prev.length > 1),
+                        {
+                          name: picked.name,
+                          qty: 1,
+                          rate: picked.salePrice,
+                          gstRate: 0,
+                          stockItemId: picked.id,
+                        },
+                      ]);
+                    }
+                    e.target.value = '';
+                  }}
+                  className="flex-1 bg-transparent text-xs font-bold text-[var(--ink)] outline-none"
                 >
-                  + Add Item
-                </button>
-              </div>
-
-              {stockItems.length > 0 && (
-                <div className="flex items-center gap-2 rounded-xl bg-[var(--surface-subtle)] px-3 py-2.5">
-                  <Package className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
-                  <select
-                    aria-label="Pick item from stock"
-                    defaultValue=""
-                    onChange={(e) => {
-                      const picked = stockItems.find((s) => s.id === e.target.value);
-                      if (picked) {
-                        setItems((prev) => [
-                          ...prev.filter((row) => row.name !== 'Grocery Item' || prev.length > 1),
-                          {
-                            name: picked.name,
-                            qty: 1,
-                            rate: picked.salePrice,
-                            gstRate: 0,
-                            stockItemId: picked.id,
-                          },
-                        ]);
-                      }
-                      e.target.value = '';
-                    }}
-                    className="flex-1 bg-transparent text-xs font-bold text-[var(--ink)] outline-none"
-                  >
-                    <option value="">
-                      + Add from Stock Inventory ({stockItems.length} items)...
+                  <option value="">
+                    + Add from Stock Inventory ({stockItems.length} items)...
+                  </option>
+                  {stockItems.map((stk) => (
+                    <option key={stk.id} value={stk.id}>
+                      {stk.name} — ₹{stk.salePrice}/{stk.unit} ({stk.quantity} left)
                     </option>
-                    {stockItems.map((stk) => (
-                      <option key={stk.id} value={stk.id}>
-                        {stk.name} — ₹{stk.salePrice}/{stk.unit} ({stk.quantity} left)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {items.map((it, idx) => (
-                <div
-                  key={idx}
-                  className="grid grid-cols-12 gap-1.5 items-center rounded-2xl bg-[var(--surface-subtle)] p-2"
-                >
-                  <input
-                    type="text"
-                    value={it.name}
-                    onChange={(e) => {
-                      const next = [...items];
-                      next[idx] = { ...it, name: e.target.value, stockItemId: undefined };
-                      setItems(next);
-                    }}
-                    placeholder="Item name"
-                    className="col-span-5 min-h-[40px] rounded-xl bg-[var(--surface)] px-2.5 text-xs font-semibold text-[var(--ink)] outline-none shadow-xs"
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    value={it.qty || ''}
-                    onChange={(e) => {
-                      const next = [...items];
-                      next[idx] = { ...it, qty: Number(e.target.value) || 0 };
-                      setItems(next);
-                    }}
-                    placeholder="Qty"
-                    className="col-span-2 min-h-[40px] rounded-xl bg-[var(--surface)] px-2 text-xs font-tabular text-[var(--ink)] outline-none shadow-xs"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    value={it.rate || ''}
-                    onChange={(e) => {
-                      const next = [...items];
-                      next[idx] = { ...it, rate: Number(e.target.value) || 0 };
-                      setItems(next);
-                    }}
-                    placeholder="₹ Rate"
-                    className="col-span-3 min-h-[40px] rounded-xl bg-[var(--surface)] px-2 text-xs font-tabular text-[var(--ink)] outline-none shadow-xs"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    value={it.gstRate}
-                    onChange={(e) => {
-                      const next = [...items];
-                      next[idx] = { ...it, gstRate: Number(e.target.value) || 0 };
-                      setItems(next);
-                    }}
-                    placeholder="GST%"
-                    className="col-span-2 min-h-[40px] rounded-xl bg-[var(--surface)] px-2 text-xs font-tabular text-[var(--ink)] outline-none shadow-xs"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <div>
-                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                  Discount (₹)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={discountAmount}
-                  onChange={(e) => setDiscountAmount(e.target.value)}
-                  placeholder="0"
-                  className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                />
-              </div>
-
-              {docTypeFilter === 'bill' && (
-                <div>
-                  <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                    Payment Mode
-                  </span>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentStatus('paid')}
-                      className={`min-h-[44px] rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
-                        paymentStatus === 'paid'
-                          ? 'bg-[var(--debit-tint)] text-[var(--debit-green)] ring-2 ring-[var(--debit-green)]'
-                          : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
-                      }`}
-                    >
-                      Paid
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentStatus('unpaid')}
-                      className={`min-h-[44px] rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
-                        paymentStatus === 'unpaid'
-                          ? 'bg-[var(--credit-tint)] text-[var(--credit-red)] ring-2 ring-[var(--credit-red)]'
-                          : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
-                      }`}
-                    >
-                      Credit
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {docTypeFilter === 'bill' && paymentStatus === 'paid' && (
-              <div className="flex items-center justify-between gap-2 rounded-xl bg-[var(--surface-subtle)] px-3 py-2">
-                <span className="text-[11px] font-bold text-[var(--ink-muted)]">
-                  Sync Paid Bill to Galla
-                </span>
-                <div className="flex items-center gap-1">
-                  {(
-                    [
-                      { id: null, label: 'Off' },
-                      { id: 'cash', label: 'Cash' },
-                      { id: 'upi', label: 'UPI' },
-                    ] as const
-                  ).map((opt) => (
-                    <button
-                      key={opt.label}
-                      type="button"
-                      onClick={() => setSyncGallaMode(opt.id)}
-                      className={`min-h-[36px] px-2.5 rounded-lg text-[11px] font-extrabold active:scale-95 transition ${
-                        syncGallaMode === opt.id
-                          ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
-                          : 'bg-[var(--surface)] text-[var(--ink-muted)]'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
                   ))}
-                </div>
+                </select>
               </div>
             )}
 
+            {items.map((it, idx) => (
+              <div
+                key={idx}
+                className="grid grid-cols-12 gap-1.5 items-center rounded-2xl bg-[var(--surface-subtle)] p-2"
+              >
+                <input
+                  type="text"
+                  value={it.name}
+                  onChange={(e) => {
+                    const next = [...items];
+                    next[idx] = { ...it, name: e.target.value, stockItemId: undefined };
+                    setItems(next);
+                  }}
+                  placeholder="Item name"
+                  className="col-span-5 min-h-[40px] rounded-xl bg-[var(--surface)] px-2.5 text-xs font-semibold text-[var(--ink)] outline-none shadow-xs"
+                />
+                <input
+                  type="number"
+                  min="1"
+                  value={it.qty || ''}
+                  onChange={(e) => {
+                    const next = [...items];
+                    next[idx] = { ...it, qty: Number(e.target.value) || 0 };
+                    setItems(next);
+                  }}
+                  placeholder="Qty"
+                  className="col-span-2 min-h-[40px] rounded-xl bg-[var(--surface)] px-2 text-xs font-tabular text-[var(--ink)] outline-none shadow-xs"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  value={it.rate || ''}
+                  onChange={(e) => {
+                    const next = [...items];
+                    next[idx] = { ...it, rate: Number(e.target.value) || 0 };
+                    setItems(next);
+                  }}
+                  placeholder="₹ Rate"
+                  className="col-span-3 min-h-[40px] rounded-xl bg-[var(--surface)] px-2 text-xs font-tabular text-[var(--ink)] outline-none shadow-xs"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  value={it.gstRate}
+                  onChange={(e) => {
+                    const next = [...items];
+                    next[idx] = { ...it, gstRate: Number(e.target.value) || 0 };
+                    setItems(next);
+                  }}
+                  placeholder="GST%"
+                  className="col-span-2 min-h-[40px] rounded-xl bg-[var(--surface)] px-2 text-xs font-tabular text-[var(--ink)] outline-none shadow-xs"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1.5">
-                Select Bill Template
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {(
-                  [
-                    { id: 'gst-color', label: 'Coloured GST' },
-                    { id: 'modern', label: 'Modern' },
-                    { id: 'classic', label: 'Classic' },
-                    { id: 'thermal-58', label: '58mm Thermal' },
-                  ] as const
-                ).map((tpl) => (
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Discount (₹)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(e.target.value)}
+                placeholder="0"
+                className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              />
+            </div>
+
+            {docTypeFilter === 'bill' && (
+              <div>
+                <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                  Payment Mode
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
                   <button
-                    key={tpl.id}
                     type="button"
-                    onClick={() => setTemplateId(tpl.id)}
-                    className={`min-h-[44px] rounded-xl text-xs font-bold active:scale-95 transition ${
-                      templateId === tpl.id
-                        ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]'
+                    onClick={() => setPaymentStatus('paid')}
+                    className={`min-h-[44px] rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
+                      paymentStatus === 'paid'
+                        ? 'bg-[var(--debit-tint)] text-[var(--debit-green)] ring-2 ring-[var(--debit-green)]'
                         : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
                     }`}
                   >
-                    {tpl.label}
+                    Paid
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentStatus('unpaid')}
+                    className={`min-h-[44px] rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
+                      paymentStatus === 'unpaid'
+                        ? 'bg-[var(--credit-tint)] text-[var(--credit-red)] ring-2 ring-[var(--credit-red)]'
+                        : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
+                    }`}
+                  >
+                    Credit
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {docTypeFilter === 'bill' && paymentStatus === 'paid' && (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-[var(--surface-subtle)] px-3 py-2">
+              <span className="text-[11px] font-bold text-[var(--ink-muted)]">
+                Sync Paid Bill to Galla
+              </span>
+              <div className="flex items-center gap-1">
+                {(
+                  [
+                    { id: null, label: 'Off' },
+                    { id: 'cash', label: 'Cash' },
+                    { id: 'upi', label: 'UPI' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    onClick={() => setSyncGallaMode(opt.id)}
+                    className={`min-h-[36px] px-2.5 rounded-lg text-[11px] font-extrabold active:scale-95 transition ${
+                      syncGallaMode === opt.id
+                        ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
+                        : 'bg-[var(--surface)] text-[var(--ink-muted)]'
+                    }`}
+                  >
+                    {opt.label}
                   </button>
                 ))}
               </div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">Notes</label>
-              <input
-                type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-xs text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-              />
+          <div>
+            <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1.5">
+              Select Bill Template
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { id: 'gst-color', label: 'Coloured GST' },
+                  { id: 'modern', label: 'Modern' },
+                  { id: 'classic', label: 'Classic' },
+                  { id: 'thermal-58', label: '58mm Thermal' },
+                ] as const
+              ).map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => setTemplateId(tpl.id)}
+                  className={`min-h-[44px] rounded-xl text-xs font-bold active:scale-95 transition ${
+                    templateId === tpl.id
+                      ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]'
+                      : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
+                  }`}
+                >
+                  {tpl.label}
+                </button>
+              ))}
             </div>
-
-            <div className="flex items-center justify-between pt-2">
-              <div>
-                <p className="text-xs text-[var(--ink-muted)]">Grand Total (incl. GST)</p>
-                <p className="font-display text-xl font-extrabold font-tabular text-[var(--brand-accent)]">
-                  {formatINR(grandTotal)}
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={handleCreate}
-                className="min-h-[48px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
-              >
-                {saving ? 'Saving...' : 'Save & Preview'}
-              </button>
-            </div>
-            {error && <p className="text-xs font-bold text-[var(--credit-red)]">{error}</p>}
           </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">Notes</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-xs text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <div>
+              <p className="text-xs text-[var(--ink-muted)]">Grand Total (incl. GST)</p>
+              <p className="font-display text-xl font-extrabold font-tabular text-[var(--brand-accent)]">
+                {formatINR(grandTotal)}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleCreate}
+              className="min-h-[48px] px-5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
+            >
+              {saving ? 'Saving...' : 'Save & Preview'}
+            </button>
+          </div>
+          {error && <p className="text-xs font-bold text-[var(--credit-red)]">{error}</p>}
         </div>
-      )}
+      </DetentSheetOverlay>
     </div>
   );
 };

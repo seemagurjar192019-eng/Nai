@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   AlertTriangle,
   Calendar,
@@ -34,8 +35,9 @@ import type {
   LedgerAccount,
   SortByOption,
 } from '@/lib/types';
-
 import type { PersonaCapabilities } from '@/lib/persona';
+import { haptics } from '@/utils/haptics';
+import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
 
 interface CollectionViewProps {
   accounts: LedgerAccount[];
@@ -50,6 +52,7 @@ interface CollectionViewProps {
 
 const RING_RADIUS = 21;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const SEG_SPRING = { type: 'spring' as const, stiffness: 420, damping: 30 };
 
 function TrustAvatarRing({
   name,
@@ -115,6 +118,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
   onSaveUpiId,
   onOpenAccount,
 }) => {
+  const prefersReducedMotion = useReducedMotion();
   const t = getUIStrings(language);
   const [rawPartyKind, setRawPartyKind] = useState<AccountKind>('customer');
   const allowSuppliers = capabilities ? capabilities.showSuppliers : true;
@@ -171,6 +175,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
     setUpiBusy(true);
     try {
       await onSaveUpiId(clean);
+      haptics.success();
       setShowUpiSetup(false);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to save UPI ID.');
@@ -185,6 +190,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
     setDueBusy(true);
     try {
       await onUpdateAccountDue(dueEditAccount.id, dueInput);
+      haptics.success();
       setDueEditAccount(null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to update due date.');
@@ -195,37 +201,40 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
 
   return (
     <div className="space-y-4 pb-32">
-      {/* Sliding Pill Customer Receivables vs Supplier Payables Switch (hidden in Personal mode) */}
+      {/* Spring Segmented Customer Receivables vs Supplier Payables Switch */}
       {allowSuppliers && (
-        <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 shadow-inner">
-          <span
-            aria-hidden="true"
-            className={`absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-xl bg-[var(--surface)] shadow-sm transition-transform duration-200 ease-out ${
-              partyKind === 'supplier' ? 'translate-x-full' : 'translate-x-0'
-            }`}
-          />
+        <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1">
           {(
             [
               { id: 'customer', label: `${capabilities?.primarySegmentLabel || 'Customers'} (Collect)` },
               { id: 'supplier', label: `${capabilities?.secondarySegmentLabel || 'Suppliers'} (Pay)` },
             ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setRawPartyKind(tab.id);
-                setSelectedIndex(null);
-              }}
-              className={`relative z-10 min-h-[44px] px-3 rounded-xl text-xs font-extrabold transition-colors active:scale-95 ${
-                partyKind === tab.id
-                  ? 'text-[var(--brand)] dark:text-[var(--brand-accent)]'
-                  : 'text-[var(--ink-muted)]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          ).map((tab) => {
+            const active = partyKind === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  haptics.tap();
+                  setRawPartyKind(tab.id);
+                  setSelectedIndex(null);
+                }}
+                className={`relative z-10 min-h-[42px] px-3 rounded-xl text-xs font-extrabold transition-colors ${
+                  active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
+                }`}
+              >
+                {active && (
+                  <motion.span
+                    layoutId={prefersReducedMotion ? undefined : 'collectionPartyKindSeg'}
+                    transition={SEG_SPRING}
+                    className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
+                  />
+                )}
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -237,13 +246,14 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
               key={c.id}
               type="button"
               onClick={() => {
+                haptics.tap();
                 setFilterChip(c.id);
                 setSelectedIndex(null);
               }}
-              className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 active:scale-95 transition ${
+              className={`min-h-[42px] px-3.5 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 active:scale-95 transition ${
                 filterChip === c.id
-                  ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-xs'
-                  : 'spatial-card text-[var(--ink-muted)]'
+                  ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-1 ring-[var(--brand-accent)]/30'
+                  : 'ios27-inset-group text-[var(--ink-muted)]'
               }`}
             >
               {c.label}
@@ -255,7 +265,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
           type="button"
           onClick={() => setShowSort(true)}
           aria-label="Sort collection accounts"
-          className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card flex items-center justify-center shrink-0 active:scale-95 transition"
+          className="min-w-[44px] min-h-[44px] rounded-2xl ios27-inset-group flex items-center justify-center shrink-0 active:scale-95 transition"
         >
           <SlidersHorizontal className="w-4 h-4 text-[var(--ink)]" />
         </button>
@@ -276,9 +286,9 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
         </div>
       )}
 
-      {/* Compact Due Cards List (tap card for QR Bottom Sheet; 1-tap Remind on WhatsApp per row) */}
+      {/* Grouped Inset Due List */}
       {dueAccounts.length === 0 ? (
-        <div className="rounded-[28px] spatial-card p-8 text-center space-y-3">
+        <div className="rounded-[28px] ios27-inset-group p-8 text-center space-y-3">
           <p className="font-display text-base font-bold text-[var(--ink)]">
             No pending {partyKind === 'customer' ? 'customer dues' : 'supplier payables'} in this
             filter.
@@ -290,99 +300,104 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
           </p>
         </div>
       ) : (
-        <div className="space-y-2.5">
-          {dueAccounts.map((acc, idx) => {
-            const trust = trustScoresByAccount[acc.id];
-            const msg = buildReminderMessage({
-              customerName: acc.name,
-              amount: acc.balance,
-              shopName: business.name,
-              upiId: business.upiId,
-              language,
-            });
-            const statusSummary =
-              trust && partyKind === 'customer'
-                ? `Trust ${trust.score}/100 · ${trust.recoveryTimingHint}`
-                : acc.promiseDate
-                  ? `Promise: ${acc.promiseDate}`
-                  : acc.dueDate
-                    ? `Due: ${acc.dueDate}`
-                    : acc.phone
-                      ? `+91 ${acc.phone}`
-                      : 'Tap for UPI QR & details';
+        <div className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
+          <AnimatePresence mode="popLayout">
+            {dueAccounts.map((acc, idx) => {
+              const trust = trustScoresByAccount[acc.id];
+              const msg = buildReminderMessage({
+                customerName: acc.name,
+                amount: acc.balance,
+                shopName: business.name,
+                upiId: business.upiId,
+                language,
+              });
+              const statusSummary =
+                trust && partyKind === 'customer'
+                  ? `Trust ${trust.score}/100 · ${trust.recoveryTimingHint}`
+                  : acc.promiseDate
+                    ? `Promise: ${acc.promiseDate}`
+                    : acc.dueDate
+                      ? `Due: ${acc.dueDate}`
+                      : acc.phone
+                        ? `+91 ${acc.phone}`
+                        : 'Tap for UPI QR & details';
 
-            return (
-              <div
-                key={acc.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedIndex(idx)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setSelectedIndex(idx);
-                  }
-                }}
-                style={{ animationDelay: `${Math.min(idx, 12) * 35}ms` }}
-                className="stagger-fade-up rounded-[22px] spatial-card p-3.5 flex items-center justify-between gap-2.5 active:scale-[0.985] transition cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <TrustAvatarRing
-                    name={acc.name}
-                    score={trust?.score ?? 100}
-                    hasTrust={Boolean(trust && partyKind === 'customer')}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-extrabold text-[var(--ink)] leading-snug truncate">
-                      {acc.name}
-                    </p>
-                    <p
-                      className={`text-[11px] font-semibold leading-snug mt-0.5 truncate ${
-                        trust?.band === 'high-risk' && partyKind === 'customer'
-                          ? 'text-[var(--credit-red)]'
-                          : 'text-[var(--ink-muted)]'
-                      }`}
-                    >
-                      {statusSummary}
-                    </p>
+              return (
+                <motion.div
+                  key={acc.id}
+                  layout={!prefersReducedMotion}
+                  initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                  transition={{ duration: 0.18 }}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedIndex(idx)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedIndex(idx);
+                    }
+                  }}
+                  className="px-4 py-3.5 flex items-center justify-between gap-2.5 hover:bg-[var(--surface-subtle)]/40 transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <TrustAvatarRing
+                      name={acc.name}
+                      score={trust?.score ?? 100}
+                      hasTrust={Boolean(trust && partyKind === 'customer')}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-extrabold text-[var(--ink)] leading-snug truncate">
+                        {acc.name}
+                      </p>
+                      <p
+                        className={`text-[11px] font-semibold leading-snug mt-0.5 truncate ${
+                          trust?.band === 'high-risk' && partyKind === 'customer'
+                            ? 'text-[var(--credit-red)]'
+                            : 'text-[var(--ink-muted)]'
+                        }`}
+                      >
+                        {statusSummary}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <p className="text-base font-extrabold font-tabular text-[var(--credit-red)]">
-                    {formatINR(Math.abs(acc.balance))}
-                  </p>
-                  {partyKind === 'customer' ? (
-                    <a
-                      href={buildWhatsAppUrl(acc.phone, msg)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="min-h-[44px] px-3 rounded-xl bg-[var(--debit-green)] text-white text-xs font-extrabold inline-flex items-center gap-1.5 whitespace-nowrap shadow-xs active:scale-95 transition"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>Remind</span>
-                    </a>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenAccount(acc);
-                      }}
-                      className="min-h-[44px] px-3 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center gap-1 whitespace-nowrap active:scale-95 transition"
-                    >
-                      <span>Open Ledger</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <p className="text-base font-extrabold font-tabular text-[var(--credit-red)]">
+                      {formatINR(Math.abs(acc.balance))}
+                    </p>
+                    {partyKind === 'customer' ? (
+                      <a
+                        href={buildWhatsAppUrl(acc.phone, msg)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="min-h-[40px] px-3 rounded-xl bg-[var(--debit-green)] text-white text-xs font-extrabold inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 transition"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>Remind</span>
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenAccount(acc);
+                        }}
+                        className="min-h-[40px] px-3 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center gap-1 whitespace-nowrap active:scale-95 transition"
+                      >
+                        <span>Open Ledger</span>
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
 
-      {/* Bulk WhatsApp Reminder Action (customers) */}
       {partyKind === 'customer' && dueAccounts.length > 0 && (
         <button
           type="button"
@@ -394,68 +409,48 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
         </button>
       )}
 
-      {/* Payment Due Reminder UPI QR Bottom Sheet */}
-      {current && safeSelectedIndex !== null && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setSelectedIndex(null)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 max-h-[90dvh] overflow-y-auto pb-safe"
-          >
-            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-            <div className="flex items-start justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedIndex(null);
-                  onOpenAccount(current);
-                }}
-                className="flex items-center gap-3 text-left min-w-0 flex-1 active:scale-95 transition"
-              >
+      {/* Payment Due Reminder UPI QR Detent Sheet */}
+      <DetentSheetOverlay
+        open={Boolean(current && safeSelectedIndex !== null)}
+        onClose={() => setSelectedIndex(null)}
+        title={current?.name || 'Reminder'}
+        subtitle={
+          currentTrust && partyKind === 'customer'
+            ? `Trust ${currentTrust.score}/100 · ${currentTrust.recoveryTimingHint}`
+            : current?.phone
+              ? `+91 ${current.phone}`
+              : undefined
+        }
+        initialDetent="full"
+      >
+        {current && safeSelectedIndex !== null && (
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedIndex(null);
+                onOpenAccount(current);
+              }}
+              className="w-full flex items-center justify-between gap-3 rounded-2xl bg-[var(--app-bg)] p-3 text-left active:scale-[0.98] transition"
+            >
+              <div className="flex items-center gap-3 min-w-0">
                 <TrustAvatarRing
                   name={current.name}
                   score={currentTrust?.score ?? 100}
                   hasTrust={Boolean(currentTrust && partyKind === 'customer')}
                 />
                 <div className="min-w-0">
-                  <p className="font-display text-base font-extrabold text-[var(--ink)]">
-                    {current.name}
+                  <p className="font-display text-sm font-extrabold text-[var(--ink)] truncate">
+                    Open {current.name}&apos;s Full Statement
                   </p>
-                  <p className="text-xs font-medium text-[var(--ink-muted)] leading-snug">
-                    {current.phone
-                      ? `+91 ${current.phone}`
-                      : current.lastNote || (partyKind === 'customer' ? 'Customer' : 'Supplier')}
-                    {current.promiseDate ? ` · Promise: ${current.promiseDate}` : ''}
+                  <p className="text-[11px] text-[var(--ink-muted)] truncate">
+                    {current.promiseDate ? `Promise: ${current.promiseDate}` : 'View timeline & entries'}
                   </p>
-                  {currentTrust && partyKind === 'customer' && (
-                    <p
-                      className={`text-[11px] font-bold mt-0.5 leading-snug ${
-                        currentTrust.band === 'high-risk'
-                          ? 'text-[var(--credit-red)]'
-                          : 'text-[var(--ink-muted)]'
-                      }`}
-                    >
-                      Trust {currentTrust.score}/100 · {currentTrust.recoveryTimingHint}
-                    </p>
-                  )}
                 </div>
-              </button>
+              </div>
+              <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setSelectedIndex(null)}
-                aria-label="Close reminder"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition shrink-0"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Center Reminder + Live UPI QR */}
             <div className="relative rounded-[24px] bg-[var(--app-bg)] p-5 text-center space-y-3">
               <button
                 type="button"
@@ -522,7 +517,6 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
               )}
             </div>
 
-            {/* Due Date + Call */}
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
@@ -567,7 +561,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
                 )}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full min-h-[50px] rounded-2xl bg-[var(--debit-green)] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+                className="w-full min-h-[50px] rounded-2xl bg-[var(--debit-green)] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm active:scale-95 transition"
               >
                 <MessageCircle className="w-5 h-5" />
                 <span>{t.sendWhatsapp}</span>
@@ -589,231 +583,177 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
               {safeSelectedIndex + 1} / {dueAccounts.length}
             </p>
           </div>
-        </div>
-      )}
+        )}
+      </DetentSheetOverlay>
 
-      {/* Setup UPI ID Bottom Sheet */}
-      {showUpiSetup && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setShowUpiSetup(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
-          >
-            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-            <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-              Setup Shop UPI ID
-            </h3>
-            <p className="text-xs text-[var(--ink-muted)]">
-              Enter your VPA (e.g. sharma@okicici or 9876543210@ybl) to generate live QR codes for
-              customers.
-            </p>
-            <input
-              type="text"
-              value={upiInput}
-              onChange={(e) => {
-                setUpiInput(e.target.value);
-                setActionError('');
+      {/* Setup UPI ID Detent Sheet */}
+      <DetentSheetOverlay
+        open={showUpiSetup}
+        onClose={() => setShowUpiSetup(false)}
+        title="Setup Shop UPI ID"
+        subtitle="Generates live QR codes for customers"
+        initialDetent="peek"
+        allowDetentToggle={false}
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-[var(--ink-muted)]">
+            Enter your VPA (e.g. sharma@okicici or 9876543210@ybl).
+          </p>
+          <input
+            type="text"
+            value={upiInput}
+            onChange={(e) => {
+              setUpiInput(e.target.value);
+              setActionError('');
+            }}
+            placeholder="yourshop@upi"
+            className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] px-3.5 font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+          />
+          {actionError && <p className="text-xs font-bold text-[var(--credit-red)]">{actionError}</p>}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={upiBusy}
+              onClick={handleSaveUpi}
+              className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold tactile-key-primary disabled:opacity-60 active:scale-95 transition"
+            >
+              {upiBusy ? 'Saving...' : 'Save UPI ID'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowUpiSetup(false)}
+              className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] font-bold text-[var(--ink)] active:scale-95 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </DetentSheetOverlay>
+
+      {/* Due Date Detent Sheet */}
+      <DetentSheetOverlay
+        open={Boolean(dueEditAccount)}
+        onClose={() => setDueEditAccount(null)}
+        title={`Due Date — ${dueEditAccount?.name || ''}`}
+        initialDetent="peek"
+        allowDetentToggle={false}
+      >
+        <div className="space-y-4">
+          <input
+            type="date"
+            value={dueInput}
+            onChange={(e) => setDueInput(e.target.value)}
+            className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] px-3.5 font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+          />
+          {actionError && <p className="text-xs font-bold text-[var(--credit-red)]">{actionError}</p>}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={dueBusy}
+              onClick={handleSaveDue}
+              className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold tactile-key-primary disabled:opacity-60 active:scale-95 transition"
+            >
+              {dueBusy ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDueEditAccount(null)}
+              className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] font-bold text-[var(--ink)] active:scale-95 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </DetentSheetOverlay>
+
+      {/* Sort By Detent Sheet */}
+      <DetentSheetOverlay
+        open={showSort}
+        onClose={() => setShowSort(false)}
+        title="Sort Collections"
+        initialDetent="peek"
+        allowDetentToggle={false}
+      >
+        <div className="ios27-inset-group rounded-2xl divide-y divide-[var(--surface-border)] overflow-hidden">
+          {(
+            [
+              { id: 'recovery-priority', label: 'Recovery Priority (Smart)' },
+              { id: 'recommended', label: 'Recommended' },
+              { id: 'last-payment', label: 'Last Payment' },
+              { id: 'latest-activity', label: 'Latest Activity' },
+              { id: 'due-amount', label: 'Due Amount' },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => {
+                setSortBy(opt.id);
+                setShowSort(false);
               }}
-              placeholder="yourshop@upi"
-              className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] px-3.5 font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-            />
-            {actionError && (
-              <p className="text-xs font-bold text-[var(--credit-red)]">{actionError}</p>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={upiBusy}
-                onClick={handleSaveUpi}
-                className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold tactile-key-primary disabled:opacity-60 active:scale-95 transition"
-              >
-                {upiBusy ? 'Saving...' : 'Save UPI ID'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowUpiSetup(false)}
-                className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] font-bold text-[var(--ink)] active:scale-95 transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+              className={`w-full min-h-[48px] px-4 flex items-center justify-between text-sm font-bold transition ${
+                sortBy === opt.id
+                  ? 'bg-[var(--brand-tint)]/50 text-[var(--brand-accent)]'
+                  : 'text-[var(--ink)]'
+              }`}
+            >
+              <span>{opt.label}</span>
+              {sortBy === opt.id && <Check className="w-4 h-4" />}
+            </button>
+          ))}
         </div>
-      )}
+      </DetentSheetOverlay>
 
-      {/* Due Date Bottom Sheet */}
-      {dueEditAccount && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setDueEditAccount(null)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe"
-          >
-            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-            <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-              Due Date — {dueEditAccount.name}
-            </h3>
-            <input
-              type="date"
-              value={dueInput}
-              onChange={(e) => setDueInput(e.target.value)}
-              className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] px-3.5 font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-            />
-            {actionError && (
-              <p className="text-xs font-bold text-[var(--credit-red)]">{actionError}</p>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={dueBusy}
-                onClick={handleSaveDue}
-                className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold tactile-key-primary disabled:opacity-60 active:scale-95 transition"
-              >
-                {dueBusy ? 'Saving...' : 'Save'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDueEditAccount(null)}
-                className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] font-bold text-[var(--ink)] active:scale-95 transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Sort By Bottom Sheet */}
-      {showSort && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setShowSort(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-2.5 pb-safe"
-          >
-            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-            <div className="flex items-center justify-between pb-1">
-              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">Sort By</h3>
-              <button
-                type="button"
-                onClick={() => setShowSort(false)}
-                aria-label="Close sort"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            {(
-              [
-                { id: 'recovery-priority', label: 'Recovery Priority (Smart)' },
-                { id: 'recommended', label: 'Recommended' },
-                { id: 'last-payment', label: 'Last Payment' },
-                { id: 'latest-activity', label: 'Latest Activity' },
-                { id: 'due-amount', label: 'Due Amount' },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => {
-                  setSortBy(opt.id);
-                  setShowSort(false);
-                }}
-                className={`w-full min-h-[46px] px-4 rounded-2xl flex items-center justify-between text-sm font-bold active:scale-[0.98] transition ${
-                  sortBy === opt.id
-                    ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
-                    : 'bg-[var(--app-bg)] hover:bg-[var(--surface-subtle)] text-[var(--ink)]'
-                }`}
-              >
-                <span>{opt.label}</span>
-                {sortBy === opt.id && <Check className="w-4 h-4" />}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Bulk WhatsApp Queue Bottom Sheet */}
-      {showBulkModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setShowBulkModal(false)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 max-h-[85dvh] overflow-y-auto pb-safe"
-          >
-            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                1-Click Vasooli Queue
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowBulkModal(false)}
-                aria-label="Close queue"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-xs text-[var(--ink-muted)]">
-              Tap Send next to any customer to launch their pre-filled WhatsApp payment reminder
-              with your UPI QR link.
-            </p>
-            <div className="space-y-2">
-              {dueAccounts.map((acc) => {
-                const trust = trustScoresByAccount[acc.id];
-                const msg = buildReminderMessage({
-                  customerName: acc.name,
-                  amount: acc.balance,
-                  shopName: business.name,
-                  upiId: business.upiId,
-                  language,
-                });
-                return (
-                  <div
-                    key={acc.id}
-                    className="rounded-2xl bg-[var(--app-bg)] p-3 flex items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-bold text-sm text-[var(--ink)] truncate">{acc.name}</p>
-                      <p className="text-xs font-tabular font-bold text-[var(--credit-red)]">
-                        {formatINR(acc.balance)} Due
-                        {trust ? ` · Trust ${trust.score}/100` : ''}
-                      </p>
-                    </div>
-                    <a
-                      href={buildWhatsAppUrl(acc.phone, msg)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="min-h-[44px] px-3.5 rounded-xl bg-[var(--debit-green)] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 active:scale-95 transition"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      <span>Send</span>
-                    </a>
+      {/* Bulk WhatsApp Queue Detent Sheet */}
+      <DetentSheetOverlay
+        open={showBulkModal}
+        onClose={() => setShowBulkModal(false)}
+        title="1-Click Vasooli Queue"
+        subtitle={`${dueAccounts.length} pending parties`}
+        initialDetent="full"
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-[var(--ink-muted)]">
+            Tap Send next to any customer to launch their pre-filled WhatsApp payment reminder with
+            your UPI QR link.
+          </p>
+          <div className="ios27-inset-group rounded-2xl divide-y divide-[var(--surface-border)] overflow-hidden">
+            {dueAccounts.map((acc) => {
+              const trust = trustScoresByAccount[acc.id];
+              const msg = buildReminderMessage({
+                customerName: acc.name,
+                amount: acc.balance,
+                shopName: business.name,
+                upiId: business.upiId,
+                language,
+              });
+              return (
+                <div
+                  key={acc.id}
+                  className="px-4 py-3 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-[var(--ink)] truncate">{acc.name}</p>
+                    <p className="text-xs font-tabular font-bold text-[var(--credit-red)]">
+                      {formatINR(acc.balance)} Due
+                      {trust ? ` · Trust ${trust.score}/100` : ''}
+                    </p>
                   </div>
-                );
-              })}
-            </div>
+                  <a
+                    href={buildWhatsAppUrl(acc.phone, msg)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-h-[40px] px-3.5 rounded-xl bg-[var(--debit-green)] text-white text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 active:scale-95 transition"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Send</span>
+                  </a>
+                </div>
+              );
+            })}
           </div>
         </div>
-      )}
+      </DetentSheetOverlay>
     </div>
   );
 };

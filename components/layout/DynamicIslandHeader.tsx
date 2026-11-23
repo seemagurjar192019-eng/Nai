@@ -346,7 +346,7 @@ export const DynamicIslandHeader: React.FC<DynamicIslandHeaderProps> = ({
                 >
                   <Bell
                     className={`w-4 h-4 ${
-                      unreadCount > 0 ? 'bell-wiggle text-[var(--brand-accent)]' : ''
+                      unreadCount > 0 ? 'text-[var(--brand-accent)]' : ''
                     }`}
                   />
                   {unreadCount > 0 && (

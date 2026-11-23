@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Camera,
@@ -12,8 +12,8 @@ import {
   RefreshCw,
   Trash2,
   Upload,
-  X,
 } from 'lucide-react';
+import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
 import {
   compressImageToDataUrl,
   formatINR,
@@ -77,15 +77,6 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
 
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !scanning && !posting) onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, scanning, posting, onClose]);
 
   const matchedAccount = useMemo(() => {
     const clean = partyName.trim().toLowerCase();
@@ -172,7 +163,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
       );
       setHasScanResult(true);
     } catch (err) {
-      setScanError(err instanceof Error ? err.message : 'AI Parchi scan failed. Try a clearer photo.');
+      setScanError(err instanceof Error ? err.message : 'Receipt scan failed. Try a clearer photo.');
     } finally {
       setScanning(false);
     }
@@ -253,50 +244,33 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
           ? validItems
           : [{ name: 'Parchi Total', qty: 1, rate: effectiveTotal, gstRate: 0 }],
       paymentStatus: direction === 'received' ? 'paid' : 'unpaid',
-      notes: notes.trim() || 'Created from AI Parchi Scan',
+      notes: notes.trim() || 'Created from Receipt Scan',
     });
     resetAll();
     onClose();
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="AI Parchi and Receipt Scanner"
-      className="fixed inset-0 z-50 bg-black/55 flex items-end justify-center"
+    <DetentSheetOverlay
+      open={open}
+      onClose={() => {
+        if (scanning || posting) return;
+        resetAll();
+        onClose();
+      }}
+      title="Receipt Scanner"
+      subtitle="Snap a handwritten parchi or supplier bill · Post to Ledger or GST Bill"
+      initialDetent="full"
     >
-      <div className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-5 space-y-4 max-h-[92dvh] overflow-y-auto pb-safe">
-        <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-xl font-extrabold text-[var(--ink)] flex items-center gap-2.5">
-              <span
-                style={{ background: 'var(--munim-gradient)' }}
-                className="w-9 h-9 rounded-2xl text-white flex items-center justify-center shadow-inner shrink-0"
-              >
-                <Receipt className="w-4 h-4" />
-              </span>
-              <span>AI Parchi Scanner</span>
-            </h2>
-            <p className="text-xs text-[var(--ink-muted)] mt-0.5">
-              Snap a handwritten parchi or supplier bill · Post to Khata or GST Bill
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={scanning || posting}
-            onClick={() => {
-              resetAll();
-              onClose();
-            }}
-            aria-label="Close Parchi Scanner"
-            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+      <div className="space-y-4 pb-safe">
+        <div className="flex items-center gap-2.5 text-xs font-bold text-[var(--ink-muted)]">
+          <span
+            style={{ background: 'var(--munim-gradient)' }}
+            className="w-8 h-8 rounded-xl text-white flex items-center justify-center shrink-0"
           >
-            <X className="w-5 h-5" />
-          </button>
+            <Receipt className="w-4 h-4" />
+          </span>
+          <span>Auto-extracts party name, line items &amp; total amount</span>
         </div>
 
         <input
@@ -408,7 +382,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                 >
                   <Loader2 className="w-6 h-6 animate-spin shrink-0" />
                   <div>
-                    <p className="text-sm font-extrabold">Reading Receipt with Ucred AI...</p>
+                    <p className="text-sm font-extrabold">Reading Receipt...</p>
                     <p className="text-xs opacity-90">
                       Extracting party name, line items, quantities, and total amount.
                     </p>
@@ -445,7 +419,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                     className="min-h-[40px] px-3 rounded-xl bg-[var(--credit-red)] text-white text-xs font-bold inline-flex items-center gap-1.5 active:scale-95 transition"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Retry AI Scan</span>
+                    <span>Retry Scan</span>
                   </button>
                   <button
                     type="button"
@@ -469,7 +443,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-xs font-semibold text-[var(--ink-muted)]">
                     <span>
-                      AI Confidence:{' '}
+                      Scan Confidence:{' '}
                       <strong className="text-[var(--ink)] capitalize">{confidence}</strong>
                       {matchedAccount ? ` · Matched: ${matchedAccount.name}` : ' · New/Manual Party'}
                     </span>
@@ -683,6 +657,6 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </DetentSheetOverlay>
   );
 };

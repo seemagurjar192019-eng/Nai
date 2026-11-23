@@ -7,14 +7,14 @@ export function getGeminiServerClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || !apiKey.trim()) {
     throw new GeminiConfigError(
-      'AI features require GEMINI_API_KEY to be configured in Settings > Secrets.'
+      'Voice and receipt cloud parsing require GEMINI_API_KEY in server configuration.'
     );
   }
   return new GoogleGenAI({
     apiKey: apiKey.trim(),
     httpOptions: {
       headers: {
-        'User-Agent': 'aistudio-build',
+        'User-Agent': 'ucred-app',
       },
     },
   });
@@ -55,7 +55,7 @@ export function extractHttpErrorInfo(err: unknown): { status: number; message: s
   if (err instanceof GeminiConfigError) {
     return { status: 503, message: err.message };
   }
-  const msg = err instanceof Error ? err.message : String(err || 'AI request failed');
+  const msg = err instanceof Error ? err.message : String(err || 'Cloud parse request failed');
   if (
     msg.includes('503') ||
     msg.toLowerCase().includes('unavailable') ||
@@ -64,11 +64,11 @@ export function extractHttpErrorInfo(err: unknown): { status: number; message: s
   ) {
     return {
       status: 503,
-      message: 'AI service is temporarily busy. Please retry in a few seconds.',
+      message: 'Cloud parsing service is temporarily busy. Please retry in a few seconds.',
     };
   }
   if (msg.includes('429') || msg.toLowerCase().includes('resource_exhausted')) {
-    return { status: 429, message: 'AI quota reached. Please retry in a few seconds.' };
+    return { status: 429, message: 'Parsing quota reached. Please retry in a few seconds.' };
   }
   if (
     msg.includes('403') ||
@@ -78,8 +78,8 @@ export function extractHttpErrorInfo(err: unknown): { status: number; message: s
   ) {
     return {
       status: 403,
-      message: 'Please check your GEMINI_API_KEY configuration in Settings > Secrets.',
+      message: 'Server configuration key is invalid. Please update GEMINI_API_KEY.',
     };
   }
-  return { status: 500, message: 'Failed to process AI request. Please try again.' };
+  return { status: 500, message: 'Failed to process request. Please try again.' };
 }

@@ -42,7 +42,7 @@ export const PERSONA_OPTIONS: PersonaOptionMeta[] = [
   {
     id: 'kirana',
     title: 'Retail & Kirana Store',
-    subtitle: 'Daily customer credit, AI receipt scan & live cashbook',
+    subtitle: 'Daily customer credit, receipt scanner & live cashbook',
     badge: 'Retail Store',
     accentHex: '#4F46E5',
     tintBg: '#EEF2FF',

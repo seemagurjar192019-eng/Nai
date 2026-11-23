@@ -18,8 +18,10 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { accountInputSchema } from './design-system';
-import { getLocalDateKey } from './i18n';
+import { encryptString, tryDecryptString, type VaultKeyEnvelope } from './e2ee';
 import { db, handleFirestoreError, OperationType } from './firebase';
+import { getLocalDateKey } from './i18n';
+import { validateSafeBackupJson } from './security';
 import type {
   AccountKind,
   ActivityActionType,
@@ -52,6 +54,31 @@ function clampStr(val: string | undefined | null, maxLen: number): string {
   return String(val || '').trim().slice(0, maxLen);
 }
 
+async function enc(
+  dek: CryptoKey | null | undefined,
+  val: string | undefined | null,
+  maxPlain: number
+): Promise<string> {
+  const clean = clampStr(val, maxPlain);
+  if (!clean || !dek) return clean;
+  return encryptString(dek, clean);
+}
+
+async function encRequired(
+  dek: CryptoKey | null | undefined,
+  val: string | undefined | null,
+  maxPlain: number,
+  fallback: string
+): Promise<string> {
+  const clean = clampStr(val, maxPlain) || fallback;
+  return dek ? encryptString(dek, clean) : clean;
+}
+
+async function dec(dek: CryptoKey | null | undefined, val: unknown): Promise<string> {
+  if (typeof val !== 'string') return String(val || '');
+  return tryDecryptString(dek ?? null, val);
+}
+
 async function commitDeletesInChunks(refs: DocumentReference[], chunkSize = 400): Promise<void> {
   for (let i = 0; i < refs.length; i += chunkSize) {
     const slice = refs.slice(i, i + chunkSize);
@@ -72,6 +99,61 @@ function runSerializedForUser<T>(uid: string, task: () => Promise<T>): Promise<T
   const cleanup = next.catch(() => undefined);
   userUpsertLocks.set(uid, cleanup);
   return next;
+}
+
+export async function getVaultKeyEnvelope(uid: string): Promise<VaultKeyEnvelope | null> {
+  const path = `users/${uid}/security/vault`;
+  try {
+    const snap = await getDoc(doc(db, 'users', uid, 'security', 'vault'));
+    if (!snap.exists()) return null;
+    const raw = snap.data() as Record<string, unknown>;
+    return {
+      version: 1,
+      mode: raw.mode === 'pin' ? 'pin' : 'auto',
+      wrappedDek: String(raw.wrappedDek || ''),
+      iv: String(raw.iv || ''),
+      salt: String(raw.salt || ''),
+      iterations: Number(raw.iterations || 150000),
+    };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, path);
+  }
+}
+
+export async function saveVaultKeyEnvelope(
+  uid: string,
+  envelope: Omit<VaultKeyEnvelope, 'ownerId' | 'createdAt' | 'updatedAt'>
+): Promise<void> {
+  const path = `users/${uid}/security/vault`;
+  try {
+    const ref = doc(db, 'users', uid, 'security', 'vault');
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, {
+        ownerId: uid,
+        version: envelope.version,
+        mode: envelope.mode,
+        wrappedDek: clampStr(envelope.wrappedDek, 512),
+        iv: clampStr(envelope.iv, 128),
+        salt: clampStr(envelope.salt, 128),
+        iterations: Math.min(600000, Math.max(10000, Math.round(envelope.iterations))),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      await updateDoc(ref, {
+        version: envelope.version,
+        mode: envelope.mode,
+        wrappedDek: clampStr(envelope.wrappedDek, 512),
+        iv: clampStr(envelope.iv, 128),
+        salt: clampStr(envelope.salt, 128),
+        iterations: Math.min(600000, Math.max(10000, Math.round(envelope.iterations))),
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
@@ -222,12 +304,13 @@ export async function upsertUserProfile(
 
 export async function createBusiness(
   ownerId: string,
-  input: { name: string; phone?: string; upiId?: string }
+  input: { name: string; phone?: string; upiId?: string },
+  dek?: CryptoKey | null
 ): Promise<Business> {
   const id = makeSafeId('biz');
   const path = `businesses/${id}`;
   try {
-    const payload: Omit<Business, 'id'> = {
+    const plain: Omit<Business, 'id'> = {
       ownerId,
       name: clampStr(input.name || 'My Shop', 120) || 'My Shop',
       phone: clampStr(input.phone, 20),
@@ -239,12 +322,24 @@ export async function createBusiness(
       about: '',
       upiId: clampStr(input.upiId, 100),
     };
+    const stored: Omit<Business, 'id'> = {
+      ownerId,
+      name: await encRequired(dek, plain.name, 120, 'My Shop'),
+      phone: await enc(dek, plain.phone, 20),
+      gstNumber: await enc(dek, plain.gstNumber, 24),
+      businessType: await enc(dek, plain.businessType, 60),
+      category: await enc(dek, plain.category, 60),
+      address: await enc(dek, plain.address, 240),
+      email: await enc(dek, plain.email, 120),
+      about: await enc(dek, plain.about, 300),
+      upiId: await enc(dek, plain.upiId, 100),
+    };
     await setDoc(doc(db, 'businesses', id), {
-      ...payload,
+      ...stored,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    return { id, ...payload };
+    return { id, ...plain };
   } catch (err) {
     handleFirestoreError(err, OperationType.CREATE, path);
   }
@@ -257,20 +352,22 @@ export async function updateBusiness(
       Business,
       'name' | 'phone' | 'gstNumber' | 'businessType' | 'category' | 'address' | 'email' | 'about' | 'upiId'
     >
-  >
+  >,
+  dek?: CryptoKey | null
 ): Promise<void> {
   const path = `businesses/${businessId}`;
   try {
     const payload: Record<string, unknown> = { updatedAt: serverTimestamp() };
-    if (patch.name !== undefined) payload.name = clampStr(patch.name, 120) || 'My Shop';
-    if (patch.phone !== undefined) payload.phone = clampStr(patch.phone, 20);
-    if (patch.gstNumber !== undefined) payload.gstNumber = clampStr(patch.gstNumber, 24);
-    if (patch.businessType !== undefined) payload.businessType = clampStr(patch.businessType, 60);
-    if (patch.category !== undefined) payload.category = clampStr(patch.category, 60);
-    if (patch.address !== undefined) payload.address = clampStr(patch.address, 240);
-    if (patch.email !== undefined) payload.email = clampStr(patch.email, 120);
-    if (patch.about !== undefined) payload.about = clampStr(patch.about, 300);
-    if (patch.upiId !== undefined) payload.upiId = clampStr(patch.upiId, 100);
+    if (patch.name !== undefined) payload.name = await encRequired(dek, patch.name, 120, 'My Shop');
+    if (patch.phone !== undefined) payload.phone = await enc(dek, patch.phone, 20);
+    if (patch.gstNumber !== undefined) payload.gstNumber = await enc(dek, patch.gstNumber, 24);
+    if (patch.businessType !== undefined)
+      payload.businessType = await enc(dek, patch.businessType, 60);
+    if (patch.category !== undefined) payload.category = await enc(dek, patch.category, 60);
+    if (patch.address !== undefined) payload.address = await enc(dek, patch.address, 240);
+    if (patch.email !== undefined) payload.email = await enc(dek, patch.email, 120);
+    if (patch.about !== undefined) payload.about = await enc(dek, patch.about, 300);
+    if (patch.upiId !== undefined) payload.upiId = await enc(dek, patch.upiId, 100);
     await updateDoc(doc(db, 'businesses', businessId), payload);
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, path);
@@ -279,143 +376,322 @@ export async function updateBusiness(
 
 export function subscribeBusinesses(
   ownerId: string,
-  onData: (rows: Business[]) => void
+  onData: (rows: Business[]) => void,
+  dek?: CryptoKey | null
 ): Unsubscribe {
   const q = query(collection(db, 'businesses'), where('ownerId', '==', ownerId));
-  return onSnapshot(
+  let seq = 0;
+  let active = true;
+  const unsub = onSnapshot(
     q,
     (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Business, 'id'>) }));
-      onData(list);
+      const currentSeq = ++seq;
+      const rawList = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Business, 'id'>) }));
+      void Promise.all(
+        rawList.map(async (b) => ({
+          ...b,
+          name: (await dec(dek, b.name)) || 'My Shop',
+          phone: await dec(dek, b.phone),
+          gstNumber: await dec(dek, b.gstNumber),
+          businessType: await dec(dek, b.businessType),
+          category: await dec(dek, b.category),
+          address: await dec(dek, b.address),
+          email: await dec(dek, b.email),
+          about: await dec(dek, b.about),
+          upiId: await dec(dek, b.upiId),
+        }))
+      ).then((decrypted) => {
+        if (active && currentSeq === seq) {
+          onData(decrypted);
+        }
+      });
     },
     (err) => handleFirestoreError(err, OperationType.LIST, 'businesses')
   );
+  return () => {
+    active = false;
+    seq++;
+    unsub();
+  };
 }
 
 export function subscribeAccounts(
   ownerId: string,
   businessId: string,
-  onData: (rows: LedgerAccount[]) => void
+  onData: (rows: LedgerAccount[]) => void,
+  dek?: CryptoKey | null
 ): Unsubscribe {
   const q = query(collection(db, 'accounts'), where('ownerId', '==', ownerId));
-  return onSnapshot(
+  let seq = 0;
+  let active = true;
+  const unsub = onSnapshot(
     q,
     (snap) => {
-      const list = snap.docs
+      const currentSeq = ++seq;
+      const rawList = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<LedgerAccount, 'id'>) }))
         .filter((item) => item.businessId === businessId);
-      onData(list);
+      void Promise.all(
+        rawList.map(async (a) => ({
+          ...a,
+          name: (await dec(dek, a.name)) || 'Customer',
+          phone: await dec(dek, a.phone),
+          lastNote: await dec(dek, a.lastNote),
+          ...(a.promiseNote !== undefined ? { promiseNote: await dec(dek, a.promiseNote) } : {}),
+        }))
+      ).then((decrypted) => {
+        if (active && currentSeq === seq) {
+          onData(decrypted);
+        }
+      });
     },
     (err) => handleFirestoreError(err, OperationType.LIST, 'accounts')
   );
+  return () => {
+    active = false;
+    seq++;
+    unsub();
+  };
 }
 
 export function subscribeTransactions(
   ownerId: string,
   businessId: string,
-  onData: (rows: LedgerTransaction[]) => void
+  onData: (rows: LedgerTransaction[]) => void,
+  dek?: CryptoKey | null
 ): Unsubscribe {
   const q = query(collection(db, 'transactions'), where('ownerId', '==', ownerId));
-  return onSnapshot(
+  let seq = 0;
+  let active = true;
+  const unsub = onSnapshot(
     q,
     (snap) => {
-      const list = snap.docs
+      const currentSeq = ++seq;
+      const rawList = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<LedgerTransaction, 'id'>) }))
         .filter((item) => item.businessId === businessId);
-      onData(list);
+      void Promise.all(
+        rawList.map(async (t) => ({
+          ...t,
+          note: await dec(dek, t.note),
+          voiceRaw: await dec(dek, t.voiceRaw),
+          billImage: await dec(dek, t.billImage),
+          ...(t.createdByName !== undefined
+            ? { createdByName: await dec(dek, t.createdByName) }
+            : {}),
+        }))
+      ).then((decrypted) => {
+        if (active && currentSeq === seq) {
+          onData(decrypted);
+        }
+      });
     },
     (err) => handleFirestoreError(err, OperationType.LIST, 'transactions')
   );
+  return () => {
+    active = false;
+    seq++;
+    unsub();
+  };
 }
 
 export function subscribeBills(
   ownerId: string,
   businessId: string,
-  onData: (rows: BillDocument[]) => void
+  onData: (rows: BillDocument[]) => void,
+  dek?: CryptoKey | null
 ): Unsubscribe {
   const q = query(collection(db, 'bills'), where('ownerId', '==', ownerId));
-  return onSnapshot(
+  let seq = 0;
+  let active = true;
+  const unsub = onSnapshot(
     q,
     (snap) => {
-      const list = snap.docs
+      const currentSeq = ++seq;
+      const rawList = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<BillDocument, 'id'>) }))
         .filter((item) => item.businessId === businessId);
-      onData(list);
+      void Promise.all(
+        rawList.map(async (b) => ({
+          ...b,
+          customerName: (await dec(dek, b.customerName)) || 'Walk-in Customer',
+          customerPhone: await dec(dek, b.customerPhone),
+          notes: await dec(dek, b.notes),
+          ...(b.createdByName !== undefined
+            ? { createdByName: await dec(dek, b.createdByName) }
+            : {}),
+          items: Array.isArray(b.items)
+            ? await Promise.all(
+                b.items.map(async (item) => ({
+                  ...item,
+                  name: (await dec(dek, item.name)) || 'Item',
+                }))
+              )
+            : [],
+        }))
+      ).then((decrypted) => {
+        if (active && currentSeq === seq) {
+          onData(decrypted);
+        }
+      });
     },
     (err) => handleFirestoreError(err, OperationType.LIST, 'bills')
   );
+  return () => {
+    active = false;
+    seq++;
+    unsub();
+  };
 }
 
 export function subscribeStockItems(
   ownerId: string,
   businessId: string,
-  onData: (rows: StockItem[]) => void
+  onData: (rows: StockItem[]) => void,
+  dek?: CryptoKey | null
 ): Unsubscribe {
   const q = query(collection(db, 'stockItems'), where('ownerId', '==', ownerId));
-  return onSnapshot(
+  let seq = 0;
+  let active = true;
+  const unsub = onSnapshot(
     q,
     (snap) => {
-      const list = snap.docs
+      const currentSeq = ++seq;
+      const rawList = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<StockItem, 'id'>) }))
         .filter((item) => item.businessId === businessId);
-      onData(list);
+      void Promise.all(
+        rawList.map(async (s) => ({
+          ...s,
+          name: (await dec(dek, s.name)) || 'Item',
+          unit: (await dec(dek, s.unit)) || 'pcs',
+        }))
+      ).then((decrypted) => {
+        if (active && currentSeq === seq) {
+          onData(decrypted);
+        }
+      });
     },
     (err) => handleFirestoreError(err, OperationType.LIST, 'stockItems')
   );
+  return () => {
+    active = false;
+    seq++;
+    unsub();
+  };
 }
 
 export function subscribeCashbookEntries(
   ownerId: string,
   businessId: string,
-  onData: (rows: CashbookEntry[]) => void
+  onData: (rows: CashbookEntry[]) => void,
+  dek?: CryptoKey | null
 ): Unsubscribe {
   const q = query(collection(db, 'cashbookEntries'), where('ownerId', '==', ownerId));
-  return onSnapshot(
+  let seq = 0;
+  let active = true;
+  const unsub = onSnapshot(
     q,
     (snap) => {
-      const list = snap.docs
+      const currentSeq = ++seq;
+      const rawList = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<CashbookEntry, 'id'>) }))
         .filter((item) => item.businessId === businessId);
-      onData(list);
+      void Promise.all(
+        rawList.map(async (c) => ({
+          ...c,
+          category: (await dec(dek, c.category)) || 'General',
+          note: await dec(dek, c.note),
+          ...(c.actorName !== undefined ? { actorName: await dec(dek, c.actorName) } : {}),
+        }))
+      ).then((decrypted) => {
+        if (active && currentSeq === seq) {
+          onData(decrypted);
+        }
+      });
     },
     (err) => handleFirestoreError(err, OperationType.LIST, 'cashbookEntries')
   );
+  return () => {
+    active = false;
+    seq++;
+    unsub();
+  };
 }
 
 export function subscribeStaffMembers(
   ownerId: string,
   businessId: string,
-  onData: (rows: StaffMember[]) => void
+  onData: (rows: StaffMember[]) => void,
+  dek?: CryptoKey | null
 ): Unsubscribe {
   const q = query(collection(db, 'staffMembers'), where('ownerId', '==', ownerId));
-  return onSnapshot(
+  let seq = 0;
+  let active = true;
+  const unsub = onSnapshot(
     q,
     (snap) => {
-      const list = snap.docs
+      const currentSeq = ++seq;
+      const rawList = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<StaffMember, 'id'>) }))
         .filter((item) => item.businessId === businessId);
-      onData(list);
+      void Promise.all(
+        rawList.map(async (st) => ({
+          ...st,
+          name: (await dec(dek, st.name)) || 'Staff',
+          phone: await dec(dek, st.phone),
+        }))
+      ).then((decrypted) => {
+        if (active && currentSeq === seq) {
+          onData(decrypted);
+        }
+      });
     },
     (err) => handleFirestoreError(err, OperationType.LIST, 'staffMembers')
   );
+  return () => {
+    active = false;
+    seq++;
+    unsub();
+  };
 }
 
 export function subscribeActivityLogs(
   ownerId: string,
   businessId: string,
-  onData: (rows: ActivityLog[]) => void
+  onData: (rows: ActivityLog[]) => void,
+  dek?: CryptoKey | null
 ): Unsubscribe {
   const q = query(collection(db, 'activityLogs'), where('ownerId', '==', ownerId));
-  return onSnapshot(
+  let seq = 0;
+  let active = true;
+  const unsub = onSnapshot(
     q,
     (snap) => {
-      const list = snap.docs
+      const currentSeq = ++seq;
+      const rawList = snap.docs
         .map((d) => ({ id: d.id, ...(d.data() as Omit<ActivityLog, 'id'>) }))
         .filter((item) => item.businessId === businessId);
-      onData(list);
+      void Promise.all(
+        rawList.map(async (l) => ({
+          ...l,
+          actorName: (await dec(dek, l.actorName)) || 'Owner',
+          summary: (await dec(dek, l.summary)) || 'Action recorded',
+          targetName: await dec(dek, l.targetName),
+        }))
+      ).then((decrypted) => {
+        if (active && currentSeq === seq) {
+          onData(decrypted);
+        }
+      });
     },
     (err) => handleFirestoreError(err, OperationType.LIST, 'activityLogs')
   );
+  return () => {
+    active = false;
+    seq++;
+    unsub();
+  };
 }
 
 export async function createAccount(params: {
@@ -427,6 +703,7 @@ export async function createAccount(params: {
   phone?: string;
   dueDate?: string;
   creditLimit?: number;
+  dek?: CryptoKey | null;
 }): Promise<LedgerAccount> {
   const parsed = accountInputSchema.safeParse({
     kind: params.kind,
@@ -444,7 +721,7 @@ export async function createAccount(params: {
     parsed.data.creditLimit > 0
       ? Math.min(100000000, Math.round(parsed.data.creditLimit))
       : 0;
-  const payload: Omit<LedgerAccount, 'id'> = {
+  const plain: Omit<LedgerAccount, 'id'> = {
     ownerId: params.ownerId,
     businessId: params.businessId,
     kind: parsed.data.kind,
@@ -458,12 +735,18 @@ export async function createAccount(params: {
     lastActivityAt: nowIso,
   };
   try {
+    const stored: Omit<LedgerAccount, 'id'> = {
+      ...plain,
+      name: await encRequired(params.dek, plain.name, 100, 'Customer'),
+      phone: await enc(params.dek, plain.phone, 20),
+      lastNote: await encRequired(params.dek, plain.lastNote, 160, 'Added Today'),
+    };
     await setDoc(doc(db, 'accounts', id), {
-      ...payload,
+      ...stored,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    return { id, ...payload };
+    return { id, ...plain };
   } catch (err) {
     handleFirestoreError(err, OperationType.CREATE, `accounts/${id}`);
   }
@@ -473,17 +756,19 @@ export async function updateAccountMeta(
   accountId: string,
   patch: Partial<
     Pick<LedgerAccount, 'name' | 'phone' | 'dueDate' | 'kind' | 'creditLimit' | 'promiseDate' | 'promiseNote'>
-  >
+  >,
+  dek?: CryptoKey | null
 ): Promise<void> {
   const path = `accounts/${accountId}`;
   try {
     const payload: Record<string, unknown> = { updatedAt: serverTimestamp() };
-    if (patch.name !== undefined) payload.name = clampStr(patch.name, 100) || 'Customer';
-    if (patch.phone !== undefined) payload.phone = clampStr(patch.phone, 20);
+    if (patch.name !== undefined) payload.name = await encRequired(dek, patch.name, 100, 'Customer');
+    if (patch.phone !== undefined) payload.phone = await enc(dek, patch.phone, 20);
     if (patch.dueDate !== undefined) payload.dueDate = clampStr(patch.dueDate, 24);
     if (patch.kind !== undefined) payload.kind = patch.kind;
     if (patch.promiseDate !== undefined) payload.promiseDate = clampStr(patch.promiseDate, 24);
-    if (patch.promiseNote !== undefined) payload.promiseNote = clampStr(patch.promiseNote, 160);
+    if (patch.promiseNote !== undefined)
+      payload.promiseNote = await enc(dek, patch.promiseNote, 160);
     if (patch.creditLimit !== undefined) {
       payload.creditLimit = Math.min(100000000, Math.max(0, Math.round(Number(patch.creditLimit) || 0)));
     }
@@ -509,6 +794,7 @@ export async function addTransactionAtomic(params: {
   createdByName?: string;
   createdByRole?: StaffRole;
   syncToGalla?: { mode: CashbookMode } | null;
+  dek?: CryptoKey | null;
 }): Promise<{
   accountId: string;
   txId: string;
@@ -534,13 +820,14 @@ export async function addTransactionAtomic(params: {
     let accountId: string;
     let newBalance: number;
     let accountCreated = false;
+    const encryptedLastNote = await encRequired(params.dek, noteSummary, 160, 'Updated');
 
     if (params.existingAccount) {
       accountId = params.existingAccount.id;
       newBalance = Math.round((params.existingAccount.balance + delta) * 100) / 100;
       batch.update(doc(db, 'accounts', accountId), {
         balance: newBalance,
-        lastNote: noteSummary,
+        lastNote: encryptedLastNote,
         lastActivityAt: nowIso,
         updatedAt: serverTimestamp(),
       });
@@ -553,18 +840,18 @@ export async function addTransactionAtomic(params: {
         businessId: params.businessId,
         kind: params.kind || 'customer',
         ...(resolvedContext ? { personaContext: resolvedContext } : {}),
-        name: clampStr(params.customerName, 100) || 'Customer',
+        name: await encRequired(params.dek, params.customerName, 100, 'Customer'),
         phone: '',
         dueDate: '',
         balance: delta,
-        lastNote: noteSummary,
+        lastNote: encryptedLastNote,
         lastActivityAt: nowIso,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
     }
 
-    const txData: Omit<LedgerTransaction, 'id'> = {
+    const plainTxData: Omit<LedgerTransaction, 'id'> = {
       ownerId: params.ownerId,
       businessId: params.businessId,
       accountId,
@@ -580,8 +867,18 @@ export async function addTransactionAtomic(params: {
       ...(shouldSyncGalla ? { gallaSynced: true } : {}),
     };
 
+    const storedTxData: Omit<LedgerTransaction, 'id'> = {
+      ...plainTxData,
+      note: await enc(params.dek, plainTxData.note, 240),
+      voiceRaw: await enc(params.dek, plainTxData.voiceRaw, 300),
+      billImage: await enc(params.dek, plainTxData.billImage, 150000),
+      ...(plainTxData.createdByName
+        ? { createdByName: await enc(params.dek, plainTxData.createdByName, 80) }
+        : {}),
+    };
+
     batch.set(doc(db, 'transactions', txId), {
-      ...txData,
+      ...storedTxData,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -605,12 +902,14 @@ export async function addTransactionAtomic(params: {
         businessId: params.businessId,
         entryType,
         mode: params.syncToGalla.mode,
-        category,
+        category: await encRequired(params.dek, category, 40, 'General'),
         amount: cleanAmount,
-        note: clampStr(`${params.customerName}: ${noteSummary}`, 200),
+        note: await enc(params.dek, `${params.customerName}: ${noteSummary}`, 200),
         entryDate: clampStr(nowIso, 40),
         linkedRefId: txId,
-        ...(params.createdByName ? { actorName: clampStr(params.createdByName, 80) } : {}),
+        ...(params.createdByName
+          ? { actorName: await enc(params.dek, params.createdByName, 80) }
+          : {}),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -621,7 +920,7 @@ export async function addTransactionAtomic(params: {
       accountId,
       txId,
       newBalance,
-      tx: { id: txId, ...txData },
+      tx: { id: txId, ...plainTxData },
       accountCreated,
     };
   } catch (err) {
@@ -640,6 +939,7 @@ export async function updateTransactionAtomic(params: {
     billDate: string;
     billImage?: string;
   };
+  dek?: CryptoKey | null;
 }): Promise<void> {
   const cleanAmount = Math.round((Number(params.patch.amount) || 0) * 100) / 100;
   if (cleanAmount <= 0) throw new Error('Amount must be greater than zero');
@@ -661,9 +961,9 @@ export async function updateTransactionAtomic(params: {
     batch.update(doc(db, 'transactions', params.tx.id), {
       direction: updatedTx.direction,
       amount: updatedTx.amount,
-      note: updatedTx.note,
+      note: await enc(params.dek, updatedTx.note, 240),
       billDate: updatedTx.billDate,
-      billImage: updatedTx.billImage,
+      billImage: await enc(params.dek, updatedTx.billImage, 150000),
       updatedAt: serverTimestamp(),
     });
 
@@ -677,14 +977,14 @@ export async function updateTransactionAtomic(params: {
     }
     nextBalance = Math.round(nextBalance * 100) / 100;
     const latestIso = sorted[0]?.billDate || params.account.lastActivityAt;
-    const lastNote = sorted[0]
+    const lastNotePlain = sorted[0]
       ? clampStr(sorted[0].note, 160) ||
         `${sorted[0].direction === 'given' ? 'Credit' : 'Payment'} ₹${sorted[0].amount.toLocaleString('en-IN')}`
       : 'No recent transactions';
 
     batch.update(doc(db, 'accounts', params.account.id), {
       balance: nextBalance,
-      lastNote,
+      lastNote: await encRequired(params.dek, lastNotePlain, 160, 'No recent transactions'),
       lastActivityAt: latestIso,
       updatedAt: serverTimestamp(),
     });
@@ -699,6 +999,7 @@ export async function restoreTransactionAtomic(params: {
   tx: LedgerTransaction;
   account: LedgerAccount;
   existingForAccount: LedgerTransaction[];
+  dek?: CryptoKey | null;
 }): Promise<void> {
   try {
     const batch = writeBatch(db);
@@ -715,11 +1016,13 @@ export async function restoreTransactionAtomic(params: {
       ...(restored.personaContext ? { personaContext: restored.personaContext } : {}),
       direction: restored.direction,
       amount: restored.amount,
-      note: clampStr(restored.note, 240),
+      note: await enc(params.dek, restored.note, 240),
       billDate: clampStr(restored.billDate, 40),
-      voiceRaw: clampStr(restored.voiceRaw, 300),
-      billImage: clampStr(restored.billImage, 150000),
-      ...(restored.createdByName ? { createdByName: clampStr(restored.createdByName, 80) } : {}),
+      voiceRaw: await enc(params.dek, restored.voiceRaw, 300),
+      billImage: await enc(params.dek, restored.billImage, 150000),
+      ...(restored.createdByName
+        ? { createdByName: await enc(params.dek, restored.createdByName, 80) }
+        : {}),
       ...(restored.createdByRole ? { createdByRole: restored.createdByRole } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -733,13 +1036,13 @@ export async function restoreTransactionAtomic(params: {
     }
     nextBalance = Math.round(nextBalance * 100) / 100;
     const latestIso = sorted[0]?.billDate || restored.billDate;
-    const lastNote =
+    const lastNotePlain =
       clampStr(sorted[0]?.note, 160) ||
       `${sorted[0].direction === 'given' ? 'Credit' : 'Payment'} ₹${sorted[0].amount.toLocaleString('en-IN')}`;
 
     batch.update(doc(db, 'accounts', params.account.id), {
       balance: nextBalance,
-      lastNote,
+      lastNote: await encRequired(params.dek, lastNotePlain, 160, 'Restored'),
       lastActivityAt: latestIso,
       updatedAt: serverTimestamp(),
     });
@@ -754,6 +1057,7 @@ export async function deleteTransactionAtomic(params: {
   tx: LedgerTransaction;
   account: LedgerAccount;
   remainingForAccount: LedgerTransaction[];
+  dek?: CryptoKey | null;
 }): Promise<void> {
   try {
     const batch = writeBatch(db);
@@ -761,7 +1065,7 @@ export async function deleteTransactionAtomic(params: {
 
     let nextBalance = 0;
     let latestIso = params.account.lastActivityAt;
-    let lastNote = 'No recent transactions';
+    let lastNotePlain = 'No recent transactions';
 
     if (params.remainingForAccount.length > 0) {
       const sorted = [...params.remainingForAccount].sort((a, b) =>
@@ -772,14 +1076,14 @@ export async function deleteTransactionAtomic(params: {
       }
       nextBalance = Math.round(nextBalance * 100) / 100;
       latestIso = sorted[0].billDate;
-      lastNote =
+      lastNotePlain =
         clampStr(sorted[0].note, 160) ||
         `${sorted[0].direction === 'given' ? 'Credit' : 'Payment'} ₹${sorted[0].amount.toLocaleString('en-IN')}`;
     }
 
     batch.update(doc(db, 'accounts', params.account.id), {
       balance: nextBalance,
-      lastNote,
+      lastNote: await encRequired(params.dek, lastNotePlain, 160, 'No recent transactions'),
       lastActivityAt: latestIso,
       updatedAt: serverTimestamp(),
     });
@@ -822,10 +1126,11 @@ export async function saveBillDocument(params: {
   templateId: BillTemplateId;
   notes: string;
   billDate: string;
+  dek?: CryptoKey | null;
 }): Promise<{ billId: string; deductedCount: number }> {
   const id = makeSafeId('bill');
   const rawFiltered = params.items.filter((i) => i.name.trim()).slice(0, 20);
-  const cleanItems = rawFiltered.map((i) => ({
+  const plainItems = rawFiltered.map((i) => ({
     name: clampStr(i.name, 80),
     qty: Math.max(0.01, Number(i.qty) || 1),
     rate: Math.max(0, Number(i.rate) || 0),
@@ -833,13 +1138,13 @@ export async function saveBillDocument(params: {
     ...(i.stockItemId ? { stockItemId: clampStr(i.stockItemId, 128) } : {}),
   }));
 
-  if (cleanItems.length === 0) throw new Error('Add at least one item to the bill.');
+  if (plainItems.length === 0) throw new Error('Add at least one item to the bill.');
 
   const subtotal =
-    Math.round(cleanItems.reduce((sum, i) => sum + i.qty * i.rate, 0) * 100) / 100;
+    Math.round(plainItems.reduce((sum, i) => sum + i.qty * i.rate, 0) * 100) / 100;
   const totalGst =
     Math.round(
-      cleanItems.reduce((sum, i) => sum + (i.qty * i.rate * i.gstRate) / 100, 0) * 100
+      plainItems.reduce((sum, i) => sum + (i.qty * i.rate * i.gstRate) / 100, 0) * 100
     ) / 100;
   const discountAmount = Math.max(
     0,
@@ -864,25 +1169,34 @@ export async function saveBillDocument(params: {
   }
 
   try {
+    const encryptedItems = await Promise.all(
+      plainItems.map(async (item) => ({
+        ...item,
+        name: await encRequired(params.dek, item.name, 80, 'Item'),
+      }))
+    );
+
     const batch = writeBatch(db);
     batch.set(doc(db, 'bills', id), {
       ownerId: params.ownerId,
       businessId: params.businessId,
       docType: params.docType,
       billNumber: clampStr(params.billNumber, 40) || 'INV-001',
-      customerName: clampStr(params.customerName, 100) || 'Walk-in Customer',
-      customerPhone: clampStr(params.customerPhone, 20),
-      items: cleanItems,
+      customerName: await encRequired(params.dek, params.customerName, 100, 'Walk-in Customer'),
+      customerPhone: await enc(params.dek, params.customerPhone, 20),
+      items: encryptedItems,
       subtotal,
       totalGst,
       discountAmount,
       totalAmount,
       paymentStatus,
       ...(params.linkedTxId ? { linkedTxId: clampStr(params.linkedTxId, 128) } : {}),
-      ...(params.createdByName ? { createdByName: clampStr(params.createdByName, 80) } : {}),
+      ...(params.createdByName
+        ? { createdByName: await enc(params.dek, params.createdByName, 80) }
+        : {}),
       ...(estimatedCost > 0 ? { estimatedCost } : {}),
       templateId: params.templateId,
-      notes: clampStr(params.notes, 240),
+      notes: await enc(params.dek, params.notes, 240),
       billDate: clampStr(params.billDate, 40),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -895,12 +1209,14 @@ export async function saveBillDocument(params: {
         businessId: params.businessId,
         entryType: 'inflow',
         mode: params.syncToGalla.mode,
-        category: 'Bill Sale',
+        category: await encRequired(params.dek, 'Bill Sale', 40, 'Bill Sale'),
         amount: totalAmount,
-        note: clampStr(`${params.billNumber} · ${params.customerName}`, 200),
+        note: await enc(params.dek, `${params.billNumber} · ${params.customerName}`, 200),
         entryDate: clampStr(params.billDate, 40),
         linkedRefId: id,
-        ...(params.createdByName ? { actorName: clampStr(params.createdByName, 80) } : {}),
+        ...(params.createdByName
+          ? { actorName: await enc(params.dek, params.createdByName, 80) }
+          : {}),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -1010,14 +1326,17 @@ export async function saveStockItem(params: {
   purchasePrice?: number;
   quantity: number;
   lowStockThreshold: number;
+  dek?: CryptoKey | null;
 }): Promise<string> {
   const id = params.existingId || makeSafeId('stk');
   const cleanPurchase = Math.max(0, Number(params.purchasePrice) || 0);
   try {
+    const encName = await encRequired(params.dek, params.name, 100, 'Item');
+    const encUnit = await encRequired(params.dek, params.unit, 24, 'pcs');
     if (params.existingId) {
       await updateDoc(doc(db, 'stockItems', id), {
-        name: clampStr(params.name, 100) || 'Item',
-        unit: clampStr(params.unit, 24) || 'pcs',
+        name: encName,
+        unit: encUnit,
         salePrice: Math.max(0, Number(params.salePrice) || 0),
         purchasePrice: cleanPurchase,
         quantity: Math.max(0, Number(params.quantity) || 0),
@@ -1028,8 +1347,8 @@ export async function saveStockItem(params: {
       await setDoc(doc(db, 'stockItems', id), {
         ownerId: params.ownerId,
         businessId: params.businessId,
-        name: clampStr(params.name, 100) || 'Item',
-        unit: clampStr(params.unit, 24) || 'pcs',
+        name: encName,
+        unit: encUnit,
         salePrice: Math.max(0, Number(params.salePrice) || 0),
         purchasePrice: cleanPurchase,
         quantity: Math.max(0, Number(params.quantity) || 0),
@@ -1065,6 +1384,7 @@ export async function addCashbookEntry(params: {
   entryDate?: string;
   linkedRefId?: string;
   actorName?: string;
+  dek?: CryptoKey | null;
 }): Promise<string> {
   const cleanAmount = Math.round((Number(params.amount) || 0) * 100) / 100;
   if (cleanAmount <= 0) throw new Error('Amount must be greater than zero.');
@@ -1075,12 +1395,12 @@ export async function addCashbookEntry(params: {
       businessId: params.businessId,
       entryType: params.entryType,
       mode: params.mode,
-      category: clampStr(params.category, 40) || 'General',
+      category: await encRequired(params.dek, params.category, 40, 'General'),
       amount: cleanAmount,
-      note: clampStr(params.note, 200),
+      note: await enc(params.dek, params.note, 200),
       entryDate: clampStr(params.entryDate || new Date().toISOString(), 40),
       ...(params.linkedRefId ? { linkedRefId: clampStr(params.linkedRefId, 128) } : {}),
-      ...(params.actorName ? { actorName: clampStr(params.actorName, 80) } : {}),
+      ...(params.actorName ? { actorName: await enc(params.dek, params.actorName, 80) } : {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -1109,14 +1429,17 @@ export async function saveStaffMember(params: {
   phone?: string;
   pinHash?: string;
   active: boolean;
+  dek?: CryptoKey | null;
 }): Promise<string> {
   const id = params.existingId || makeSafeId('stf');
   try {
+    const encName = await encRequired(params.dek, params.name, 80, 'Staff');
+    const encPhone = await enc(params.dek, params.phone, 20);
     if (params.existingId) {
       const updatePayload: Record<string, unknown> = {
-        name: clampStr(params.name, 80) || 'Staff',
+        name: encName,
         role: params.role,
-        phone: clampStr(params.phone, 20),
+        phone: encPhone,
         active: params.active,
         updatedAt: serverTimestamp(),
       };
@@ -1128,9 +1451,9 @@ export async function saveStaffMember(params: {
       await setDoc(doc(db, 'staffMembers', id), {
         ownerId: params.ownerId,
         businessId: params.businessId,
-        name: clampStr(params.name, 80) || 'Staff',
+        name: encName,
         role: params.role,
-        phone: clampStr(params.phone, 20),
+        phone: encPhone,
         ...(params.pinHash ? { pinHash: clampStr(params.pinHash, 128) } : {}),
         active: params.active,
         createdAt: serverTimestamp(),
@@ -1162,17 +1485,18 @@ export async function recordActivityLog(params: {
   summary: string;
   targetName?: string;
   amount?: number;
+  dek?: CryptoKey | null;
 }): Promise<void> {
   const id = makeSafeId('log');
   try {
     await setDoc(doc(db, 'activityLogs', id), {
       ownerId: params.ownerId,
       businessId: params.businessId,
-      actorName: clampStr(params.actorName, 80) || 'Owner',
+      actorName: await encRequired(params.dek, params.actorName, 80, 'Owner'),
       actorRole: params.actorRole,
       actionType: params.actionType,
-      summary: clampStr(params.summary, 240) || 'Action recorded',
-      targetName: clampStr(params.targetName, 100),
+      summary: await encRequired(params.dek, params.summary, 240, 'Action recorded'),
+      targetName: await enc(params.dek, params.targetName, 100),
       ...(params.amount !== undefined && params.amount >= 0
         ? { amount: Math.min(100000000, Math.round(Number(params.amount) * 100) / 100) }
         : {}),
@@ -1242,6 +1566,7 @@ export async function deleteUserAccountCascade(ownerId: string): Promise<void> {
         refs.push(d.ref);
       }
     }
+    refs.push(doc(db, 'users', ownerId, 'security', 'vault'));
     refs.push(doc(db, 'users', ownerId));
     await commitDeletesInChunks(refs, 400);
   } catch (err) {
@@ -1252,29 +1577,10 @@ export async function deleteUserAccountCascade(ownerId: string): Promise<void> {
 export async function restoreBusinessBackup(
   ownerId: string,
   businessId: string,
-  rawParsed: unknown
+  rawParsed: unknown,
+  dek?: CryptoKey | null
 ): Promise<{ accounts: number; transactions: number; bills: number; stockItems: number }> {
-  if (!rawParsed || typeof rawParsed !== 'object') {
-    throw new Error('Invalid JSON backup structure.');
-  }
-  const parsed = rawParsed as {
-    accounts?: unknown[];
-    transactions?: unknown[];
-    bills?: unknown[];
-    stockItems?: unknown[];
-    cashbookEntries?: unknown[];
-    staffMembers?: unknown[];
-  };
-
-  if (
-    !Array.isArray(parsed.accounts) &&
-    !Array.isArray(parsed.transactions) &&
-    !Array.isArray(parsed.bills) &&
-    !Array.isArray(parsed.stockItems) &&
-    !Array.isArray(parsed.cashbookEntries)
-  ) {
-    throw new Error('Backup JSON must contain accounts, transactions, bills, stockItems, or cashbookEntries.');
-  }
+  const parsed = validateSafeBackupJson(rawParsed);
 
   const accIdMap = new Map<string, string>();
   const ops: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
@@ -1287,8 +1593,8 @@ export async function restoreBusinessBackup(
     for (const rawAcc of parsed.accounts) {
       if (!rawAcc || typeof rawAcc !== 'object') continue;
       const a = rawAcc as Record<string, unknown>;
-      const name = clampStr(String(a.name || ''), 100);
-      if (!name) continue;
+      const namePlain = clampStr(String(a.name || ''), 100);
+      if (!namePlain) continue;
       const oldId = String(a.id || makeSafeId('old'));
       const newAccId = makeSafeId('acc');
       accIdMap.set(oldId, newAccId);
@@ -1307,14 +1613,14 @@ export async function restoreBusinessBackup(
         businessId,
         kind,
         ...(validAccCtx ? { personaContext: validAccCtx } : {}),
-        name,
-        phone: clampStr(String(a.phone || ''), 20),
+        name: await encRequired(dek, namePlain, 100, 'Customer'),
+        phone: await enc(dek, String(a.phone || ''), 20),
         dueDate: clampStr(String(a.dueDate || ''), 24),
         ...(creditLimit > 0 ? { creditLimit } : {}),
         ...(a.promiseDate ? { promiseDate: clampStr(String(a.promiseDate), 24) } : {}),
-        ...(a.promiseNote ? { promiseNote: clampStr(String(a.promiseNote), 160) } : {}),
+        ...(a.promiseNote ? { promiseNote: await enc(dek, String(a.promiseNote), 160) } : {}),
         balance,
-        lastNote: clampStr(String(a.lastNote || 'Restored'), 160),
+        lastNote: await encRequired(dek, String(a.lastNote || 'Restored'), 160, 'Restored'),
         lastActivityAt: clampStr(String(a.lastActivityAt || new Date().toISOString()), 40),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1346,10 +1652,10 @@ export async function restoreBusinessBackup(
         ...(validTxCtx ? { personaContext: validTxCtx } : {}),
         direction: t.direction === 'received' ? 'received' : 'given',
         amount,
-        note: clampStr(String(t.note || ''), 240),
+        note: await enc(dek, String(t.note || ''), 240),
         billDate: clampStr(String(t.billDate || new Date().toISOString()), 40),
-        voiceRaw: clampStr(String(t.voiceRaw || ''), 300),
-        billImage: clampStr(String(t.billImage || ''), 150000),
+        voiceRaw: await enc(dek, String(t.voiceRaw || ''), 300),
+        billImage: await enc(dek, String(t.billImage || ''), 150000),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
@@ -1362,18 +1668,20 @@ export async function restoreBusinessBackup(
     for (const rawBill of parsed.bills) {
       if (!rawBill || typeof rawBill !== 'object') continue;
       const b = rawBill as Record<string, unknown>;
-      const items = Array.isArray(b.items)
+      const rawItems = Array.isArray(b.items)
         ? b.items
             .filter((x): x is Record<string, unknown> => Boolean(x && typeof x === 'object'))
             .slice(0, 20)
-            .map((item) => ({
-              name: clampStr(String(item.name || 'Item'), 80) || 'Item',
-              qty: Math.max(0.01, Number(item.qty) || 1),
-              rate: Math.max(0, Number(item.rate) || 0),
-              gstRate: Math.max(0, Number(item.gstRate) || 0),
-            }))
         : [];
-      if (items.length === 0) continue;
+      if (rawItems.length === 0) continue;
+      const items = await Promise.all(
+        rawItems.map(async (item) => ({
+          name: await encRequired(dek, String(item.name || 'Item'), 80, 'Item'),
+          qty: Math.max(0.01, Number(item.qty) || 1),
+          rate: Math.max(0, Number(item.rate) || 0),
+          gstRate: Math.max(0, Number(item.gstRate) || 0),
+        }))
+      );
       const newBillId = makeSafeId('bill');
       const tpl =
         b.templateId === 'modern' || b.templateId === 'gst-color' || b.templateId === 'thermal-58'
@@ -1384,8 +1692,13 @@ export async function restoreBusinessBackup(
         businessId,
         docType: b.docType === 'quote' ? 'quote' : 'bill',
         billNumber: clampStr(String(b.billNumber || 'INV-001'), 40) || 'INV-001',
-        customerName: clampStr(String(b.customerName || 'Walk-in Customer'), 100) || 'Walk-in Customer',
-        customerPhone: clampStr(String(b.customerPhone || ''), 20),
+        customerName: await encRequired(
+          dek,
+          String(b.customerName || 'Walk-in Customer'),
+          100,
+          'Walk-in Customer'
+        ),
+        customerPhone: await enc(dek, String(b.customerPhone || ''), 20),
         items,
         subtotal: Math.max(0, Number(b.subtotal) || 0),
         totalGst: Math.max(0, Number(b.totalGst) || 0),
@@ -1394,7 +1707,7 @@ export async function restoreBusinessBackup(
         paymentStatus:
           b.paymentStatus === 'unpaid' || b.paymentStatus === 'partial' ? b.paymentStatus : 'paid',
         templateId: tpl,
-        notes: clampStr(String(b.notes || ''), 240),
+        notes: await enc(dek, String(b.notes || ''), 240),
         billDate: clampStr(String(b.billDate || getLocalDateKey()), 40),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1408,14 +1721,14 @@ export async function restoreBusinessBackup(
     for (const rawStock of parsed.stockItems) {
       if (!rawStock || typeof rawStock !== 'object') continue;
       const s = rawStock as Record<string, unknown>;
-      const name = clampStr(String(s.name || ''), 100);
-      if (!name) continue;
+      const namePlain = clampStr(String(s.name || ''), 100);
+      if (!namePlain) continue;
       const newStockId = makeSafeId('stk');
       const stockData = {
         ownerId,
         businessId,
-        name,
-        unit: clampStr(String(s.unit || 'pcs'), 24) || 'pcs',
+        name: await encRequired(dek, namePlain, 100, 'Item'),
+        unit: await encRequired(dek, String(s.unit || 'pcs'), 24, 'pcs'),
         salePrice: Math.max(0, Number(s.salePrice) || 0),
         purchasePrice: Math.max(0, Number(s.purchasePrice) || 0),
         quantity: Math.max(0, Number(s.quantity) || 0),
@@ -1440,9 +1753,9 @@ export async function restoreBusinessBackup(
         businessId,
         entryType: c.entryType === 'outflow' ? 'outflow' : 'inflow',
         mode: c.mode === 'upi' || c.mode === 'bank' ? c.mode : 'cash',
-        category: clampStr(String(c.category || 'General'), 40) || 'General',
+        category: await encRequired(dek, String(c.category || 'General'), 40, 'General'),
         amount,
-        note: clampStr(String(c.note || ''), 200),
+        note: await enc(dek, String(c.note || ''), 200),
         entryDate: clampStr(String(c.entryDate || new Date().toISOString()), 40),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

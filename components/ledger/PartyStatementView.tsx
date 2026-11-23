@@ -56,6 +56,7 @@ import type {
 } from '@/types';
 import { haptics } from '@/utils/haptics';
 import { OdometerNumber } from '../motion/OdometerNumber';
+import { DetentSheetOverlay } from '../motion/DetentSheetOverlay';
 
 export interface PartyStatementViewProps {
   account: LedgerAccount;
@@ -806,7 +807,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                 onOpenParchiScanner();
               }}
               aria-label="Scan Receipt"
-              title="Scan Receipt (AI)"
+              title="Scan Receipt"
               className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
             >
               <Camera className="w-4 h-4" />
@@ -852,31 +853,41 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
 
       {/* Timeline Filter Strip */}
       {transactions.length > 0 && (
-        <div className="no-print bg-[var(--surface)] px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          {(
-            [
-              { id: 'all', label: 'All' },
-              { id: 'given', label: 'Credit' },
-              { id: 'received', label: 'Received' },
-              { id: 'photos', label: 'Photos' },
-            ] as const
-          ).map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                setTimelineFilter(f.id);
-              }}
-              className={`min-h-[34px] px-3.5 rounded-full text-xs font-extrabold whitespace-nowrap transition active:scale-95 ${
-                timelineFilter === f.id
-                  ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
-                  : 'bg-[var(--app-bg)] text-[var(--ink-muted)]'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="no-print bg-[var(--surface)] px-3 py-2 border-b border-[var(--surface-border)]">
+          <div className="grid grid-cols-4 rounded-xl bg-[var(--surface-subtle)] p-1">
+            {(
+              [
+                { id: 'all', label: 'All' },
+                { id: 'given', label: 'Credit' },
+                { id: 'received', label: 'Received' },
+                { id: 'photos', label: 'Photos' },
+              ] as const
+            ).map((f) => {
+              const active = timelineFilter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => {
+                    haptics.tap();
+                    setTimelineFilter(f.id);
+                  }}
+                  className={`relative min-h-[34px] px-2 rounded-lg text-xs font-extrabold whitespace-nowrap transition-colors ${
+                    active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId={prefersReducedMotion ? undefined : 'partyTimelineFilterSeg'}
+                      transition={ACCORDION_SPRING}
+                      className="absolute inset-0 rounded-lg bg-[var(--surface)] shadow-xs"
+                    />
+                  )}
+                  <span className="relative z-10">{f.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -918,8 +929,8 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
         ) : (
           timeline.map((group) => (
             <div key={group.dateLabel} className="space-y-2.5">
-              <div className="flex justify-center">
-                <span className="text-[11px] font-extrabold text-[var(--ink-muted)] bg-[var(--surface)] shadow-xs px-3 py-1 rounded-full">
+              <div className="flex justify-center pt-1">
+                <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--ink-muted)]">
                   {group.dateLabel}
                 </span>
               </div>
@@ -1020,7 +1031,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                           {hideBalance ? '₹••••' : formatINR(tx.amount)}
                         </span>
 
-                        <span className="px-2 py-0.5 rounded-full bg-[var(--app-bg)] text-[10px] font-bold font-tabular text-[var(--ink-muted)]">
+                        <span className="text-[11px] font-semibold font-tabular text-[var(--ink-muted)]">
                           Bal:{' '}
                           {hideBalance
                             ? '₹••••'
@@ -1250,367 +1261,284 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
         </div>
       </div>
 
-      {/* Party Profile / Edit Bottom Sheet */}
-      <AnimatePresence>
-        {showProfileDrawer && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => {
-              if (!profileSaving) setShowProfileDrawer(false);
+      {/* Party Profile / Edit Detent Sheet */}
+      <DetentSheetOverlay
+        open={showProfileDrawer}
+        onClose={() => {
+          if (!profileSaving) setShowProfileDrawer(false);
+        }}
+        title="Party Profile"
+        subtitle={account.name}
+        initialDetent="full"
+      >
+        <div className="space-y-4 pb-safe">
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Name
+              </label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Mobile Number
+              </label>
+              <input
+                type="tel"
+                maxLength={10}
+                value={editPhone}
+                onChange={(e) => {
+                  setProfileError('');
+                  setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
+                }}
+                placeholder="9876543210"
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={editDueDate}
+                  onChange={(e) => setEditDueDate(e.target.value)}
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3 text-xs font-tabular text-[var(--ink)] outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                  Promise-to-Pay Date
+                </label>
+                <input
+                  type="date"
+                  value={editPromiseDate}
+                  onChange={(e) => setEditPromiseDate(e.target.value)}
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3 text-xs font-tabular text-[var(--ink)] outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Credit Limit (₹ Optional)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={editCreditLimit}
+                onChange={(e) => setEditCreditLimit(e.target.value)}
+                placeholder="e.g. 5000 (0 = No Limit)"
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none"
+              />
+            </div>
+          </div>
+
+          {profileError && (
+            <p className="text-xs font-bold text-[var(--credit-red)]">{profileError}</p>
+          )}
+
+          <button
+            type="button"
+            disabled={profileSaving}
+            onClick={async () => {
+              setProfileError('');
+              if (editPhone && !isValidIndianMobile(editPhone)) {
+                setProfileError('Enter a valid 10-digit Indian mobile number.');
+                return;
+              }
+              setProfileSaving(true);
+              try {
+                await onUpdateAccount({
+                  name: editName.trim() || account.name,
+                  phone: editPhone.trim(),
+                  dueDate: editDueDate,
+                  promiseDate: editPromiseDate,
+                  creditLimit: Math.max(0, Number(editCreditLimit) || 0),
+                });
+                setShowProfileDrawer(false);
+              } catch (err) {
+                setProfileError(
+                  err instanceof Error ? err.message : 'Failed to save party profile.'
+                );
+              } finally {
+                setProfileSaving(false);
+              }
             }}
-            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
+            className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold disabled:opacity-60 shadow-md active:scale-95 transition"
           >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              drag="y"
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.4 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.y > 90 && !profileSaving) setShowProfileDrawer(false);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[28px] spatial-sheet p-6 space-y-4 max-h-[90dvh] overflow-y-auto no-scrollbar pb-safe"
-            >
-              <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg font-extrabold flex items-center gap-2 text-[var(--ink)]">
-                  <UserCog className="w-5 h-5 text-[var(--brand-accent)]" />
-                  <span>Party Profile</span>
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowProfileDrawer(false)}
-                  aria-label="Close profile"
-                  className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                    Mobile Number
-                  </label>
-                  <input
-                    type="tel"
-                    maxLength={10}
-                    value={editPhone}
-                    onChange={(e) => {
-                      setProfileError('');
-                      setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
-                    }}
-                    placeholder="9876543210"
-                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                      Due Date
-                    </label>
-                    <input
-                      type="date"
-                      value={editDueDate}
-                      onChange={(e) => setEditDueDate(e.target.value)}
-                      className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3 text-xs font-tabular text-[var(--ink)] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                      Promise-to-Pay Date
-                    </label>
-                    <input
-                      type="date"
-                      value={editPromiseDate}
-                      onChange={(e) => setEditPromiseDate(e.target.value)}
-                      className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3 text-xs font-tabular text-[var(--ink)] outline-none"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                    Credit Limit (₹ Optional)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editCreditLimit}
-                    onChange={(e) => setEditCreditLimit(e.target.value)}
-                    placeholder="e.g. 5000 (0 = No Limit)"
-                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none"
-                  />
-                </div>
-              </div>
+            {profileSaving ? 'Saving...' : 'Save Changes'}
+          </button>
 
-              {profileError && (
-                <p className="text-xs font-bold text-[var(--credit-red)]">{profileError}</p>
-              )}
-
+          <div className="pt-2">
+            {!confirmDeleteCustomer ? (
               <button
                 type="button"
-                disabled={profileSaving}
-                onClick={async () => {
-                  setProfileError('');
-                  if (editPhone && !isValidIndianMobile(editPhone)) {
-                    setProfileError('Enter a valid 10-digit Indian mobile number.');
-                    return;
-                  }
-                  setProfileSaving(true);
-                  try {
-                    await onUpdateAccount({
-                      name: editName.trim() || account.name,
-                      phone: editPhone.trim(),
-                      dueDate: editDueDate,
-                      promiseDate: editPromiseDate,
-                      creditLimit: Math.max(0, Number(editCreditLimit) || 0),
-                    });
-                    setShowProfileDrawer(false);
-                  } catch (err) {
-                    setProfileError(
-                      err instanceof Error ? err.message : 'Failed to save party profile.'
-                    );
-                  } finally {
-                    setProfileSaving(false);
-                  }
-                }}
-                className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold disabled:opacity-60 shadow-md active:scale-95 transition"
+                onClick={() => setConfirmDeleteCustomer(true)}
+                className="w-full min-h-[44px] rounded-2xl text-sm font-bold text-[var(--credit-red)] hover:bg-[var(--credit-tint)] active:scale-95 transition"
               >
-                {profileSaving ? 'Saving...' : 'Save Changes'}
+                Delete Party &amp; Ledger
               </button>
-
-              <div className="pt-2">
-                {!confirmDeleteCustomer ? (
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-[var(--credit-red)] text-center">
+                  Permanently delete {account.name} and all entries?
+                </p>
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setConfirmDeleteCustomer(true)}
-                    className="w-full min-h-[44px] rounded-2xl text-sm font-bold text-[var(--credit-red)] hover:bg-[var(--credit-tint)] active:scale-95 transition"
+                    disabled={profileSaving}
+                    onClick={async () => {
+                      setProfileSaving(true);
+                      setProfileError('');
+                      try {
+                        await onDeleteAccount();
+                      } catch (err) {
+                        setProfileError(
+                          err instanceof Error ? err.message : 'Failed to delete party.'
+                        );
+                        setProfileSaving(false);
+                      }
+                    }}
+                    className="min-h-[44px] rounded-2xl bg-[var(--credit-red)] text-white text-sm font-bold disabled:opacity-60 active:scale-95 transition"
                   >
-                    Delete Party &amp; Ledger
+                    {profileSaving ? 'Deleting...' : 'Yes, Delete'}
                   </button>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold text-[var(--credit-red)] text-center">
-                      Permanently delete {account.name} and all entries?
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        disabled={profileSaving}
-                        onClick={async () => {
-                          setProfileSaving(true);
-                          setProfileError('');
-                          try {
-                            await onDeleteAccount();
-                          } catch (err) {
-                            setProfileError(
-                              err instanceof Error ? err.message : 'Failed to delete party.'
-                            );
-                            setProfileSaving(false);
-                          }
-                        }}
-                        className="min-h-[44px] rounded-2xl bg-[var(--credit-red)] text-white text-sm font-bold disabled:opacity-60 active:scale-95 transition"
-                      >
-                        {profileSaving ? 'Deleting...' : 'Yes, Delete'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteCustomer(false)}
-                        className="min-h-[44px] rounded-2xl bg-[var(--app-bg)] text-sm font-bold text-[var(--ink)] active:scale-95 transition"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteCustomer(false)}
+                    className="min-h-[44px] rounded-2xl bg-[var(--app-bg)] text-sm font-bold text-[var(--ink)] active:scale-95 transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            )}
+          </div>
+        </div>
+      </DetentSheetOverlay>
 
-      {/* UPI QR Payment Bottom Sheet */}
-      <AnimatePresence>
-        {showQrModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowQrModal(false)}
-            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
+      {/* UPI QR Payment Detent Sheet */}
+      <DetentSheetOverlay
+        open={showQrModal}
+        onClose={() => setShowQrModal(false)}
+        title="Collect via UPI QR"
+        subtitle={account.name}
+        initialDetent="peek"
+        allowDetentToggle={false}
+      >
+        <div className="text-center space-y-4 pb-safe">
+          <p className="text-xs text-[var(--ink-muted)]">
+            {business.upiId
+              ? `UPI ID: ${business.upiId}`
+              : 'Set your real UPI ID in Settings for live payments'}
+          </p>
+          <div className="mx-auto w-fit p-4 bg-white rounded-3xl shadow-md">
+            <QRCodeSVG value={upiUri} size={180} />
+          </div>
+          <p className="font-display text-xl font-extrabold font-tabular text-[var(--brand-accent)]">
+            {account.balance > 0 ? formatINR(account.balance) : 'Any Amount'}
+          </p>
+          <a
+            href={buildWhatsAppUrl(account.phone, reminderMsg)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full min-h-[48px] rounded-2xl bg-[var(--debit-green)] text-white font-bold flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
           >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              drag="y"
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.4 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.y > 90) setShowQrModal(false);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[28px] spatial-sheet p-6 text-center space-y-4 pb-safe"
-            >
-              <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                  Collect via UPI QR
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowQrModal(false)}
-                  aria-label="Close QR"
-                  className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <p className="text-xs text-[var(--ink-muted)]">
-                {business.upiId
-                  ? `UPI ID: ${business.upiId}`
-                  : 'Set your real UPI ID in Settings for live payments'}
-              </p>
-              <div className="mx-auto w-fit p-4 bg-white rounded-3xl shadow-md">
-                <QRCodeSVG value={upiUri} size={180} />
-              </div>
-              <p className="font-display text-xl font-extrabold font-tabular text-[var(--brand-accent)]">
-                {account.balance > 0 ? formatINR(account.balance) : 'Any Amount'}
-              </p>
-              <a
-                href={buildWhatsAppUrl(account.phone, reminderMsg)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full min-h-[48px] rounded-2xl bg-[var(--debit-green)] text-white font-bold flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>Share Reminder on WhatsApp</span>
-              </a>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <MessageCircle className="w-4 h-4" />
+            <span>Share Reminder on WhatsApp</span>
+          </a>
+        </div>
+      </DetentSheetOverlay>
 
-      {/* Due Date & Promise-to-Pay Bottom Sheet */}
-      <AnimatePresence>
-        {showDueModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => {
-              if (!dueSaving) setShowDueModal(false);
-            }}
-            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              drag="y"
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.4 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.y > 90 && !dueSaving) setShowDueModal(false);
+      {/* Due Date & Promise-to-Pay Detent Sheet */}
+      <DetentSheetOverlay
+        open={showDueModal}
+        onClose={() => {
+          if (!dueSaving) setShowDueModal(false);
+        }}
+        title="Due Date & Payment Promise"
+        subtitle={account.name}
+        initialDetent="peek"
+      >
+        <div className="space-y-4 pb-safe">
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Collection Due Date
+              </label>
+              <input
+                type="date"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 font-tabular text-[var(--ink)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Promise-to-Pay Date
+              </label>
+              <input
+                type="date"
+                value={editPromiseDate}
+                onChange={(e) => setEditPromiseDate(e.target.value)}
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 font-tabular text-[var(--ink)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                Promise Note (Optional)
+              </label>
+              <input
+                type="text"
+                value={editPromiseNote}
+                onChange={(e) => setEditPromiseNote(e.target.value)}
+                placeholder="e.g. Kal shaam ko UPI karega"
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm text-[var(--ink)]"
+              />
+            </div>
+          </div>
+          {dueError && <p className="text-xs font-bold text-[var(--credit-red)]">{dueError}</p>}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={dueSaving}
+              onClick={async () => {
+                setDueError('');
+                setDueSaving(true);
+                try {
+                  await onUpdateAccount({
+                    dueDate: editDueDate,
+                    promiseDate: editPromiseDate,
+                    promiseNote: editPromiseNote.trim(),
+                  });
+                  setShowDueModal(false);
+                } catch (err) {
+                  setDueError(err instanceof Error ? err.message : 'Failed to save dates.');
+                } finally {
+                  setDueSaving(false);
+                }
               }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[430px] rounded-t-[28px] spatial-sheet p-6 space-y-4 pb-safe"
+              className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60 active:scale-95 transition"
             >
-              <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                Due Date &amp; Payment Promise
-              </h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                    Collection Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={editDueDate}
-                    onChange={(e) => setEditDueDate(e.target.value)}
-                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 font-tabular text-[var(--ink)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                    Promise-to-Pay Date
-                  </label>
-                  <input
-                    type="date"
-                    value={editPromiseDate}
-                    onChange={(e) => setEditPromiseDate(e.target.value)}
-                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 font-tabular text-[var(--ink)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                    Promise Note (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={editPromiseNote}
-                    onChange={(e) => setEditPromiseNote(e.target.value)}
-                    placeholder="e.g. Kal shaam ko UPI karega"
-                    className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm text-[var(--ink)]"
-                  />
-                </div>
-              </div>
-              {dueError && <p className="text-xs font-bold text-[var(--credit-red)]">{dueError}</p>}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={dueSaving}
-                  onClick={async () => {
-                    setDueError('');
-                    setDueSaving(true);
-                    try {
-                      await onUpdateAccount({
-                        dueDate: editDueDate,
-                        promiseDate: editPromiseDate,
-                        promiseNote: editPromiseNote.trim(),
-                      });
-                      setShowDueModal(false);
-                    } catch (err) {
-                      setDueError(err instanceof Error ? err.message : 'Failed to save dates.');
-                    } finally {
-                      setDueSaving(false);
-                    }
-                  }}
-                  className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold disabled:opacity-60 active:scale-95 transition"
-                >
-                  {dueSaving ? 'Saving...' : 'Save Dates'}
-                </button>
-                <button
-                  type="button"
-                  disabled={dueSaving}
-                  onClick={() => setShowDueModal(false)}
-                  className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] text-[var(--ink)] font-bold active:scale-95 transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {dueSaving ? 'Saving...' : 'Save Dates'}
+            </button>
+            <button
+              type="button"
+              disabled={dueSaving}
+              onClick={() => setShowDueModal(false)}
+              className="min-h-[46px] rounded-2xl bg-[var(--app-bg)] text-[var(--ink)] font-bold active:scale-95 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </DetentSheetOverlay>
 
       {/* Bill Image Lightbox */}
       <AnimatePresence>

@@ -3,10 +3,10 @@ import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: '/',
-    name: 'Ucred — Smart Voice Khata & Galla OS',
+    name: 'Ucred — Voice Ledger & Cashbook OS',
     short_name: 'Ucred',
     description:
-      'Voice-first digital khata, AI parchi scanner, live Galla cashbook, GST billing, stock & UPI collection PWA for Indian shopkeepers.',
+      'Voice-first digital khata, receipt scanner, live cashbook, GST billing, stock & UPI collection PWA for Indian shopkeepers.',
     start_url: '/',
     scope: '/',
     display: 'standalone',
@@ -47,8 +47,8 @@ export default function manifest(): MetadataRoute.Manifest {
         icons: [{ src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
       },
       {
-        name: 'Scan Parchi (AI)',
-        short_name: 'Scan Parchi',
+        name: 'Scan Receipt',
+        short_name: 'Scan Receipt',
         description: 'Snap a handwritten slip or bill photo to post khata or GST bill',
         url: '/?action=parchi',
         icons: [{ src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' }],

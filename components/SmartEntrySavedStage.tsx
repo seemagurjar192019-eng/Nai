@@ -2,8 +2,8 @@
 
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { haptic } from '@/lib/haptic';
-import { AnimatedRupeeNumber } from './AnimatedRupeeNumber';
+import { haptic } from '@/utils/haptics';
+import { OdometerNumber } from './motion/OdometerNumber';
 
 interface SmartEntrySavedStageProps {
   partyName: string;
@@ -75,7 +75,7 @@ export const SmartEntrySavedStage: React.FC<SmartEntrySavedStageProps> = ({
           Saved to {partyName}
         </p>
         <p className="font-display text-2xl font-extrabold font-tabular text-[var(--ink)]">
-          <AnimatedRupeeNumber
+          <OdometerNumber
             value={Math.abs(newBalance)}
             prefix={newBalance < 0 ? 'Adv ' : ''}
           />

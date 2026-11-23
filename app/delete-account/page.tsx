@@ -57,8 +57,8 @@ export default function DeleteAccountPage() {
           <ol className="list-decimal pl-5 text-sm text-[var(--ink-muted)] space-y-2 leading-relaxed">
             <li>Open <strong className="text-[var(--ink)]">Ucred</strong> while signed in with Google, your verified Email, or +91 Mobile OTP.</li>
             <li>Tap <strong className="text-[var(--ink)]">Settings</strong> in the bottom dock (or the profile avatar at top-right).</li>
-            <li>(Recommended) Tap <strong className="text-[var(--ink)]">JSON Backup</strong> first if you want a personal archive.</li>
-            <li>Scroll to <strong className="text-[var(--ink)]">Data &amp; Danger Zone</strong> and tap <strong className="text-[var(--ink)]">Delete Account &amp; All Cloud Data</strong>.</li>
+            <li>(Recommended) Tap <strong className="text-[var(--ink)]">Download JSON Backup</strong> first if you want a personal archive.</li>
+            <li>Scroll to <strong className="text-[var(--ink)]">Data &amp; Backups</strong> and tap <strong className="text-[var(--ink)]">Delete Cloud Account Permanently</strong>.</li>
             <li>Confirm deletion (re-authenticating via Google popup, email, or 6-digit OTP if prompted) to permanently wipe all Cloud Firestore records and your Firebase Authentication account.</li>
           </ol>
         </section>
@@ -81,7 +81,7 @@ export default function DeleteAccountPage() {
         <div className="rounded-[22px] bg-[var(--brand-tint)] p-4 flex items-start gap-3 text-xs text-[var(--ink)] leading-relaxed">
           <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5 text-[var(--brand-accent)]" />
           <p>
-            Deletion is immediate and irreversible. Need manual assistance? Contact <strong className="font-extrabold">naitik.webstudio45@gmail.com</strong> or <strong className="font-extrabold">support@ucred.app</strong> from your registered email or mobile details.
+            Deletion is immediate and irreversible. Need manual assistance? Contact <strong className="font-extrabold">naitik.webstudio45@gmail.com</strong> from your registered email or mobile details.
           </p>
         </div>
 

@@ -22,8 +22,11 @@ import type {
   TxDirection,
 } from './types';
 import { getLocalDateKey } from './i18n';
+import { decryptString, encryptString, isEncryptedEnvelope } from './e2ee';
+import { validateSafeBackupJson } from './security';
 
 export const GUEST_VAULT_STORAGE_KEY = 'ucred_guest_vault_v1';
+export const GUEST_ENCRYPTED_VAULT_KEY = 'ucred_guest_vault_enc_v1';
 export const GUEST_OWNER_ID = 'guest';
 export const DEFAULT_GUEST_BUSINESS_ID = 'guest_biz_1';
 
@@ -169,11 +172,117 @@ export function saveGuestVault(vault: GuestVaultState): GuestVaultState {
   return vault;
 }
 
+function normalizeGuestVault(
+  parsed: Partial<GuestVaultState> | null | undefined,
+  prelogin?: Partial<Pick<GuestProfileState, 'language' | 'appearance' | 'mobileNumber'>>
+): GuestVaultState {
+  const businesses =
+    Array.isArray(parsed?.businesses) && parsed.businesses.length > 0
+      ? parsed.businesses
+      : [createStarterGuestBusiness('My Store')];
+  const activeId =
+    parsed?.profile?.activeBusinessId &&
+    businesses.some((b) => b.id === parsed.profile?.activeBusinessId)
+      ? parsed.profile.activeBusinessId
+      : businesses[0].id;
+  return {
+    version: 1,
+    profile: {
+      mobileNumber: clampStr(parsed?.profile?.mobileNumber ?? prelogin?.mobileNumber, 20),
+      language: parsed?.profile?.language || prelogin?.language || 'en',
+      appearance:
+        parsed?.profile?.appearance === 'dark'
+          ? 'dark'
+          : parsed?.profile?.appearance === 'light'
+            ? 'light'
+            : prelogin?.appearance === 'dark'
+              ? 'dark'
+              : 'light',
+      activeBusinessId: activeId,
+      appLockPin: clampStr(parsed?.profile?.appLockPin, 128),
+    },
+    businesses,
+    accounts: Array.isArray(parsed?.accounts) ? parsed.accounts : [],
+    transactions: Array.isArray(parsed?.transactions) ? parsed.transactions : [],
+    bills: Array.isArray(parsed?.bills) ? parsed.bills : [],
+    stockItems: Array.isArray(parsed?.stockItems) ? parsed.stockItems : [],
+    cashbookEntries: Array.isArray(parsed?.cashbookEntries) ? parsed.cashbookEntries : [],
+    staffMembers: Array.isArray(parsed?.staffMembers) ? parsed.staffMembers : [],
+    activityLogs: Array.isArray(parsed?.activityLogs) ? parsed.activityLogs : [],
+  };
+}
+
+export async function loadEncryptedGuestVault(
+  dek: CryptoKey | null,
+  prelogin?: Partial<Pick<GuestProfileState, 'language' | 'appearance' | 'mobileNumber'>>
+): Promise<GuestVaultState> {
+  if (typeof window === 'undefined') {
+    if (!inMemoryFallbackVault) inMemoryFallbackVault = createInitialGuestVault(prelogin);
+    return inMemoryFallbackVault;
+  }
+  try {
+    const encRaw = window.localStorage.getItem(GUEST_ENCRYPTED_VAULT_KEY);
+    if (encRaw) {
+      const jsonStr = isEncryptedEnvelope(encRaw) ? await decryptString(dek, encRaw) : encRaw;
+      const normalized = normalizeGuestVault(JSON.parse(jsonStr) as Partial<GuestVaultState>, prelogin);
+      inMemoryFallbackVault = normalized;
+      if (dek && !isEncryptedEnvelope(encRaw)) {
+        await saveEncryptedGuestVault(dek, normalized);
+      }
+      return normalized;
+    }
+
+    const legacyRaw = window.localStorage.getItem(GUEST_VAULT_STORAGE_KEY);
+    if (legacyRaw) {
+      const normalized = normalizeGuestVault(JSON.parse(legacyRaw) as Partial<GuestVaultState>, prelogin);
+      inMemoryFallbackVault = normalized;
+      if (dek) {
+        await saveEncryptedGuestVault(dek, normalized);
+      }
+      return normalized;
+    }
+
+    const fresh = createInitialGuestVault(prelogin);
+    inMemoryFallbackVault = fresh;
+    if (dek) {
+      await saveEncryptedGuestVault(dek, fresh);
+    }
+    return fresh;
+  } catch {
+    const fallback = inMemoryFallbackVault || createInitialGuestVault(prelogin);
+    inMemoryFallbackVault = fallback;
+    return fallback;
+  }
+}
+
+export async function saveEncryptedGuestVault(
+  dek: CryptoKey | null,
+  vault: GuestVaultState
+): Promise<GuestVaultState> {
+  inMemoryFallbackVault = vault;
+  if (typeof window !== 'undefined') {
+    try {
+      const serialized = JSON.stringify(vault);
+      if (dek) {
+        const encrypted = await encryptString(dek, serialized);
+        window.localStorage.setItem(GUEST_ENCRYPTED_VAULT_KEY, encrypted);
+        window.localStorage.removeItem(GUEST_VAULT_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(GUEST_VAULT_STORAGE_KEY, serialized);
+      }
+    } catch {
+      // Rely on in-memory vault if storage quota is full
+    }
+  }
+  return vault;
+}
+
 export function clearGuestVault(): void {
   inMemoryFallbackVault = null;
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.removeItem(GUEST_VAULT_STORAGE_KEY);
+      window.localStorage.removeItem(GUEST_ENCRYPTED_VAULT_KEY);
     } catch {
       // Ignore removal error
     }
@@ -1065,27 +1174,7 @@ export function applyRestoreBusinessBackup(
   vault: GuestVaultState;
   counts: { accounts: number; transactions: number; bills: number; stockItems: number };
 } {
-  if (!rawParsed || typeof rawParsed !== 'object') {
-    throw new Error('Invalid JSON backup structure.');
-  }
-  const parsed = rawParsed as {
-    accounts?: unknown[];
-    transactions?: unknown[];
-    bills?: unknown[];
-    stockItems?: unknown[];
-    cashbookEntries?: unknown[];
-  };
-  if (
-    !Array.isArray(parsed.accounts) &&
-    !Array.isArray(parsed.transactions) &&
-    !Array.isArray(parsed.bills) &&
-    !Array.isArray(parsed.stockItems) &&
-    !Array.isArray(parsed.cashbookEntries)
-  ) {
-    throw new Error(
-      'Backup JSON must contain accounts, transactions, bills, stockItems, or cashbookEntries.'
-    );
-  }
+  const parsed = validateSafeBackupJson(rawParsed);
 
   const accIdMap = new Map<string, string>();
   const addedAccs: LedgerAccount[] = [];

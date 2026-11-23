@@ -1,14 +1,15 @@
 # Ucred Firestore Security Specification
 
 ## Data Invariants
-1. **Strict Ownership**: Every document in `businesses`, `accounts`, `transactions`, `bills`, `stockItems`, `cashbookEntries`, `staffMembers`, and `activityLogs` must have `ownerId == request.auth.uid`, and `users/{uid}` is readable/writable only when `request.auth.uid == uid`.
-2. **Verified Email Identity**: Write operations require `request.auth != null && request.auth.token.email_verified == true`.
+1. **Strict Ownership**: Every document in `businesses`, `accounts`, `transactions`, `bills`, `stockItems`, `cashbookEntries`, `staffMembers`, and `activityLogs` must have `ownerId == request.auth.uid`. Both `users/{uid}` and its key-wrapping subcollection `users/{uid}/security/{docId}` are readable and writable only when `request.auth.uid == uid`.
+2. **Verified Identity**: Write operations require `request.auth != null && (request.auth.token.phone_number != null || request.auth.token.email_verified == true)`.
 3. **Referential Integrity on Create**:
    - `accounts/{accountId}`, `bills/{billId}`, `stockItems/{itemId}`, `cashbookEntries/{entryId}`, `staffMembers/{staffId}`, and `activityLogs/{logId}` cannot be created unless `businesses/{businessId}` exists and belongs to `request.auth.uid`.
    - `transactions/{txId}` cannot be created unless `accounts/{accountId}` exists, belongs to `request.auth.uid`, and matches `incoming().businessId`.
 4. **Immutable Lineage & Timestamps**: `ownerId`, `businessId`, `accountId`, and `createdAt` cannot change after creation; `createdAt` (on create) and `updatedAt` (on create/update) must equal `request.time`.
-5. **Bounded Types & Strict Keys**: Every collection enforces `keys().hasAll(...)` + `keys().hasOnly(...)` on create, `affectedKeys().hasOnly(...)` on update, numeric bounds (`amount > 0`), optional enum validation (`personaContext in ['personal', 'kirana', 'mandi', 'wholesale']`), and explicit string length caps.
+5. **Bounded Types, Strict Keys & E2EE Ciphertext Bounds**: Every collection enforces `keys().hasAll(...)` + `keys().hasOnly(...)` on create, `affectedKeys().hasOnly(...)` on update, numeric bounds (`amount > 0`), optional enum validation (`personaContext in ['personal', 'kirana', 'mandi', 'wholesale']`), and explicit string length caps accommodating `e2ee:v1:` AES-256-GCM envelopes.
 6. **Zero Query Delegation**: Every `allow list` rule explicitly requires `resource.data.ownerId == request.auth.uid` (no `get()`/`exists()` inside `allow list`).
+7. **Zero-Knowledge Key Envelope Isolation**: Wrapped DEKs in `/users/{uid}/security/{docId}` validate strict `mode in ['auto', 'pin']`, PBKDF2 `iterations` bounds (`[10000, 600000]`), and immutable `ownerId == uid`.
 
 ## Dirty Dozen Adversarial Payloads (Must Return PERMISSION_DENIED)
 1. **Unauthenticated Read**: `get /accounts/acc1` with `auth == null`.
@@ -22,4 +23,4 @@
 9. **Negative / Zero Amount**: User A creates `/cashbookEntries/cb1` with `amount: -500`.
 10. **Immutable Owner Mutation**: User A updates `/staffMembers/s1` attempting to change `ownerId` or `createdAt`.
 11. **Oversized String DoS**: User A updates `/businesses/biz1` setting `name` to a 10,000-character string.
-12. **Unverified Email Write**: Authenticated user with `email_verified: false` attempts to write `/users/{uid}`.
+12. **Unverified Email Write**: Authenticated user with `email_verified: false` (and no `phone_number`) attempts to write `/users/{uid}` or `/users/{uid}/security/vault`.

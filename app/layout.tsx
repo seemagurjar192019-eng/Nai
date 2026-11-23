@@ -56,15 +56,15 @@ export const metadata: Metadata = {
   metadataBase: resolveMetadataBase(),
   applicationName: 'Ucred',
   title: {
-    default: 'Ucred — Smart Voice Khata, AI Parchi & Galla OS',
+    default: 'Ucred — Voice Ledger, Receipt Scanner & Cashbook OS',
     template: '%s | Ucred',
   },
   description:
-    'Voice-first offline Hinglish khata, AI parchi scanner, live Galla cashbook, trust scores, GST billing, stock & UPI collection for Indian shopkeepers.',
+    'Voice-first offline Hinglish ledger, receipt scanner, live cashbook, customer trust score, GST billing, stock & UPI collection for Indian shopkeepers.',
   keywords: [
     'Ucred',
     'Voice Khata',
-    'AI Parchi Scanner',
+    'Receipt Scanner',
     'Galla Cashbook',
     'Udhaar Khata App',
     'Digital Bahi Khata',
@@ -84,9 +84,9 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: 'Ucred — Smart Voice Khata, AI Parchi & Galla OS',
+    title: 'Ucred — Voice Ledger, Receipt Scanner & Cashbook OS',
     description:
-      'Voice-first digital khata, AI receipt scanner, live Galla drawer, GST billing & UPI collection PWA for Indian shopkeepers.',
+      'Voice-first digital khata, receipt scanner, live cashbook drawer, GST billing & UPI collection PWA for Indian shopkeepers.',
     url: '/',
     siteName: 'Ucred',
     locale: 'en_IN',
@@ -94,21 +94,21 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Ucred — Smart Voice Khata, AI Parchi & Galla OS',
+    title: 'Ucred — Voice Ledger, Receipt Scanner & Cashbook OS',
     description:
-      'Voice-first digital khata, AI receipt scanner, live Galla drawer, GST billing & UPI collection PWA for Indian shopkeepers.',
+      'Voice-first digital khata, receipt scanner, live cashbook drawer, GST billing & UPI collection PWA for Indian shopkeepers.',
   },
 };
 
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: 'Ucred — Smart Voice Khata & Galla OS',
+  name: 'Ucred — Voice Ledger & Cashbook OS',
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Android, iOS, Web',
   inLanguage: ['en-IN', 'hi-IN'],
   description:
-    'Voice-first offline Hinglish khata ledger PWA with AI parchi scanner, live Galla cashbook, trust score predictor, GST billing, and UPI collection for Indian shopkeepers.',
+    'Voice-first offline Hinglish ledger PWA with receipt scanner, live cashbook, trust score predictor, GST billing, and UPI collection for Indian shopkeepers.',
   offers: {
     '@type': 'Offer',
     price: '0',

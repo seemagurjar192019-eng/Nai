@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowDownLeft,
   ArrowLeft,
@@ -26,6 +27,8 @@ import type {
   LedgerTransaction,
   StockItem,
 } from '@/lib/types';
+import { haptics } from '@/utils/haptics';
+import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
 
 interface GallaCashbookViewProps {
   cashbookEntries: CashbookEntry[];
@@ -49,6 +52,7 @@ interface GallaCashbookViewProps {
 
 const INFLOW_CATEGORIES = ['Cash Sale', 'Opening', 'Vasooli', 'Other Income'];
 const OUTFLOW_CATEGORIES = ['Expense', 'Chai / Staff', 'Supplier Pay', 'Rent / Bijli', 'Withdrawal'];
+const SEG_SPRING = { type: 'spring' as const, stiffness: 420, damping: 30 };
 
 export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
   cashbookEntries,
@@ -62,13 +66,13 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
   onDeleteEntry,
   onBack,
 }) => {
+  const prefersReducedMotion = useReducedMotion();
   const todayStr = getLocalDateKey();
   const [dateScope, setDateScope] = useState<'today' | 'all'>('today');
   const [modeFilter, setModeFilter] = useState<'all' | CashbookMode>('all');
   const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
   const [listError, setListError] = useState('');
 
-  // Modal state
   const [modalType, setModalType] = useState<CashbookEntryType | null>(null);
   const [mode, setMode] = useState<CashbookMode>('cash');
   const [category, setCategory] = useState('Cash Sale');
@@ -101,6 +105,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
   }, [cashbookEntries, dateScope, modeFilter, todayStr]);
 
   const openEntryModal = (type: CashbookEntryType) => {
+    haptics.tap();
     setModalType(type);
     setMode('cash');
     setCategory(type === 'inflow' ? 'Cash Sale' : 'Expense');
@@ -130,6 +135,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
         note: note.trim(),
         entryDate: isoDate,
       });
+      haptics.success();
       setModalType(null);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Could not save Galla entry.');
@@ -144,7 +150,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
     <div className="space-y-4 pb-32">
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0">
           {onBack && (
             <button
               type="button"
@@ -176,12 +182,12 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
         )}
       </div>
 
-      {/* Top 50/50 Split Actions: + Cash In (Green) & - Expense / Out (Red) */}
+      {/* Top 50/50 Split Actions */}
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
           onClick={() => openEntryModal('inflow')}
-          className="min-h-[48px] px-4 rounded-2xl bg-[var(--debit-green)] text-white text-sm font-extrabold inline-flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+          className="min-h-[48px] px-4 rounded-2xl bg-[var(--debit-green)] text-white text-sm font-extrabold inline-flex items-center justify-center gap-2 shadow-sm active:scale-95 transition"
         >
           <PlusCircle className="w-4 h-4 shrink-0" />
           <span>+ Cash In</span>
@@ -189,21 +195,21 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
         <button
           type="button"
           onClick={() => openEntryModal('outflow')}
-          className="min-h-[48px] px-4 rounded-2xl bg-[var(--credit-red)] text-white text-sm font-extrabold inline-flex items-center justify-center gap-2 shadow-md active:scale-95 transition"
+          className="min-h-[48px] px-4 rounded-2xl bg-[var(--credit-red)] text-white text-sm font-extrabold inline-flex items-center justify-center gap-2 shadow-sm active:scale-95 transition"
         >
           <MinusCircle className="w-4 h-4 shrink-0" />
           <span>- Expense / Out</span>
         </button>
       </div>
 
-      {/* 2-Column Spatial Bento Grid: Cash Drawer (Galla) & UPI/Bank Balance */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-[24px] spatial-card p-4 space-y-2">
+      {/* Balances + Daily Profit Pulse (3-column responsive on desktop) */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="rounded-[24px] ios27-inset-group p-4 space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-extrabold text-[var(--ink-muted)] uppercase tracking-wider">
               Cash Drawer
             </span>
-            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-inner shrink-0">
+            <span className="w-8 h-8 rounded-xl bg-[var(--brand)] text-white flex items-center justify-center shrink-0">
               <Wallet className="w-4 h-4" />
             </span>
           </div>
@@ -221,12 +227,12 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
           </p>
         </div>
 
-        <div className="rounded-[24px] spatial-card p-4 space-y-2">
+        <div className="rounded-[24px] ios27-inset-group p-4 space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-extrabold text-[var(--ink-muted)] uppercase tracking-wider">
               UPI &amp; Bank
             </span>
-            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 text-white flex items-center justify-center shadow-inner shrink-0">
+            <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
               <Landmark className="w-4 h-4" />
             </span>
           </div>
@@ -238,95 +244,112 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
             {hideBalance ? '₹••' : formatINR(pulse.todayOutflow)}
           </p>
         </div>
-      </div>
 
-      {/* Dynamic Horizontal Today's Profit Pulse Card (Emerald if >=0, Red if <0) */}
-      <div
-        className={`rounded-[24px] p-4 flex items-center justify-between gap-3 shadow-[var(--spatial-shadow)] ${
-          profitPositive ? 'bg-[var(--debit-tint)]' : 'bg-[var(--credit-tint)]'
-        }`}
-      >
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-8 h-8 rounded-xl bg-gradient-to-br text-white flex items-center justify-center shadow-inner shrink-0 ${
-                profitPositive ? 'from-emerald-500 to-green-600' : 'from-red-500 to-rose-600'
-              }`}
-            >
-              {profitPositive ? (
-                <TrendingUp className="w-4 h-4" />
-              ) : (
-                <TrendingDown className="w-4 h-4" />
-              )}
-            </span>
-            <span
-              className={`text-xs font-extrabold uppercase tracking-wider ${
-                profitPositive ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
-              }`}
-            >
-              Today&apos;s Profit Pulse
-            </span>
-          </div>
-          <p className="text-xs font-medium text-[var(--ink-muted)] leading-snug">
-            {pulse.profitBasisNote}
-          </p>
-        </div>
-        <p
-          className={`font-display text-2xl font-extrabold font-tabular shrink-0 ${
-            profitPositive ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
+        <div
+          className={`col-span-2 lg:col-span-1 rounded-[24px] p-4 flex lg:flex-col items-center lg:items-stretch justify-between gap-3 ${
+            profitPositive ? 'bg-[var(--debit-tint)]' : 'bg-[var(--credit-tint)]'
           }`}
         >
-          {hideBalance
-            ? '₹••••'
-            : `${profitPositive ? '+' : '-'}${formatINR(Math.abs(pulse.estimatedDailyProfit))}`}
-        </p>
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-8 h-8 rounded-xl text-white flex items-center justify-center shrink-0 ${
+                  profitPositive ? 'bg-[var(--debit-green)]' : 'bg-[var(--credit-red)]'
+                }`}
+              >
+                {profitPositive ? (
+                  <TrendingUp className="w-4 h-4" />
+                ) : (
+                  <TrendingDown className="w-4 h-4" />
+                )}
+              </span>
+              <span
+                className={`text-xs font-extrabold uppercase tracking-wider ${
+                  profitPositive ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
+                }`}
+              >
+                Today&apos;s Profit Pulse
+              </span>
+            </div>
+            <p className="text-xs font-medium text-[var(--ink-muted)] leading-snug">
+              {pulse.profitBasisNote}
+            </p>
+          </div>
+          <p
+            className={`font-display text-2xl font-extrabold font-tabular shrink-0 ${
+              profitPositive ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
+            }`}
+          >
+            {hideBalance
+              ? '₹••••'
+              : `${profitPositive ? '+' : '-'}${formatINR(Math.abs(pulse.estimatedDailyProfit))}`}
+          </p>
+        </div>
       </div>
 
-      {/* Single Horizontal Scrollable Filter Bar (Dates + Payment Modes) */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-        {(
-          [
-            { id: 'today', label: 'Today' },
-            { id: 'all', label: 'All Dates' },
-          ] as const
-        ).map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            onClick={() => setDateScope(d.id)}
-            className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 active:scale-95 transition ${
-              dateScope === d.id
-                ? 'bg-[var(--brand)] text-[var(--brand-fg)] tactile-key-primary'
-                : 'spatial-card text-[var(--ink-muted)]'
-            }`}
-          >
-            {d.label}
-          </button>
-        ))}
+      {/* Segmented Scope & Mode Controls */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 min-w-[165px]">
+          {(
+            [
+              { id: 'today', label: 'Today' },
+              { id: 'all', label: 'All Dates' },
+            ] as const
+          ).map((d) => {
+            const active = dateScope === d.id;
+            return (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => setDateScope(d.id)}
+                className={`relative min-h-[38px] px-3 rounded-xl text-xs font-extrabold z-10 transition-colors ${
+                  active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
+                }`}
+              >
+                {active && (
+                  <motion.span
+                    layoutId={prefersReducedMotion ? undefined : 'gallaDateScopeSeg'}
+                    transition={SEG_SPRING}
+                    className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
+                  />
+                )}
+                <span className="relative z-10">{d.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
-        <div className="h-5 w-px bg-[var(--surface-subtle)] shrink-0 mx-0.5" />
-
-        {(
-          [
-            { id: 'all', label: 'All Modes' },
-            { id: 'cash', label: 'Cash' },
-            { id: 'upi', label: 'UPI' },
-            { id: 'bank', label: 'Bank' },
-          ] as const
-        ).map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => setModeFilter(m.id)}
-            className={`min-h-[44px] px-3.5 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 active:scale-95 transition ${
-              modeFilter === m.id
-                ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] shadow-xs'
-                : 'spatial-card text-[var(--ink-muted)]'
-            }`}
-          >
-            {m.label}
-          </button>
-        ))}
+        <div className="relative grid grid-cols-4 rounded-2xl bg-[var(--surface-subtle)] p-1 flex-1 min-w-[230px]">
+          {(
+            [
+              { id: 'all', label: 'All' },
+              { id: 'cash', label: 'Cash' },
+              { id: 'upi', label: 'UPI' },
+              { id: 'bank', label: 'Bank' },
+            ] as const
+          ).map((m) => {
+            const active = modeFilter === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setModeFilter(m.id)}
+                className={`relative min-h-[38px] px-2 rounded-xl text-xs font-extrabold z-10 transition-colors ${
+                  active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
+                }`}
+              >
+                {active && (
+                  <motion.span
+                    layoutId={prefersReducedMotion ? undefined : 'gallaModeSeg'}
+                    transition={SEG_SPRING}
+                    className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
+                  />
+                )}
+                <span className="relative z-10">{m.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {listError && (
@@ -338,9 +361,9 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
         </div>
       )}
 
-      {/* Cashbook Entries Cards */}
+      {/* Cashbook Entries Inset Group */}
       {visibleEntries.length === 0 ? (
-        <div className="rounded-[28px] spatial-card p-8 text-center space-y-3">
+        <div className="rounded-[28px] ios27-inset-group p-8 text-center space-y-3">
           <p className="font-display text-base font-bold text-[var(--ink)]">
             No Galla entries for this view yet.
           </p>
@@ -359,206 +382,193 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className="space-y-2.5">
-          {visibleEntries.map((entry, idx) => {
-            const isIn = entry.entryType === 'inflow';
-            const armed = armedDeleteId === entry.id;
-            return (
-              <div
-                key={entry.id}
-                style={{ animationDelay: `${Math.min(idx, 10) * 35}ms` }}
-                className="stagger-fade-up rounded-[22px] spatial-card px-3.5 py-3 flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <span
-                    className={`w-10 h-10 rounded-2xl bg-gradient-to-br text-white flex items-center justify-center shadow-inner shrink-0 ${
-                      isIn ? 'from-emerald-500 to-green-600' : 'from-red-500 to-rose-600'
-                    }`}
-                  >
-                    {isIn ? (
-                      <ArrowDownLeft className="w-4 h-4" />
-                    ) : (
-                      <ArrowUpRight className="w-4 h-4" />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-extrabold text-[var(--ink)] leading-snug truncate">
-                      {entry.note || entry.category}
-                    </p>
-                    <p className="text-[11px] font-medium text-[var(--ink-muted)] leading-snug mt-0.5">
-                      {entry.category} · {entry.mode.toUpperCase()}
-                      {entry.actorName ? ` · ${entry.actorName}` : ''} ·{' '}
-                      {formatDateTime(entry.entryDate)}
-                    </p>
+        <div className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
+          <AnimatePresence mode="popLayout">
+            {visibleEntries.map((entry) => {
+              const isIn = entry.entryType === 'inflow';
+              const armed = armedDeleteId === entry.id;
+              return (
+                <motion.div
+                  key={entry.id}
+                  layout={!prefersReducedMotion}
+                  initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="px-4 py-3.5 flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span
+                      className={`w-10 h-10 rounded-xl text-white flex items-center justify-center shrink-0 ${
+                        isIn ? 'bg-[var(--debit-green)]' : 'bg-[var(--credit-red)]'
+                      }`}
+                    >
+                      {isIn ? (
+                        <ArrowDownLeft className="w-4 h-4" />
+                      ) : (
+                        <ArrowUpRight className="w-4 h-4" />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-extrabold text-[var(--ink)] leading-snug truncate">
+                        {entry.note || entry.category}
+                      </p>
+                      <p className="text-[11px] font-medium text-[var(--ink-muted)] leading-snug mt-0.5 truncate">
+                        {entry.category} · {entry.mode.toUpperCase()}
+                        {entry.actorName ? ` · ${entry.actorName}` : ''} ·{' '}
+                        {formatDateTime(entry.entryDate)}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span
-                    className={`text-base font-extrabold font-tabular ${
-                      isIn ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
-                    }`}
-                  >
-                    {hideBalance
-                      ? '₹••••'
-                      : `${isIn ? '+' : '-'}${formatINR(entry.amount)}`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (armed) {
-                        setListError('');
-                        try {
-                          await onDeleteEntry(entry.id);
-                          setArmedDeleteId(null);
-                        } catch (err) {
-                          setListError(
-                            err instanceof Error ? err.message : 'Failed to delete entry.'
-                          );
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`text-base font-extrabold font-tabular ${
+                        isIn ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
+                      }`}
+                    >
+                      {hideBalance
+                        ? '₹••••'
+                        : `${isIn ? '+' : '-'}${formatINR(entry.amount)}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (armed) {
+                          setListError('');
+                          try {
+                            await onDeleteEntry(entry.id);
+                            setArmedDeleteId(null);
+                          } catch (err) {
+                            setListError(
+                              err instanceof Error ? err.message : 'Failed to delete entry.'
+                            );
+                          }
+                        } else {
+                          setArmedDeleteId(entry.id);
                         }
-                      } else {
-                        setArmedDeleteId(entry.id);
-                      }
-                    }}
-                    aria-label="Delete cashbook entry"
-                    className={`min-w-[40px] min-h-[40px] px-2 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
-                      armed
-                        ? 'bg-[var(--credit-red)] text-white'
-                        : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
-                    }`}
-                  >
-                    {armed ? 'Delete?' : <Trash2 className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+                      }}
+                      aria-label="Delete cashbook entry"
+                      className={`min-w-[40px] min-h-[40px] px-2 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
+                        armed
+                          ? 'bg-[var(--credit-red)] text-white'
+                          : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
+                      }`}
+                    >
+                      {armed ? 'Delete?' : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
 
-      {/* Add Cashbook Entry Bottom Sheet */}
-      {modalType && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !saving && setModalType(null)}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="sheet-slide-up w-full max-w-[430px] rounded-t-[32px] spatial-sheet p-6 space-y-4 pb-safe max-h-[90dvh] overflow-y-auto"
-          >
-            <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                {modalType === 'inflow' ? 'Cash In / Galla Deposit' : 'Shop Expense / Payout'}
-              </h3>
+      {/* Add Cashbook Entry Detent Sheet */}
+      <DetentSheetOverlay
+        open={Boolean(modalType)}
+        onClose={() => {
+          if (!saving) setModalType(null);
+        }}
+        title={modalType === 'inflow' ? 'Cash In / Galla Deposit' : 'Shop Expense / Payout'}
+        subtitle={activeOperatorName}
+        initialDetent="peek"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-2">
+            {(['cash', 'upi', 'bank'] as const).map((m) => (
               <button
+                key={m}
                 type="button"
-                onClick={() => setModalType(null)}
-                aria-label="Close"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+                onClick={() => setMode(m)}
+                className={`min-h-[44px] rounded-2xl text-xs font-extrabold uppercase active:scale-95 transition ${
+                  mode === m
+                    ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]'
+                    : 'bg-[var(--app-bg)] text-[var(--ink)]'
+                }`}
               >
-                <X className="w-5 h-5" />
+                {m}
               </button>
-            </div>
+            ))}
+          </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              {(['cash', 'upi', 'bank'] as const).map((m) => (
+          <div>
+            <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1.5">
+              Category
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {(modalType === 'inflow' ? INFLOW_CATEGORIES : OUTFLOW_CATEGORIES).map((cat) => (
                 <button
-                  key={m}
+                  key={cat}
                   type="button"
-                  onClick={() => setMode(m)}
-                  className={`min-h-[44px] rounded-2xl text-xs font-extrabold uppercase active:scale-95 transition ${
-                    mode === m
-                      ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]'
+                  onClick={() => setCategory(cat)}
+                  className={`min-h-[40px] px-3.5 rounded-2xl text-xs font-bold active:scale-95 transition ${
+                    category === cat
+                      ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
                       : 'bg-[var(--app-bg)] text-[var(--ink)]'
                   }`}
                 >
-                  {m}
+                  {cat}
                 </button>
               ))}
             </div>
+          </div>
 
-            <div>
-              <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1.5">
-                Category
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {(modalType === 'inflow' ? INFLOW_CATEGORIES : OUTFLOW_CATEGORIES).map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setCategory(cat)}
-                    className={`min-h-[40px] px-3.5 rounded-2xl text-xs font-bold active:scale-95 transition ${
-                      category === cat
-                        ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
-                        : 'bg-[var(--app-bg)] text-[var(--ink)]'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                  Amount (₹)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="500"
-                  className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] ring-2 ring-[var(--brand-accent)] px-3 text-lg font-extrabold font-tabular text-[var(--ink)] outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  value={entryDate}
-                  onChange={(e) => setEntryDate(e.target.value)}
-                  className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] px-3 text-xs font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                />
-              </div>
-            </div>
-
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
-                Note (Optional)
+                Amount (₹)
               </label>
               <input
-                type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder={
-                  modalType === 'inflow'
-                    ? 'Morning opening cash / counter sale'
-                    : 'Chai, transport, electricity...'
-                }
-                className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                type="number"
+                min="1"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="500"
+                className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] ring-2 ring-[var(--brand-accent)] px-3 text-lg font-extrabold font-tabular text-[var(--ink)] outline-none"
               />
             </div>
-
-            {formError && <p className="text-xs font-bold text-[var(--credit-red)]">{formError}</p>}
-
-            <button
-              type="button"
-              disabled={saving}
-              onClick={handleSave}
-              className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
-            >
-              {saving ? 'Saving...' : 'Save to Galla'}
-            </button>
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">Date</label>
+              <input
+                type="date"
+                value={entryDate}
+                onChange={(e) => setEntryDate(e.target.value)}
+                className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] px-3 text-xs font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              />
+            </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+              Note (Optional)
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={
+                modalType === 'inflow'
+                  ? 'Morning opening cash / counter sale'
+                  : 'Chai, transport, electricity...'
+              }
+              className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+            />
+          </div>
+
+          {formError && <p className="text-xs font-bold text-[var(--credit-red)]">{formError}</p>}
+
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleSave}
+            className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
+          >
+            {saving ? 'Saving...' : 'Save to Galla'}
+          </button>
         </div>
-      )}
+      </DetentSheetOverlay>
     </div>
   );
 };

@@ -48,7 +48,7 @@ service cloud.firestore {
       return ctx in ['personal', 'kirana', 'mandi', 'wholesale'];
     }
 
-    // Entity Validation Blueprints
+    // Entity Validation Blueprints (sized cleanly for AES-256-GCM E2EE envelopes)
     function isValidUserProfile(data, uid) {
       return data.keys().hasAll(['uid', 'mobileNumber', 'language', 'appearance', 'activeBusinessId', 'onboardingDone', 'createdAt', 'updatedAt'])
         && data.keys().hasOnly(['uid', 'mobileNumber', 'language', 'appearance', 'activeBusinessId', 'appLockPin', 'onboardingDone', 'createdAt', 'updatedAt'])
@@ -63,19 +63,33 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidVaultKeyEnvelope(data, uid) {
+      return data.keys().hasAll(['ownerId', 'version', 'mode', 'wrappedDek', 'iv', 'salt', 'iterations', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'version', 'mode', 'wrappedDek', 'iv', 'salt', 'iterations', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId == uid && data.ownerId.size() >= 1 && data.ownerId.size() <= 128
+        && data.version is int && data.version == 1
+        && data.mode is string && data.mode in ['auto', 'pin']
+        && data.wrappedDek is string && data.wrappedDek.size() >= 16 && data.wrappedDek.size() <= 512
+        && data.iv is string && data.iv.size() >= 8 && data.iv.size() <= 128
+        && data.salt is string && data.salt.size() >= 8 && data.salt.size() <= 128
+        && data.iterations is int && data.iterations >= 10000 && data.iterations <= 600000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     function isValidBusiness(data) {
       return data.keys().hasAll(['ownerId', 'name', 'phone', 'gstNumber', 'businessType', 'category', 'address', 'email', 'about', 'upiId', 'createdAt', 'updatedAt'])
         && data.keys().hasOnly(['ownerId', 'name', 'phone', 'gstNumber', 'businessType', 'category', 'address', 'email', 'about', 'upiId', 'createdAt', 'updatedAt'])
         && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
-        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
-        && data.phone is string && data.phone.size() <= 20
-        && data.gstNumber is string && data.gstNumber.size() <= 24
-        && data.businessType is string && data.businessType.size() <= 60
-        && data.category is string && data.category.size() <= 60
-        && data.address is string && data.address.size() <= 240
-        && data.email is string && data.email.size() <= 120
-        && data.about is string && data.about.size() <= 300
-        && data.upiId is string && data.upiId.size() <= 100
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 512
+        && data.phone is string && data.phone.size() <= 256
+        && data.gstNumber is string && data.gstNumber.size() <= 256
+        && data.businessType is string && data.businessType.size() <= 256
+        && data.category is string && data.category.size() <= 256
+        && data.address is string && data.address.size() <= 1024
+        && data.email is string && data.email.size() <= 512
+        && data.about is string && data.about.size() <= 1024
+        && data.upiId is string && data.upiId.size() <= 512
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -86,15 +100,15 @@ service cloud.firestore {
         && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
         && isValidId(data.businessId)
         && data.kind in ['customer', 'supplier']
-        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
-        && data.phone is string && data.phone.size() <= 20
-        && data.dueDate is string && data.dueDate.size() <= 24
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 512
+        && data.phone is string && data.phone.size() <= 256
+        && data.dueDate is string && data.dueDate.size() <= 32
         && (!('creditLimit' in data) || ((data.creditLimit is int || data.creditLimit is float) && data.creditLimit >= 0 && data.creditLimit <= 100000000))
-        && (!('promiseDate' in data) || (data.promiseDate is string && data.promiseDate.size() <= 24))
-        && (!('promiseNote' in data) || (data.promiseNote is string && data.promiseNote.size() <= 160))
+        && (!('promiseDate' in data) || (data.promiseDate is string && data.promiseDate.size() <= 32))
+        && (!('promiseNote' in data) || (data.promiseNote is string && data.promiseNote.size() <= 512))
         && (data.balance is int || data.balance is float)
-        && data.lastNote is string && data.lastNote.size() <= 160
-        && data.lastActivityAt is string && data.lastActivityAt.size() <= 40
+        && data.lastNote is string && data.lastNote.size() <= 512
+        && data.lastActivityAt is string && data.lastActivityAt.size() <= 48
         && (!('personaContext' in data) || (data.personaContext is string && isValidPersonaContext(data.personaContext)))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
@@ -108,11 +122,11 @@ service cloud.firestore {
         && isValidId(data.accountId)
         && data.direction in ['given', 'received']
         && (data.amount is int || data.amount is float) && data.amount > 0 && data.amount <= 100000000
-        && data.note is string && data.note.size() <= 240
-        && data.billDate is string && data.billDate.size() >= 1 && data.billDate.size() <= 40
-        && data.voiceRaw is string && data.voiceRaw.size() <= 300
-        && data.billImage is string && data.billImage.size() <= 150000
-        && (!('createdByName' in data) || (data.createdByName is string && data.createdByName.size() <= 80))
+        && data.note is string && data.note.size() <= 1024
+        && data.billDate is string && data.billDate.size() >= 1 && data.billDate.size() <= 48
+        && data.voiceRaw is string && data.voiceRaw.size() <= 1024
+        && data.billImage is string && data.billImage.size() <= 350000
+        && (!('createdByName' in data) || (data.createdByName is string && data.createdByName.size() <= 256))
         && (!('createdByRole' in data) || (data.createdByRole is string && isValidStaffRole(data.createdByRole)))
         && (!('gallaSynced' in data) || data.gallaSynced is bool)
         && (!('personaContext' in data) || (data.personaContext is string && isValidPersonaContext(data.personaContext)))
@@ -126,23 +140,23 @@ service cloud.firestore {
         && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
         && isValidId(data.businessId)
         && data.docType in ['bill', 'quote']
-        && data.billNumber is string && data.billNumber.size() >= 1 && data.billNumber.size() <= 40
-        && data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 100
-        && data.customerPhone is string && data.customerPhone.size() <= 20
+        && data.billNumber is string && data.billNumber.size() >= 1 && data.billNumber.size() <= 64
+        && data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 512
+        && data.customerPhone is string && data.customerPhone.size() <= 256
         && data.items is list && data.items.size() >= 1 && data.items.size() <= 20
         && data.items[0] is map
-        && data.items[0].name is string && data.items[0].name.size() >= 1 && data.items[0].name.size() <= 80
+        && data.items[0].name is string && data.items[0].name.size() >= 1 && data.items[0].name.size() <= 256
         && (data.subtotal is int || data.subtotal is float) && data.subtotal >= 0
         && (data.totalGst is int || data.totalGst is float) && data.totalGst >= 0
         && (!('discountAmount' in data) || ((data.discountAmount is int || data.discountAmount is float) && data.discountAmount >= 0 && data.discountAmount <= 100000000))
         && (data.totalAmount is int || data.totalAmount is float) && data.totalAmount >= 0
         && (!('paymentStatus' in data) || (data.paymentStatus is string && data.paymentStatus in ['paid', 'unpaid', 'partial']))
         && (!('linkedTxId' in data) || (data.linkedTxId is string && data.linkedTxId.size() <= 128))
-        && (!('createdByName' in data) || (data.createdByName is string && data.createdByName.size() <= 80))
+        && (!('createdByName' in data) || (data.createdByName is string && data.createdByName.size() <= 256))
         && (!('estimatedCost' in data) || ((data.estimatedCost is int || data.estimatedCost is float) && data.estimatedCost >= 0 && data.estimatedCost <= 100000000))
         && data.templateId in ['classic', 'modern', 'gst-color', 'thermal-58']
-        && data.notes is string && data.notes.size() <= 240
-        && data.billDate is string && data.billDate.size() >= 1 && data.billDate.size() <= 40
+        && data.notes is string && data.notes.size() <= 1024
+        && data.billDate is string && data.billDate.size() >= 1 && data.billDate.size() <= 48
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -152,8 +166,8 @@ service cloud.firestore {
         && data.keys().hasOnly(['ownerId', 'businessId', 'name', 'unit', 'salePrice', 'purchasePrice', 'quantity', 'lowStockThreshold', 'createdAt', 'updatedAt'])
         && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
         && isValidId(data.businessId)
-        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
-        && data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 24
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 512
+        && data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 128
         && (data.salePrice is int || data.salePrice is float) && data.salePrice >= 0
         && (!('purchasePrice' in data) || ((data.purchasePrice is int || data.purchasePrice is float) && data.purchasePrice >= 0 && data.purchasePrice <= 100000000))
         && (data.quantity is int || data.quantity is float) && data.quantity >= 0
@@ -169,12 +183,12 @@ service cloud.firestore {
         && isValidId(data.businessId)
         && data.entryType in ['inflow', 'outflow']
         && data.mode in ['cash', 'upi', 'bank']
-        && data.category is string && data.category.size() >= 1 && data.category.size() <= 40
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 256
         && (data.amount is int || data.amount is float) && data.amount > 0 && data.amount <= 100000000
-        && data.note is string && data.note.size() <= 200
-        && data.entryDate is string && data.entryDate.size() >= 1 && data.entryDate.size() <= 40
+        && data.note is string && data.note.size() <= 1024
+        && data.entryDate is string && data.entryDate.size() >= 1 && data.entryDate.size() <= 48
         && (!('linkedRefId' in data) || (data.linkedRefId is string && data.linkedRefId.size() <= 128))
-        && (!('actorName' in data) || (data.actorName is string && data.actorName.size() <= 80))
+        && (!('actorName' in data) || (data.actorName is string && data.actorName.size() <= 256))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -184,9 +198,9 @@ service cloud.firestore {
         && data.keys().hasOnly(['ownerId', 'businessId', 'name', 'role', 'phone', 'pinHash', 'active', 'createdAt', 'updatedAt'])
         && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
         && isValidId(data.businessId)
-        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 256
         && data.role is string && isValidStaffRole(data.role)
-        && data.phone is string && data.phone.size() <= 20
+        && data.phone is string && data.phone.size() <= 256
         && (!('pinHash' in data) || (data.pinHash is string && data.pinHash.size() <= 128))
         && data.active is bool
         && data.createdAt is timestamp
@@ -198,11 +212,11 @@ service cloud.firestore {
         && data.keys().hasOnly(['ownerId', 'businessId', 'actorName', 'actorRole', 'actionType', 'summary', 'targetName', 'amount', 'createdAt', 'updatedAt'])
         && data.ownerId is string && data.ownerId == request.auth.uid && data.ownerId.size() <= 128
         && isValidId(data.businessId)
-        && data.actorName is string && data.actorName.size() >= 1 && data.actorName.size() <= 80
+        && data.actorName is string && data.actorName.size() >= 1 && data.actorName.size() <= 256
         && data.actorRole is string && isValidStaffRole(data.actorRole)
         && data.actionType in ['ledger', 'bill', 'stock', 'galla', 'staff', 'account']
-        && data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 240
-        && data.targetName is string && data.targetName.size() <= 100
+        && data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 1024
+        && data.targetName is string && data.targetName.size() <= 512
         && (!('amount' in data) || ((data.amount is int || data.amount is float) && data.amount >= 0 && data.amount <= 100000000))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
@@ -230,6 +244,25 @@ service cloud.firestore {
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly(['uid', 'mobileNumber', 'language', 'appearance', 'activeBusinessId', 'appLockPin', 'onboardingDone', 'createdAt', 'updatedAt', 'accentTheme', 'email', 'displayName', 'photoURL', 'name']);
       allow delete: if isValidId(uid) && isOwner(uid);
+
+      match /security/{docId} {
+        allow get, list: if isValidId(uid) && isOwner(uid);
+        allow create: if isValidId(uid)
+          && isValidId(docId)
+          && isOwner(uid)
+          && isValidVaultKeyEnvelope(incoming(), uid)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(uid)
+          && isValidId(docId)
+          && isOwner(uid)
+          && isValidVaultKeyEnvelope(incoming(), uid)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['version', 'mode', 'wrappedDek', 'iv', 'salt', 'iterations', 'updatedAt']);
+        allow delete: if isValidId(uid) && isValidId(docId) && isOwner(uid);
+      }
     }
 
     match /businesses/{businessId} {

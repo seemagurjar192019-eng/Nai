@@ -19,8 +19,8 @@ import {
   Mic,
   Plus,
   Repeat,
-  Sparkles,
   UserPlus,
+  Volume2,
   Wallet,
   X,
 } from 'lucide-react';
@@ -113,7 +113,13 @@ export interface CashKhataFeedProps {
   onSwipeRemind?: (account: LedgerAccount) => void;
   onOpenCollection: () => void;
   onOpenVoiceEntry: () => void;
-  onRunVoiceDemo?: () => void;
+  onInlineQuickAdd?: (payload: {
+    customerName: string;
+    direction: TxDirection;
+    amount: number;
+    kind: AccountKind;
+    note?: string;
+  }) => Promise<void>;
   onOpenCounterMode: () => void;
   onOpenParchiScanner: () => void;
   onOpenGalla: () => void;
@@ -177,7 +183,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   onSwipeRemind,
   onOpenCollection,
   onOpenVoiceEntry,
-  onRunVoiceDemo,
+  onInlineQuickAdd,
   onOpenCounterMode,
   onOpenParchiScanner,
   onOpenGalla,
@@ -244,6 +250,57 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
     amount: number;
     direction: TxDirection;
   } | null>(null);
+
+  // Empty-state Instant Inline Quick Add state (zero demo button, Fitts's Law muscle memory)
+  const [inlineName, setInlineName] = useState('');
+  const [inlineAmount, setInlineAmount] = useState('');
+  const [inlineNote, setInlineNote] = useState('');
+  const [inlineBusy, setInlineBusy] = useState(false);
+  const [inlineError, setInlineError] = useState('');
+
+  const handleInlineSubmit = async (dir: TxDirection) => {
+    setInlineError('');
+    const cleanName = inlineName.trim();
+    const numericAmount = Math.round((Number(inlineAmount) || 0) * 100) / 100;
+    if (!cleanName) {
+      setInlineError(
+        capabilities.focus === 'personal' ? 'Enter contact name.' : 'Enter party or customer name.'
+      );
+      return;
+    }
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setInlineError('Enter an amount greater than ₹0.');
+      return;
+    }
+    setInlineBusy(true);
+    try {
+      const targetKind: AccountKind =
+        capabilities.showSuppliers && segment === 'supplier' ? 'supplier' : 'customer';
+      if (onInlineQuickAdd) {
+        await onInlineQuickAdd({
+          customerName: cleanName,
+          direction: dir,
+          amount: numericAmount,
+          kind: targetKind,
+          note: inlineNote.trim() || undefined,
+        });
+      } else {
+        await onCreateAccount({
+          kind: targetKind,
+          name: cleanName,
+          phone: '',
+          dueDate: '',
+        });
+      }
+      setInlineName('');
+      setInlineAmount('');
+      setInlineNote('');
+    } catch (err) {
+      setInlineError(err instanceof Error ? err.message : 'Could not save entry.');
+    } finally {
+      setInlineBusy(false);
+    }
+  };
 
   const segmentRef = useRef<CashKhataSegment>(segment);
   const todayStr = getLocalDateKey();
@@ -661,7 +718,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                 <div className="min-w-0">
                   <p className="text-xs font-extrabold text-[var(--ink)] truncate">Scan Receipt</p>
                   <p className="text-[10px] font-semibold text-[var(--ink-muted)] truncate">
-                    AI Bill Reader
+                    Receipt Reader
                   </p>
                 </div>
               </motion.button>
@@ -677,7 +734,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                 className="ios27-ceramic-tile rounded-[22px] p-3 text-left flex items-center gap-3 min-h-[60px]"
               >
                 <span className="w-10 h-10 rounded-[14px] bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4 h-4 stroke-[2.3]" />
+                  <Volume2 className="w-4 h-4 stroke-[2.3]" />
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs font-extrabold text-[var(--ink)] truncate">Daily Audio</p>
@@ -737,7 +794,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                   >
                     {active && (
                       <motion.span
-                        layoutId="cashKhataKindPill"
+                        layoutId={prefersReducedMotion ? undefined : 'cashKhataKindPill'}
                         transition={SPRING_FAST}
                         className="absolute inset-0 rounded-full bg-[var(--surface)] shadow-sm"
                       />
@@ -831,16 +888,11 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                               )}
                             </span>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className="text-sm font-extrabold text-[var(--ink)] truncate">
-                                  {entry.category}
-                                </p>
-                                <span className="px-1.5 py-0.5 rounded-full bg-[var(--surface-subtle)] text-[9px] font-extrabold uppercase text-[var(--ink-muted)]">
-                                  {entry.mode}
-                                </span>
-                              </div>
+                              <p className="text-sm font-extrabold text-[var(--ink)] truncate">
+                                {entry.category}
+                              </p>
                               <p className="text-[11px] font-semibold text-[var(--ink-muted)] truncate">
-                                {entry.note || formatDateTime(entry.entryDate)}
+                                {entry.mode.toUpperCase()} · {entry.note || formatDateTime(entry.entryDate)}
                               </p>
                             </div>
                           </div>
@@ -865,105 +917,176 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                 initial={{ opacity: 0, y: 12, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={SPRING_FAST}
-                className="ios27-inset-group rounded-[28px] p-5 space-y-3.5 text-center"
+                className="ios27-inset-group rounded-[28px] p-5 space-y-3.5"
               >
-                <div className="flex justify-center">
-                  <div className="w-11 h-11 rounded-full bg-[var(--debit-tint)] flex items-center justify-center">
-                    <svg
-                      viewBox="0 0 48 48"
-                      className="w-6 h-6 sprout-grow"
-                      fill="none"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M24 38V20"
-                        stroke="#15803D"
-                        strokeWidth="3.2"
-                        strokeLinecap="round"
-                      />
-                      <path
-                        d="M24 26C17.5 26 14 21.5 14 15.5C20 15.5 24 19.5 24 26Z"
-                        fill="#22C55E"
-                      />
-                      <path
-                        d="M24 22C30.5 22 34 17.5 34 11.5C28 11.5 24 15.5 24 22Z"
-                        fill="#15803D"
-                      />
-                      <path
-                        d="M15 39H33"
-                        stroke="#15803D"
-                        strokeWidth="2.8"
-                        strokeLinecap="round"
-                        strokeOpacity="0.4"
-                      />
-                    </svg>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
+                      {activeAdaptation.focusBadge} · Instant Entry
+                    </p>
+                    <h1 className="font-display text-lg font-extrabold text-[var(--ink)]">
+                      {capabilities.focus === 'personal'
+                        ? 'Record First Personal Entry'
+                        : 'Record First Ledger Entry'}
+                    </h1>
+                    <p className="text-xs text-[var(--ink-muted)] leading-snug">
+                      {activeAdaptation.emptyStateHint}
+                    </p>
                   </div>
-                </div>
 
-                <div className="space-y-0.5">
-                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
-                    {activeAdaptation.focusBadge} · Ready For Records
-                  </p>
-                  <h1 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                    {capabilities.focus === 'personal'
-                      ? 'Start Your Personal Ledger'
-                      : 'Start Your Shop Ledger'}
-                  </h1>
-                  <p className="text-xs text-[var(--ink-muted)] leading-snug max-w-sm mx-auto">
-                    {activeAdaptation.emptyStateHint}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-2.5">
-                  <motion.button
-                    whileTap={{ scale: 0.94, y: 1 }}
-                    transition={SPRING_FAST}
+                  <button
                     type="button"
                     onClick={() =>
                       handleOpenAddModal(
                         capabilities.showSuppliers && segment === 'supplier' ? 'supplier' : 'customer'
                       )
                     }
-                    className="tactile-key-primary min-h-[48px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-sm font-extrabold flex items-center justify-center gap-2"
+                    className="min-h-[34px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-[11px] font-bold text-[var(--ink)] inline-flex items-center gap-1 shrink-0 active:scale-95 transition"
                   >
-                    <UserPlus className="w-4 h-4 shrink-0" />
-                    <span>
-                      {capabilities.showSuppliers && segment === 'supplier'
-                        ? `Add First ${capabilities.secondarySegmentLabel || 'Supplier'}`
-                        : `Add First ${capabilities.primarySegmentLabel === 'Contacts' ? 'Contact' : 'Customer'}`}
-                    </span>
-                  </motion.button>
+                    <UserPlus className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
+                    <span>Full Form</span>
+                  </button>
+                </div>
 
-                  {onRunVoiceDemo && (
-                    <motion.button
-                      whileTap={{ scale: 0.94, y: 1 }}
-                      transition={SPRING_FAST}
-                      type="button"
-                      onClick={() => {
-                        haptics.orbTap();
-                        onRunVoiceDemo();
+                {/* Instant Inline Quick Add Form (Zero Modal Hopping, Muscle Memory Symmetry) */}
+                <div className="space-y-2.5 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                    <div className="sm:col-span-7">
+                      <label htmlFor="inline-quick-party" className="sr-only">
+                        Party Name
+                      </label>
+                      <input
+                        id="inline-quick-party"
+                        type="text"
+                        value={inlineName}
+                        onChange={(e) => {
+                          setInlineError('');
+                          setInlineName(e.target.value);
+                        }}
+                        placeholder={
+                          capabilities.focus === 'personal'
+                            ? 'Friend or contact name (e.g. Rahul)'
+                            : 'Party or customer name (e.g. Sharma Ji)'
+                        }
+                        className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                      />
+                    </div>
+                    <div className="sm:col-span-5">
+                      <label htmlFor="inline-quick-amount" className="sr-only">
+                        Amount in Rupees
+                      </label>
+                      <input
+                        id="inline-quick-amount"
+                        type="number"
+                        inputMode="decimal"
+                        min="1"
+                        step="any"
+                        value={inlineAmount}
+                        onChange={(e) => {
+                          setInlineError('');
+                          setInlineAmount(e.target.value);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !inlineBusy) {
+                            void handleInlineSubmit('given');
+                          }
+                        }}
+                        placeholder="₹ Amount"
+                        className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-base font-extrabold font-tabular text-right text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quick Increment Chips */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[100, 500, 1000].map((inc) => (
+                      <button
+                        key={inc}
+                        type="button"
+                        onClick={() => {
+                          haptics.tap();
+                          setInlineError('');
+                          const current = Number(inlineAmount) || 0;
+                          setInlineAmount(String(current + inc));
+                        }}
+                        className="min-h-[32px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-[11px] font-extrabold font-tabular text-[var(--ink)] active:scale-95 transition"
+                      >
+                        +₹{inc}
+                      </button>
+                    ))}
+                    {inlineAmount && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          haptics.tap();
+                          setInlineAmount('');
+                        }}
+                        className="min-h-[32px] px-2.5 rounded-xl bg-[var(--app-bg)] text-[11px] font-bold text-[var(--ink-muted)] active:scale-95 transition"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <input
+                      type="text"
+                      value={inlineNote}
+                      onChange={(e) => setInlineNote(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !inlineBusy) {
+                          void handleInlineSubmit('given');
+                        }
                       }}
-                      className="min-h-[44px] px-4 rounded-2xl bg-[var(--brand-tint)] border border-[var(--brand-accent)]/25 text-[var(--brand-accent)] text-xs font-extrabold flex items-center justify-center gap-2"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                      <span>Try 1-Tap Demo: Ramesh ₹500 Credit</span>
-                    </motion.button>
+                      placeholder={activeAdaptation.quickNotePlaceholder}
+                      aria-label="Optional entry note"
+                      className="flex-1 min-w-[140px] min-h-[32px] rounded-xl bg-[var(--app-bg)] px-2.5 text-xs font-medium text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                    />
+                  </div>
+
+                  {inlineError && (
+                    <p role="alert" className="text-xs font-bold text-[var(--credit-red)]">
+                      {inlineError}
+                    </p>
                   )}
 
+                  {/* Symmetric Fitts's Law Direction Buttons: Left Red Credit · Right Green Received */}
+                  <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+                    <motion.button
+                      whileTap={{ scale: 0.95, y: 1 }}
+                      transition={SPRING_FAST}
+                      type="button"
+                      disabled={inlineBusy}
+                      onClick={() => void handleInlineSubmit('given')}
+                      className="min-h-[48px] px-3 rounded-2xl bg-[var(--credit-red)] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-60"
+                    >
+                      <ArrowUp className="w-4 h-4 shrink-0" />
+                      <span>{inlineBusy ? 'Saving...' : 'Credit Given'}</span>
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.95, y: 1 }}
+                      transition={SPRING_FAST}
+                      type="button"
+                      disabled={inlineBusy}
+                      onClick={() => void handleInlineSubmit('received')}
+                      className="min-h-[48px] px-3 rounded-2xl bg-[var(--debit-green)] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-60"
+                    >
+                      <ArrowDown className="w-4 h-4 shrink-0" />
+                      <span>{inlineBusy ? 'Saving...' : 'Payment Received'}</span>
+                    </motion.button>
+                  </div>
+
                   <div
-                    className={`grid gap-2.5 ${
+                    className={`grid gap-2 pt-1 ${
                       capabilities.focus === 'personal' ? 'grid-cols-1' : 'grid-cols-2'
                     }`}
                   >
                     <motion.button
-                      whileTap={{ scale: 0.94, y: 1 }}
+                      whileTap={{ scale: 0.95, y: 1 }}
                       transition={SPRING_FAST}
                       type="button"
                       onClick={() => {
                         haptics.tap();
                         onOpenVoiceEntry();
                       }}
-                      className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-[11px] font-extrabold whitespace-nowrap flex items-center justify-center gap-1.5"
+                      className="min-h-[42px] px-2.5 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-[11px] font-extrabold whitespace-nowrap flex items-center justify-center gap-1.5"
                     >
                       <Mic className="w-3.5 h-3.5 shrink-0" />
                       <span>Speak to Save</span>
@@ -971,14 +1094,14 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
 
                     {capabilities.focus !== 'personal' && (
                       <motion.button
-                        whileTap={{ scale: 0.94, y: 1 }}
+                        whileTap={{ scale: 0.95, y: 1 }}
                         transition={SPRING_FAST}
                         type="button"
                         onClick={() => {
                           haptics.tap();
                           onOpenParchiScanner();
                         }}
-                        className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--app-bg)] text-[11px] font-bold text-[var(--ink)] whitespace-nowrap flex items-center justify-center gap-1.5"
+                        className="min-h-[42px] px-2.5 rounded-2xl bg-[var(--app-bg)] text-[11px] font-bold text-[var(--ink)] whitespace-nowrap flex items-center justify-center gap-1.5"
                       >
                         <Camera className="w-3.5 h-3.5 text-[var(--brand-accent)] shrink-0" />
                         <span>Scan Receipt</span>
@@ -1108,7 +1231,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
               className="w-full min-h-[50px] px-4 rounded-2xl bg-[var(--app-bg)] text-[var(--ink)] flex items-center gap-3 text-left font-bold text-sm active:scale-[0.98] transition"
             >
               <Camera className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
-              <span>Scan Receipt (AI)</span>
+              <span>Scan Receipt</span>
             </button>
           )}
 
@@ -1358,7 +1481,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                         haptics.tap();
                         setQuickNote(preset);
                       }}
-                      className={`min-h-[30px] px-2.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0 active:scale-95 transition ${
+                      className={`min-h-[30px] px-2.5 rounded-xl text-[11px] font-bold whitespace-nowrap shrink-0 active:scale-95 transition ${
                         quickNote === preset
                           ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
                           : 'bg-[var(--surface-subtle)] text-[var(--ink-muted)]'
