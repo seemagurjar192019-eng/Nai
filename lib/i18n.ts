@@ -137,10 +137,10 @@ export function formatINR(num: number): string {
   const n = Math.round(Number(num) || 0);
   const abs = Math.abs(n);
   if (abs >= 100000000000) {
-    return (n < 0 ? '-₹' : '₹') + (abs / 10000000).toFixed(0) + ' Cr';
+    return (n < 0 ? '-₹' : '₹') + (abs / 10000000).toFixed(0) + 'Cr';
   }
   if (abs >= 10000000) {
-    return (n < 0 ? '-₹' : '₹') + (abs / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr';
+    return (n < 0 ? '-₹' : '₹') + (abs / 10000000).toFixed(2).replace(/\.?0+$/, '') + 'Cr';
   }
   let formatted = String(abs);
   try {
@@ -149,6 +149,22 @@ export function formatINR(num: number): string {
     formatted = String(abs);
   }
   return (n < 0 ? '-₹' : '₹') + formatted;
+}
+
+export function formatINRCompact(num: number): string {
+  const n = Math.round(Number(num) || 0);
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-₹' : '₹';
+  if (abs >= 10000000) {
+    return sign + (abs / 10000000).toFixed(2).replace(/\.?0+$/, '') + 'Cr';
+  }
+  if (abs >= 100000) {
+    return sign + (abs / 100000).toFixed(2).replace(/\.?0+$/, '') + 'L';
+  }
+  if (abs >= 1000) {
+    return sign + (abs / 1000).toFixed(1).replace(/\.?0+$/, '') + 'K';
+  }
+  return formatINR(n);
 }
 
 export function formatDateTime(iso: string): string {

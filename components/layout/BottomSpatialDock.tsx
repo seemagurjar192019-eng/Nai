@@ -56,7 +56,7 @@ export const BottomSpatialDock: React.FC<BottomSpatialDockProps> = ({
           haptics.tap();
           params.onClick();
         }}
-        className={`relative flex-1 min-w-0 min-h-[46px] rounded-full flex flex-col items-center justify-center gap-0.5 px-1.5 text-[10px] font-extrabold whitespace-nowrap active:scale-95 transition-colors ${
+        className={`relative flex-1 min-w-0 min-h-[46px] rounded-full flex flex-col items-center justify-center gap-0.5 px-0.5 text-[9.5px] sm:text-[10px] font-extrabold whitespace-nowrap active:scale-95 transition-colors ${
           active
             ? 'text-[var(--brand-accent)]'
             : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
@@ -76,7 +76,7 @@ export const BottomSpatialDock: React.FC<BottomSpatialDockProps> = ({
         >
           <Icon className="w-4 h-4 shrink-0" />
         </motion.span>
-        <span className="relative z-10 leading-none truncate max-w-full">{params.label}</span>
+        <span className="relative z-10 leading-none truncate max-w-full tracking-tight">{params.label}</span>
       </button>
     );
   };
@@ -85,9 +85,9 @@ export const BottomSpatialDock: React.FC<BottomSpatialDockProps> = ({
     <div className="no-print absolute bottom-0 inset-x-0 z-40 pb-safe pointer-events-none flex justify-center">
       <nav
         aria-label="Primary navigation"
-        className="w-full max-w-[440px] mx-3.5 mb-2.5 flex items-center justify-between gap-2"
+        className="w-full max-w-[430px] mx-2.5 mb-2 flex items-center justify-between gap-1.5"
       >
-        {/* Left Floating Capsule: Home + Bills / Summary */}
+        {/* Left Floating Capsule: Home + Ledger */}
         <div className="pointer-events-auto flex-1 min-w-0 bg-[var(--surface)] border border-[var(--surface-border)] rounded-full p-1 shadow-[var(--spatial-dock-shadow)] flex items-center gap-0.5">
           {renderDockButton({
             id: 'home',
@@ -97,7 +97,7 @@ export const BottomSpatialDock: React.FC<BottomSpatialDockProps> = ({
           })}
           {renderDockButton({
             id: 'bills',
-            label: capabilities.showGstBills ? 'Bills' : 'Summary',
+            label: 'Ledger',
             icon: BillsIcon,
             onClick: onSelectBills,
           })}
@@ -109,21 +109,21 @@ export const BottomSpatialDock: React.FC<BottomSpatialDockProps> = ({
             size="dock"
             listening={voiceModalOpen}
             onClick={onOpenVoice}
-            ariaLabel="Open Speak to Save Voice Entry"
+            ariaLabel="Open Voice Munim Transaction Entry"
           />
         </div>
 
-        {/* Right Floating Capsule: Overdue / Notes + Settings */}
+        {/* Right Floating Capsule: Contacts + More */}
         <div className="pointer-events-auto flex-1 min-w-0 bg-[var(--surface)] border border-[var(--surface-border)] rounded-full p-1 shadow-[var(--spatial-dock-shadow)] flex items-center gap-0.5">
           {renderDockButton({
             id: 'overdue',
-            label: capabilities.leftDockLabel,
+            label: 'Contacts',
             icon: OverdueIcon,
             onClick: onSelectOverdue,
           })}
           {renderDockButton({
             id: 'settings',
-            label: 'Settings',
+            label: 'More',
             icon: Settings,
             onClick: onSelectSettings,
           })}

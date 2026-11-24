@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { UCRED_LOGO_PATH, formatINR } from '@/lib/i18n';
+import { UCRED_LOGO_PATH, formatINR, formatINRCompact } from '@/lib/i18n';
 import {
   PERSONA_OPTIONS,
   getTimeGreeting,
@@ -312,18 +312,18 @@ export const DynamicIslandHeader: React.FC<DynamicIslandHeaderProps> = ({
                   haptics.tap();
                   setIslandExpanded((v) => !v);
                 }}
-                className="min-h-[34px] px-2.5 rounded-full bg-[var(--surface-subtle)] text-[var(--ink)] inline-flex items-center gap-1 text-xs font-extrabold font-tabular shrink-0 active:scale-95 transition"
+                className="min-h-[34px] max-w-[140px] px-2.5 rounded-full bg-[var(--surface-subtle)] text-[var(--ink)] inline-flex items-center gap-1 text-xs font-extrabold font-tabular shrink-0 whitespace-nowrap truncate active:scale-95 transition"
               >
                 <span
-                  className={
+                  className={`truncate ${
                     netBalance > 0
                       ? 'text-[var(--debit-green)]'
                       : netBalance < 0
                         ? 'text-[var(--credit-red)]'
                         : 'text-[var(--ink)]'
-                  }
+                  }`}
                 >
-                  {hideBalance ? '₹••••' : `${netSign}${formatINR(absNet)}`}
+                  {hideBalance ? '₹••••' : `${netSign}${formatINRCompact(absNet)}`}
                 </span>
                 <ChevronDown
                   className={`w-3 h-3 text-[var(--ink-muted)] transition-transform ${

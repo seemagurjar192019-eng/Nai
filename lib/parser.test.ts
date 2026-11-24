@@ -11,6 +11,7 @@ import {
   isValidGstNumber,
   isValidIndianMobile,
   isValidUpiId,
+  formatINRCompact,
 } from './i18n';
 import {
   computeCustomerTrustScore,
@@ -335,3 +336,11 @@ test('computeNetCashflowSummary calculates receivable, payable, net cashflow, an
   assert.equal(emptySummary.receivableSharePct, 50);
   assert.equal(emptySummary.payableSharePct, 50);
 });
+
+test('formatINRCompact formats amounts in lakhs, crores, and thousands per Master Plan 2.0', () => {
+  assert.equal(formatINRCompact(450), '₹450');
+  assert.equal(formatINRCompact(12500), '₹12.5K');
+  assert.equal(formatINRCompact(125000), '₹1.25L');
+  assert.equal(formatINRCompact(10000000), '₹1Cr');
+});
+

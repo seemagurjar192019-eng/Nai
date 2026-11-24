@@ -42,6 +42,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import {
   buildUpiUri,
   formatINR,
+  formatINRCompact,
   isValidGstNumber,
   isValidIndianMobile,
   isValidUpiId,
@@ -1708,14 +1709,14 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
         <div className="grid grid-cols-2 gap-3 font-tabular">
           <div className="rounded-2xl bg-[var(--debit-tint)] p-4 truncate">
             <p className="text-xs font-bold text-[var(--debit-green)]">You Get</p>
-            <p className="text-base sm:text-xl font-extrabold text-[var(--debit-green)] mt-0.5 truncate">
-              {formatINR(custDue)}
+            <p className="text-base sm:text-xl font-extrabold text-[var(--debit-green)] mt-0.5 truncate whitespace-nowrap">
+              {custDue >= 10000000 ? formatINRCompact(custDue) : formatINR(custDue)}
             </p>
           </div>
           <div className="rounded-2xl bg-[var(--brand-tint)] p-4 truncate">
             <p className="text-xs font-bold text-[var(--brand-accent)]">Advance</p>
-            <p className="text-base sm:text-xl font-extrabold text-[var(--brand-accent)] mt-0.5 truncate">
-              {formatINR(custAdv)}
+            <p className="text-base sm:text-xl font-extrabold text-[var(--brand-accent)] mt-0.5 truncate whitespace-nowrap">
+              {custAdv >= 10000000 ? formatINRCompact(custAdv) : formatINR(custAdv)}
             </p>
           </div>
         </div>
@@ -1730,8 +1731,8 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
             {suppliers.length} suppliers
           </span>
         </div>
-        <p className="text-base sm:text-2xl font-extrabold font-tabular text-[var(--credit-red)] truncate">
-          {formatINR(suppDue)}
+        <p className="text-base sm:text-2xl font-extrabold font-tabular text-[var(--credit-red)] truncate whitespace-nowrap">
+          {suppDue >= 10000000 ? formatINRCompact(suppDue) : formatINR(suppDue)}
         </p>
         <p className="text-xs text-[var(--ink-muted)] font-tabular">
           Total recorded ledger entries across this business: {transactions.length}

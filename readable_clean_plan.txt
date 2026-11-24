@@ -1,0 +1,778 @@
+=== stream_98.txt ===
+
+Ab hum Ucred ka redesign random ideas se nahi , ek proper product - design project ki
+tarah execute karenge .
+Main tumhare Ceramic Frosted Glass + Spatial Depth + Apple - inspired UX + Native
+Android concept ko master blueprint mein re fi ne kar raha hoon . Iska objective sirf
+beautiful screenshots banana nahi hai . Final app visually premium , functionally complete ,
+responsive aur actual Kotlin + Jetpack Compose native honi chahiye .
+# # # UCRED — MASTER REDESIGN PLAN 2 . 0
+Proposed design direction
+# # # UCRED
+# # # Business , beautifully organised .
+CERAMIC · SPATIAL · TACTILE · INTELLIGENT · NATIVE
+! [ Aura Finance Wealth Management App UI Design by ALI HAMZA on Dribbble ]
+( https : / / images . openai . com / static - rsc -
+4 / R8tngs2MkLse1DL8PfyY9egnDrWo_0OjkXC84PRGYlyyRyvWyeMrEbNDQ5cw2Tzx6BcAYXK
+kjOwV9uWvtKeljaHkDuhSH8VhPYTpUapFPUsOVgW92IckrIt6wBI_SEEUKkV5pSDrT6Rv6BVzF
+i2Zbt55Ea9A2E0Y1u24w6tuSqfj0eqanUwh18o4PhKD7F9Y ? purpose = fullsize )
+Product vision
+An Apple - inspired business fi nance operating system for Indian merchants , combining
+the simplicity of a premium consumer app with the capabilities of a professional business
+ledger .
+# # # 1 \ . Project principles — non - negotiable
+=== stream_99.txt ===
+
+| Principle | Implementation rule |
+| - - - - - - - - - - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+| Native fi rst | Kotlin + Jetpack Compose , not a WebView wrapper |
+| Apple - inspired | Borrow design principles , not Apple ' s exact interface |
+| Ceramic material | Glass used selectively , not on every component |
+| Spatial depth | Depth communicates hierarchy and interaction |
+| Zero slop | No unnecessary decoration , pills or random gradients |
+| Financial clarity | Amounts , dues and transactions always readable |
+| Functional integrity | No existing feature silently removed |
+| Responsive | Small Android screens supported |
+| Accessibility | Contrast , touch targets and reduced - motion support |
+| Performance | Smooth rendering without unnecessary blur or overdraw |
+Design reference clari fi cation : " iOS 27 - inspired " is our creative direction , not a claim that
+we are reproducing an o ffi cial iOS 27 design speci fi cation .
+# # # 2 \ . Visual identity and design system
+# # # 2 . 1 Colour system
+Primary palette
+Canvas # F5F5F7
+Surface # FFFFFF
+Ink # 17171B
+Indigo # 5146E5
+Muted # 888894
+=== stream_100.txt ===
+
+Semantic palette
+Received
+Due
+Pending
+Information
+Rules :
+* Indigo is the main brand accent , not a background colour for everything .
+* Green means money received or positive balance .
+* Red means outstanding or negative balance .
+* Amber means pending or requires attention .
+* Blue is reserved for neutral information .
+* Avoid using multiple accent colours in one component without a semantic reason .
+* Dark mode must be designed as a separate visual system , not simply inverted colours .
+# # # 2 . 2 Typography
+Recommended direction : SF - inspired system typography , implemented with an
+appropriately licensed font or Android system font .
+| Token | Usage |
+=== stream_101.txt ===
+
+| - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+| Display | Main business balance |
+| Heading 1 | Screen titles |
+| Heading 2 | Section headings |
+| Body | Main content |
+| Label | Metadata and secondary information |
+| Numeric | Currency , totals and fi nancial data |
+| Micro | Timestamps and tertiary details |
+Typography rules :
+* Financial numbers should have strong visual hierarchy .
+* Use tabular numerals for amounts wherever possible .
+* Avoid bolding every heading .
+* Use consistent line height and letter spacing .
+* Never sacri fi ce readability to fi t more content .
+# # # 2 . 3 Spacing and shape system
+| Token | Proposed value |
+| - - - - - - - - - - - - - - - - - - - - - - - | - - - - - - - - - - - - - - |
+| Base spacing | 4 dp |
+| Compact spacing | 8 dp |
+| Standard spacing | 16 dp |
+| Section spacing | 24 dp |
+| Large section spacing | 32 dp |
+| Small radius | 10 dp |
+| Standard radius | 16 dp |
+=== stream_102.txt ===
+
+| Large radius | 24 dp |
+| Floating surface radius | 28 dp |
+These are starting design tokens . Final values will be validated against actual Android
+screen sizes .
+# # # 2 . 4 Ceramic material system
+! [ A glimpse of the new Apple Liquid Glass UI in iOS 26 by Angel Zhelyazkov - Web Design
+and Development for SaaS Startups on Dribbble ] ( https : / / images . openai . com / static - rsc -
+4 / _R5zVllnx8QOUudl - _Sc - pZ - P7RQpdHru7ew0PkrL9PmSguMXpcPDjpaoKOfAe -
+fhDK8Y28lCRLgYHi0U0sPJ6WQufUQIhTTHiz9hqFLPjASwAY6x10IO7FMAnJuod1ad80ukXfpUj
+EwdzZVXQ4cFdOpSuH61M76A4AJyhVrSsVz2lH0jUUt9fkGB_uBTXqu ? purpose = fullsize )
+! [ Transparent frosted glass frame with rounded corners and glossy re fl ection , isolated on
+a transparent background . ] ( https : / / images . openai . com / static - rsc - 4 / iu75Lv9VB -
+8A6uAoZlpzEkQiA8DQxwafXghCNw_Ty_ - 96gnbGEOvisiLNxS4Iqi3vZT9CIlqKn4ZM6WRBA -
+EMoiTJfqeK_XXKoAdS4uWqaB - 8tj_ -
+n5cK_60XC1VPq1XPnuc0Pp7y4SOo4uJ3OLFp4KY9OZtUXLKSuO1Qd - 8zwxirFg_cJp41k -
+OJ65g7Y7k ? purpose = fullsize )
+! [ The Science of Titanium : Why Choose a TitaniumCook Board ? ]
+( https : / / images . openai . com / static - rsc - 4 / E9XJzQyrleY41IXuwUgdBXSQ6vZpM -
+9rj8zCVSU76egR49ZsNHrcMkIZkApxQqJbE51mbcW2lJuKfsV83YxL_AGIY_OP7Nb fl mjCw -
+pc1c8EkpYFHnsKGV3Lz2AzLphFACOPtQbFiHXAcSoCjJNeFOzMJjv64PLjaU -
+KPgUOQMiWlzrbRvTDOc4721XUOFL5 ? purpose = fullsize )
+! [ Breaking Down Apple ’s Liquid Glass : The Tech , The Hype , and The Reality - Roger Wong ]
+( https : / / images . openai . com / static - rsc - 4 / htOFGp - 2H3MULZ_ItbL7GJZsV2PPCrXIEjVtpMsjp -
+kTAiJTD9ydPsIAG1A6mS9TOjfdUEcntdRO1AjUO5vjDoBH62wY87P4pWVPX2SxI0UcTAn4DDK
+tcxB_f6RoF_HHDGbFyKwipv_werWQ0eo8xb8vLzDTZSlnIC7Kxlrd5k6tZ0SWKu6IyZMTP90M0
+C6f ? purpose = fullsize )
+=== stream_103.txt ===
+
+! [ Glassmorphism Noti fi cation Panel with Rounded Rectangle Transparent Glass E ff ect for
+Mobile App Popup Alert and Web Interface Design ] ( https : / / images . openai . com / static - rsc -
+4 / DlJqZ68van -
+OPw0s25_U9f2vjEprqg10EJBZh0oTYq6yirrueXvirZYFa6yIwsD7ogcRdmu1z1J90DzZEWG1_cp
+Gb0 - wxf9bG - 139q3cawDhKc_x24EqvEvZ4oiE - kZPVZRL6S5 - JlanTQH_DrMhsAt4_vA -
+RL63JFzjJqioqMi5VI20F2P4ss6YtOb5yPfX ? purpose = fullsize )
+! [ RESOPAL Real Metals & Metallics | RESOPAL ] ( https : / / images . openai . com / static - rsc -
+4 / IFK_jrqO8qxMokhNDWzl -
+5K_RQJJIOM8Sstv0SI6GcRz3iWVZzLnMB8qC2ofUmwVcAEz82FA_0lJwGUD8NY8SyyPaZ5mM
+Wj1rKDGjRzfKoKQnRRH6tX5z4sUppJmIWPgV9TgRUW7POwVgpz4W1AurPHos5PmU90Wht
+Be6SULlapYj - Fn1O045Q1wzqPny4m_ ? purpose = fullsize )
+! [ Liquid Glass Button iOS 26 - Light & Dark by Outline on Dribbble ]
+( https : / / images . openai . com / static - rsc - 4 / pFwESYbAOUT_ar1HkWL1 -
+CZv5H9pBv_XyvZ9i7W9dIl7GC - zZtsjXH34frUClsZGPv_DMXV4fTeGv -
+1Bxbu5Amw2vAyoooDSqyNltZ0TAGf2655DUN -
+- 0TM28JZHAtmV6PM8kIYz0Ssv7xgO6H6NXb0F7PvZ -
+5VdeBYdxEa5KlukPlKCmbWCYtiZbnDtnX - t ? purpose = fullsize )
+! [ Glassmorphism E ff ect by Rohan Ranjan on Dribbble ] ( https : / / images . openai . com / static -
+rsc - 4 / 1v8YuIp4kubDogiyYrE2e7YXtUdFX9vsKj2LgD9 - d - dpAetvBJRhsGTZ1O5HuMH2zWw -
+d_44jpqjp4nYZpH5MiKXWf3IGKumAbUQIb_Rf9dk9v_aBewgek -
+Dor1_Ci9GfXzUScT9aRgZxCmoE59xSTUl01F8zHIRfsCBy - Ex9bQg1jHG - 2Ll_ - 81ecKFO11b ?
+purpose = fullsize )
+! [ Design System For Spatial UI / UX Kit - Apple Vision Pro ] ( https : / / images . openai . com / static -
+rsc -
+4 / bLnv9g6967Vki0yzNiKNWhixl80LPQpXGOI66C2IFQxfIvTfkeOEqDce8cSpzK3_PpnFogwkV -
+c77XMElw_ -
+IvNdV8o25Gnka8LHp4o4BERG9UnxoU0z95ZO6Y8H3_zojLYkH54kYv7sXg5XuVy0gwnR6mpk
+i75LAXx4FOACtd2TEsXeOl9mEm9SLl6heQpr ? purpose = fullsize )
+Three surface classes :
+=== stream_104.txt ===
+
+| Material | Usage | Visual treatment |
+| - - - - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+| Ceramic Solid | Main content , ledger , lists | Clean solid surface |
+| Ceramic Frost | Floating sheets , overlays | Translucent , restrained blur |
+| Titanium Depth | Wallet deck and signature surfaces | Layered shading and specular
+highlights |
+Material rules :
+* Inner highlight should be subtle .
+* Border opacity must remain low .
+* Shadows should communicate elevation , not decoration .
+* Background blur should not make text di ffi cult to read .
+* Do not put every list row inside a glass card .
+* Avoid excessive transparency over busy backgrounds .
+Critical re fi nement : Blur is expensive on some Android hardware . Use it selectively , with a
+non - blurred fallback for lower - performance devices .
+# # # 3 \ . Information architecture
+The app should have a simple navigation model .
+# # # UCRED navigation map
+Home / Business Overview
+=== stream_105.txt ===
+
+Ledger
+Transactions and summaries
+Contacts
+Customers and suppliers
+Voice Munim
+Voice - fi rst transactions
+More
+Business tools and settings
+Conceptual navigation structure ; fi nal placement will be validated against the existing
+work fl ows .
+The bottom navigation should have fi ve predictable destinations :
+* Home
+* Ledger
+* Central Voice action
+* Contacts
+* More
+=== stream_106.txt ===
+
+The central Voice action should be visually prominent without making the other
+destinations di ffi cult to access .
+# # # 4 \ . Complete screen - by - screen redesign
+# # # 4 . 1 Home dashboard
+Highest priority
+! [ J Ventures ] ( https : / / images . openai . com / static - rsc - 4 / JJlt7z5DPQTYi6K1HIPf - IUek3fobet7 -
+RtfGOMFCq9pjFijDADLGF -
+qrceAyjElvxoq7XQLKVPYWbjacR6QqMiJz_hyYZQ_zlzFDxrJcBgHvq4Nr1nr17bUlpNwwCjkXxIe
+4axdrqzuBEKtk4qM10THQPGudIXimR_rx81SB7Sd0W1nFcSKQqBszvs4XDbn ?
+purpose = fullsize )
+Proposed layout :
+* Compact Ucred header .
+* Business switcher .
+* Live Capsule .
+* Main 3D fi nancial pass deck .
+* Income , outstanding and cash summary .
+* Quick actions .
+* Recent transactions .
+* Bottom navigation .
+=== stream_107.txt ===
+
+Home screen should answer these questions immediately :
+* How much money is available ?
+* How much is outstanding ?
+* What has recently happened ?
+* What action should the merchant take next ?
+Avoid putting every business metric on the fi rst screen .
+# # # 4 . 2 3D Wallet Pass Deck
+! [ Iberia Cards app design | Made by Plastic ] ( https : / / images . openai . com / static - rsc -
+4 / 4J6KrGoWGbW9QIDZkWbNofpRwtDql2cZ7ByhvQUKY -
+FmfHJgrogUx0JhBe6nVKCGjBU5f3QsSFnz9YE9vDSFlfh -
+f9z00iVrhf8tzNEkIHwFW9NTScsdlXHLhOQxDlYrvuyn_zJVN_T9Uwwf7dn9jk4Pyif1_vsXrUzjiZV
+sq_MrKjsCUrCIAE4Zu6zf4a9Y ? purpose = fullsize )
+This will be Ucred ' s signature visual component .
+Three fi nancial passes :
+| Pass | Purpose |
+| - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+| Net Balance | Overall business fi nancial position |
+| Due | Outstanding customer / supplier amounts |
+| Cash | Available cash balance |
+Interactions :
+=== stream_108.txt ===
+
+* Tap a visible card to bring it forward .
+* Swipe horizontally to switch passes .
+* Smooth spring - based depth transitions .
+* Active card gets highest visual emphasis .
+* Inactive cards remain identi fi able .
+* Financial fi gures update without abrupt layout jumps .
+Important accounting rule : Net balance , cash balance and dues must retain their existing
+business de fi nitions . UI redesign must not change the calculation logic .
+# # # 4 . 3 Ledger
+! [ Download the Tabby app ] ( https : / / images . openai . com / static - rsc - 4 / x2CRWkZ1OylKGeGqZ -
+g1ac2_kNu4wj4PYBZpbUJtpqOP5wIxuzOEDebvMFj5RkfGuw4jdhNFcVt2o -
+bwso0ovhk1AJlT7epwWb5NJP -
+InoKqQPFGsin44eZ_ZgyHlfeAwcaQSKTo0OENPihxixjEib_XLcnAbU90iaz -
+eN7iTHq709uHSVlIm - uXT6XacrEX ? purpose = fullsize )
+Components :
+* Date - grouped transaction list .
+* Credit and debit distinction .
+* Search .
+=== stream_109.txt ===
+
+* Filters .
+* Transaction details .
+* Edit and delete actions , subject to existing permission rules .
+* Empty , loading and error states .
+No unnecessary individual glass cards for each transaction . Use clean rows and
+separators .
+# # # 4 . 4 Contacts and customer pro fi les
+! [ Traskolik - Randevu Takip Uygulaması ] ( https : / / images . openai . com / static - rsc -
+4 / 0F9BiZaIoRjanQz30ofRuYr1ENRZqkM9PTVNMmH3lchslPePSCFEZX36NRc22mbrwFgV56q
+NMZZtrgoOuBjGGDIoWwJ2PwrGq0EL4aCloEmBBwrdYbaWzfFZy -
+Ye8PZbn2JG43UhpoHA3Hx6mrXR4lkWIzLO2aMXUPSz0331nfU97Ueb98sOJVV8fbAPMjHC ?
+purpose = fullsize )
+Contacts list :
+* Search at the top .
+* Customer and supplier classi fi cation .
+* Name and relevant fi nancial summary .
+* Last transaction date .
+* Add - contact action .
+Customer pro fi le :
+=== stream_110.txt ===
+
+* Name and contact information .
+* Current outstanding balance .
+* Total received .
+* Transaction history .
+* Trust score , if supported by the existing data model .
+* WhatsApp slip and reminder actions .
+* Edit and archive actions .
+Trust score should be presented transparently ; never imply that it is a veri fi ed credit
+rating .
+# # # 4 . 5 Voice Munim
+! [ AI Voice Assistant Mobile App | Smart Voice Interaction | Qudra by Md Forhad Alam for
+Qudra on Dribbble ] ( https : / / images . openai . com / static - rsc -
+4 / RKyjDIf4F5nh_jdQjskAXM742_hPld5btPa3JELu37 - QhYkBaaKQZ4 - ie4PVXX - vlxnCIuE18 -
+6Ub1U8UVSx1 - nri_jHn1RgQVV6mjqvNSakxSDDnhwRPTtH - qS - aC6x2cYJoGqXxn4o -
+JumECjBmX8ZGcDYrV2hwre_0MQbn2jAbpVBWYtxomF0EqhmDGog ? purpose = fullsize )
+This should feel like a core product feature , not an ordinary popup .
+States :
+* Idle .
+=== stream_111.txt ===
+
+* Listening .
+* Speech processing .
+* Parsed transaction .
+* User con fi rmation .
+* Saved successfully .
+* Error or retry .
+Example work fl ow :
+* User speaks a transaction .
+* Speech is transcribed .
+* Parser identi fi es amount , person and transaction type .
+* App displays a reviewable transaction .
+* User con fi rms .
+* Ledger is updated .
+Never save a fi nancial transaction from ambiguous voice recognition without
+con fi rmation .
+# # # 4 . 6 Receipt Scanner
+=== stream_112.txt ===
+
+! [ Collect receipts easily with Spendesk Solution ] ( https : / / images . openai . com / static - rsc -
+4 / kTJDliQ46oC2Dxqt9V1pqCQEDaWM_yxddLwWOS68FWIv_62xLQH5jSq -
+QYsW4JynqLj9IcujCSx -
+K6fpfO0fyscSWYWaajKR29EG7VFPKcYl3XQ5RJiCQp4kzL5fCify0vxsNNpofqabq4ugmqdvv3m
+hRyQovjfD6K7ISHkDiR4LaVn4m2CIaAo_S4fSaJ49 ? purpose = fullsize )
+* Camera preview .
+* Document boundary detection .
+* Capture and retake .
+* OCR processing state .
+* Extracted data preview .
+* Edit extracted values .
+* Con fi rm and save .
+# # # 4 . 7 GST Billing
+! [ SumUp : Explore our card readers and payment solutions ]
+( https : / / images . openai . com / static - rsc -
+4 / EdRFAgH6tl9GiIsCWimoOAu5f5TUTTYfqqOCh4UTyHM7n_8JVlT2Xg74V1qSbDKES8iN3zzEr
+3DahkbCY03BHeG5fAZGfLCdlNDmR20oL -
+rcfktbd8816nLcXhapOTH8r75WJfN0aI9vJCkUNj8k20mBKcXmkBJME_XBhYgBYLN51kHAtJV7E
+gNJACtQ4CYj ? purpose = fullsize )
+* Invoice creation .
+* Customer selection .
+=== stream_113.txt ===
+
+* Item and quantity entry .
+* Tax calculation .
+* Preview .
+* PDF / share work fl ow .
+* Invoice history .
+All tax calculations must be preserved and validated separately from visual presentation .
+# # # 4 . 8 Galla Cashbook
+* Opening balance .
+* Cash in .
+* Cash out .
+* Closing balance .
+* Daily summary .
+* Reconciliation .
+* Clear date - based history .
+# # # 4 . 9 Inventory and stock
+* Product list .
+=== stream_114.txt ===
+
+* Stock quantity .
+* Purchase and sale updates .
+* Low - stock information .
+* Product details .
+* Search and category fi lters .
+# # # 4 . 10 Summary , backup and settings
+* Financial summaries .
+* Backup and restore .
+* Encryption status .
+* Account and security .
+* Language .
+* Appearance .
+* Business con fi guration .
+* Noti fi cations .
+* Help and support .
+# # # 5 \ . Live Capsule — Ucred ' s contextual header
+=== stream_117.txt ===
+
+! [
+ !a)
+ 
+ J
+ | su fl y ® 
+ 1)
+ ] ( https : / / images . openai . com / static - rsc -
+4 / 3QHhKW56_ujPSmehH50I342FugptdpsTLNB -
+KmRF77ghFiByWTzkG7oX2HEIoVm1eFSa5o3VaD4As_W2a -
+_uK0wrpqq70016lszp2g65L8GhFiWznV9EZZhjeyaRx7tygL6RHm1jCp - M0o50avP -
+q_dr4X7SWMLipd5xUdz4ZT9onoWHKedslIf6B1bWBoLQ ? purpose = fullsize )
+The Live Capsule is inspired by contextual status interfaces , but it must have its own
+Ucred identity .
+| State | Behaviour |
+| - - - - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - |
+| Default | Compact business context |
+| Expanded | Quick search and controls |
+| Voice active | Listening state |
+| Processing | Progress indicator |
+| Noti fi cation | Brief contextual alert |
+| Hidden balance | Privacy - preserving display |
+It should not permanently occupy excessive screen space .
+Balance visibility should have an accessible toggle and should not expose sensitive
+information unnecessarily .
+# # # 6 \ . Interaction and motion speci fi cation
+# # # 6 . 1 Motion principles
+Use motion to explain state changes , not to decorate the screen .
+| Interaction | Proposed behaviour |
+| - - - - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+| Button press | Scale feedback around 0 . 96 |
+=== stream_118.txt ===
+
+| Card selection | Smooth elevation and depth |
+| Wallet deck | Spring - based movement |
+| Bottom sheet | Drag - responsive expansion |
+| Navigation | Consistent screen transition |
+| Balance update | Numeric interpolation |
+| Voice | Live waveform |
+| Scanner | Processing feedback |
+| Modal close | Smooth dismissal |
+# # # 6 . 2 Motion tokens
+These are initial design targets , not fi xed promises of 120 FPS or 120 Hz rendering .
+| Motion token | Initial target |
+| - - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+| Quick | 120 – 160 ms |
+| Standard | 200 – 260 ms |
+| Expressive | 300 – 420 ms |
+| Spring | Tuned by sti ff ness and damping |
+| Press scale | 0 . 96 |
+| Drag | Gesture - responsive |
+Actual animation performance must be tested on the target Android hardware .
+# # # 6 . 3 Haptic feedback
+* Light feedback for ordinary selection .
+* Medium feedback for important con fi rmation .
+* Distinct feedback for success or error where appropriate .
+=== stream_121.txt ===
+
+* No unnecessary vibration on every interaction .
+* Respect Android system haptic preferences .
+# # # 7 \ . Responsive and fi nancial - data rules
+This section is especially important because Ucred is a fi nance application .
+# # # Currency formatting
+Examples :
+| Value | Display |
+| - - - - - - - - - - - - | - - - - - - - |
+| 
+ d
+ 450 | 
+ d
+ 450 |
+| 
+ d
+ 12 , 500 | 
+ d
+ 12 . 5K |
+| 
+ d
+ 1 , 25 , 000 | 
+ d
+ 1 . 25L |
+| 
+ d
+ 1 , 00 , 00 , 000 | 
+ d
+ 1Cr |
+The compact format is for overview cards only . Full precise values should remain
+accessible in transaction details and other relevant contexts .
+Rules :
+* Never allow currency values to wrap awkwardly .
+* Avoid shrinking numbers until they become unreadable .
+* Use proper Indian number grouping .
+* Support large values and negative amounts .
+=== stream_122.txt ===
+
+* Keep currency symbol and amount visually connected .
+* Test long customer names and unusually large values .
+# # # Responsive layouts
+Must support :
+* Compact phones .
+* Standard Android phones .
+* Large phones .
+* Landscape where relevant .
+* System font scaling .
+* Display scaling .
+* Keyboard - visible states .
+* Gesture navigation and system bars .
+# # # 8 \ . Native Android technical architecture
+The fi nal implementation should be a real native Android project .
+Recommended architecture
+Jetpack Compose UI
+=== stream_123.txt ===
+
+Design system , screens and reusable components
+ViewModels + UI State
+State management and screen work fl ows
+Domain Layer
+Ledger , billing , voice parsing and business rules
+Repository Layer
+Local database , cloud services and encryption
+Room
+Local storage
+Firebase
+Cloud sync / auth
+Gemini backend
+AI processing
+Security
+Encryption and keys
+# # # Proposed technology stack
+=== stream_124.txt ===
+
+| Layer | Technology |
+| - - - - - - - - - - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+| Language | Kotlin |
+| UI | Jetpack Compose |
+| Design | Material foundations + custom Ucred system |
+| Navigation | Navigation Compose |
+| State | ViewModel + StateFlow |
+| Local database | Room |
+| Preferences | DataStore |
+| Dependency injection | Hilt |
+| Backend | Existing Firebase services , after audit |
+| Authentication | Firebase Auth |
+| Cloud database | Cloud Firestore |
+| AI processing | Secure hosted backend |
+| Camera | CameraX |
+| Image processing | ML Kit or existing veri fi ed OCR service |
+| Encryption | Audited cryptographic implementation |
+| Build | Gradle + Android Gradle Plugin |
+Exact dependency versions will be locked after checking compatibility during
+implementation .
+# # # Backend and security rules
+This is a critical migration area :
+* Never embed Gemini API secrets in the APK .
+* Keep privileged operations on a trusted backend .
+* Preserve Firebase authentication rules .
+=== stream_125.txt ===
+
+* Verify Firestore security rules .
+* Keep encryption keys out of plain - text preferences .
+* Preserve guest vault functionality .
+* Audit local encryption and backup recovery .
+* Test account switching and data isolation .
+The existing Next . js API routes cannot simply be assumed to work inside native Android .
+Their server - side responsibilities must remain hosted or be migrated to an appropriate
+backend .
+# # # 9 \ . Component library
+Build reusable components before creating all screens .
+| Component | Responsibility |
+| - - - - - - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - |
+| CeramicSurface | Solid and frosted surfaces |
+| TitaniumSurface | Premium depth surface |
+| WalletPassDeck | Three fi nancial passes |
+| WalletPass | Individual fi nancial pass |
+| LiveCapsule | Contextual header |
+| UcredTopBar | Consistent screen header |
+| UcredBottomBar | Primary navigation |
+| FinancialAmount | Currency formatting |
+| TransactionRow | Ledger data |
+| ContactRow | Contact summary |
+| VoiceWaveform | Listening animation |
+| UcredBottomSheet | Shared sheet behaviour |
+=== stream_126.txt ===
+
+| PrimaryAction | Main CTA |
+| EmptyState | No - data experience |
+| ErrorState | Failure feedback |
+| LoadingState | Loading experience |
+| Con fi rmDialog | Important con fi rmations |
+Every component should support light mode , dark mode , accessibility and responsive
+constraints where relevant .
+# # # 10 \ . Implementation phases
+This is the execution sequence I recommend .
+* Phase 0 — Source audit and feature inventory
+* Inspect the latest complete project .
+* Identify every existing screen .
+* Map existing business logic .
+* Identify API routes , Firebase dependencies and encryption .
+* Record all features that must survive migration .
+Deliverable : Feature and architecture inventory
+* Phase 1 — Design foundation
+* Finalize colour tokens .
+* Finalize typography .
+=== stream_127.txt ===
+
+* Finalize spacing and shapes .
+* Build ceramic material variants .
+* De fi ne motion tokens .
+* De fi ne component behaviour .
+* Establish accessibility rules .
+Deliverable : Ucred Design System 2 . 0
+* Phase 2 — Visual prototype
+* Home dashboard .
+* Wallet pass deck .
+* Live Capsule .
+* Ledger .
+* Contacts .
+* Voice Munim .
+Test the visual direction before migrating the entire application .
+Deliverable : Approved screen designs
+* Phase 3 — Native Android foundation
+=== stream_128.txt ===
+
+* Create Kotlin project .
+* Con fi gure Gradle .
+* Set up Compose .
+* Con fi gure navigation .
+* Add theme and reusable components .
+* Add state management .
+* Establish repository structure .
+Deliverable : Running native app shell
+* Phase 4 — Core screens
+* Home .
+* Ledger .
+* Contacts .
+* Customer details .
+* Financial summary .
+* Live Capsule .
+Deliverable : Functional core experience
+=== stream_129.txt ===
+
+* Phase 5 — Advanced tools
+* Voice Munim .
+* Receipt Scanner .
+* GST Billing .
+* Galla Cashbook .
+* Inventory .
+* WhatsApp slips .
+* Thermal receipts .
+Deliverable : Feature - complete native work fl ows
+* Phase 6 — Data and security migration
+* Firebase integration .
+* Local persistence .
+* Guest data .
+* E2EE .
+* Backup and restore .
+* O ffl ine behaviour .
+=== stream_130.txt ===
+
+* Authentication .
+* Access - control testing .
+Deliverable : Veri fi ed data and security layer
+* Phase 7 — Motion and polish
+* Spring interactions .
+* Haptic feedback .
+* Gesture behaviour .
+* Sheet transitions .
+* Loading and error animations .
+* Performance optimisation .
+Deliverable : Final interaction system
+* Phase 8 — QA and release preparation
+* Functional testing .
+* Regression testing .
+* UI testing .
+* Financial calculation validation .
+=== stream_131.txt ===
+
+* Accessibility checks .
+* Small - screen checks .
+* APK build veri fi cation .
+* Release con fi guration .
+Deliverable : Release candidate
+# # # 11 \ . Quality acceptance criteria
+No phase should be considered complete just because the screen looks correct .
+| Category | Acceptance criteria |
+| - - - - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+| Visual | Consistent typography , spacing and material system |
+| Navigation | All destinations work |
+| Financial data | Existing calculations match expected results |
+| Currency | No clipping or unintended wrapping |
+| Wallet deck | All passes switch and display correct data |
+| Voice | Ambiguous transactions require con fi rmation |
+| Ledger | Create , edit and view work fl ows work |
+| Persistence | Data survives app restart |
+| O ffl ine | Supported local work fl ows function o ffl ine |
+| Security | No exposed API secrets or unauthorised data access |
+| Motion | No stuck gestures or dead interactions |
+| Performance | No persistent jank during normal navigation |
+| Accessibility | Usable contrast and touch targets |
+| Regression | Existing features remain available |
+=== stream_132.txt ===
+
+# # # 12 \ . What we must not do
+These are explicit anti - patterns for the redesign :
+* No random gradients on every screen .
+* No excessive blur everywhere .
+* No giant fl oating buttons covering important content .
+* No decorative pills around ordinary metadata .
+* No fake 3D e ff ects that obscure information .
+* No unnecessary animations on fi nancial fi gures .
+* No tiny text to fi t more information .
+* No inconsistent icon families .
+* No replacing real features with visual placeholders .
+* No claiming a native conversion when the result is still a WebView .
+* No changing fi nancial calculations as part of UI work .
+# # # 13 \ . Project deliverables
+The project should maintain these documents as its source of truth :
+| File | Purpose |
+| - - - - - - - - - - - - - - - - - - - - | - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - |
+=== stream_133.txt ===
+
+| prd . md | Product requirements |
+| feature_inventory . md | Existing feature preservation |
+| architecture . md | Native app architecture |
+| design_system . md | Visual tokens and material rules |
+| components . md | Component library |
+| screen_specs . md | Screen - by - screen speci fi cations |
+| motion_system . md | Motion and interaction rules |
+| data_migration . md | Existing - to - native data mapping |
+| security . md | Authentication and encryption |
+| testing . md | Acceptance and regression tests |
+| phases . md | Execution milestones |
+| memory . md | Project decisions and current progress |
+# UCRED — MASTER PROJECT RULES
+# # Product identity
+Ucred is a premium , Apple - inspired Indian business fi nance operating system .
+# # Design direction
+Ceramic surfaces , restrained frosted glass , spatial depth , premium typography , tactile
+native interactions and a distinctive Ucred visual identity .
+# # Technical direction
+The fi nal Android application must be implemented in Kotlin and Jetpack Compose . A
+WebView wrapper is not an acceptable substitute for the intended native application .
+# # Preservation rule
+All existing business work fl ows , fi nancial calculations , authentication , local storage , cloud
+sync , encryption , backup , receipt processing , billing and ledger features must be
+inventoried before migration . Do not remove or silently simplify any feature .
+# # Design rules
+=== stream_134.txt ===
+
+1 . Use glass selectively .
+2 . Prioritise content clarity over decoration .
+3 . Use consistent spacing , typography and colour tokens .
+4 . Avoid unnecessary pills and fl oating cards .
+5 . Keep all fi nancial fi gures readable .
+6 . Preserve accessible contrast and touch targets .
+7 . Support light and dark themes .
+8 . Use native , interruptible motion .
+9 . Respect reduced - motion preferences .
+10 . Never sacri fi ce performance for visual e ff ects .
+# # Engineering rules
+1 . Keep UI , domain logic and data layers separate .
+2 . Keep secrets outside the APK .
+3 . Validate all fi nancial calculations .
+4 . Preserve existing data semantics .
+5 . Implement explicit loading , empty , success and error states .
+6 . Test every important work fl ow .
+7 . Never claim completion without veri fi cation .
+# # Review rule
+Every screen must pass visual review , interaction review , functional testing , accessibility
+checks and regression testing before being marked complete .
+# # # 14 \ . Immediate next milestone
+Meri recommendation hai ki abhi poori app code mein convert karne se pehle ek hi
+screen ko reference - quality banaya jaye .
+First design milestone
+# # # Ucred Home 2 . 0
+=== stream_135.txt ===
+
+! [ Liez tous vos comptes sur une application | Open Banking | Revolut Belgique ]
+( https : / / images . openai . com / static - rsc -
+4 / XgafgVVM97UubTCnAXgfUlvFP4EDoIbCic4e13snKz0fOmTONa - DYR6lgBpALuI80aTi -
+VHbxGXO28zVBCemLwDZ3t - a6LtL6rAcxyPNwrpF3NpM -
+9y3ms17gtHsUeoBRTbkYwHpG_zFdgTqWbVko0Tl67Zm5vhtEF4BIQLkpp89VO8y0IL1A_O8oZ
+J7P6QE ? purpose = fullsize )
+Is milestone mein :
+* Complete home - screen composition .
+* 3D wallet deck .
+* Live Capsule .
+* Financial summary .
+* Quick actions .
+* Recent transactions .
+* Bottom navigation .
+* Light and dark theme .
+* Responsive layout .
+* Interaction speci fi cations .
+Mera execution rule : Home screen ko reference quality tak pahunchane ke baad uske
+design system ko remaining screens par extend karenge . Isse har screen alag designer ki
+=== stream_136.txt ===
+
+banayi hui nahi lagegi .
+# # # Ek cheez ab chahiye
+Pichhli ZIP ke bajay latest Google AI Studio project ZIP chahiye , jisme tumhare recent
+changes bhi included hon . Usi ko source of truth banayenge .
+Uske baad pehla actual deliverable hoga : Ucred Design System 2 . 0 + Home Screen
+implementation speci fi cation , phir native Kotlin migration .
+Tumhare paanch din ke existing work ko discard nahi karenge ; pehle uska feature
+inventory banayenge aur sirf UI layer ko systematically replace karenge .

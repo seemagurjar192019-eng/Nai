@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { formatINR } from '@/lib/i18n';
+import { formatINR, formatINRCompact } from '@/lib/i18n';
 
 export interface OdometerNumberProps {
   value: number;
   hidden?: boolean;
   prefix?: string;
   className?: string;
+  compact?: boolean;
 }
 
 const DIGIT_STRIP = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
@@ -56,13 +57,22 @@ export const OdometerNumber: React.FC<OdometerNumberProps> = ({
   hidden = false,
   prefix = '',
   className = '',
+  compact = false,
 }) => {
   const prefersReducedMotion = Boolean(useReducedMotion());
-  const formattedText = hidden ? '₹••••' : `${prefix}${formatINR(value)}`;
+  const formattedText = hidden
+    ? '₹••••'
+    : compact || Math.abs(value) >= 10000000
+      ? `${prefix}${formatINRCompact(value)}`
+      : `${prefix}${formatINR(value)}`;
   const chars = formattedText.split('');
 
   if (prefersReducedMotion || chars.length > 8) {
-    return <span className={`inline-block font-tabular ${className}`}>{formattedText}</span>;
+    return (
+      <span className={`inline-block font-tabular whitespace-nowrap ${className}`}>
+        {formattedText}
+      </span>
+    );
   }
 
   return (

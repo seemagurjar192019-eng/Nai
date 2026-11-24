@@ -2,31 +2,31 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* Ucred iOS 27 Matte Spatial Light Mode (#F2F2F7 Canvas · #FFFFFF Elevated Cards · Zero Glass/Blur) */
-  --app-bg: #F2F2F7;
+  /* Ucred Master Plan 2.0: iOS 27 Apple Ceramic Light Mode (#F5F5F7 Canvas · #FFFFFF Surfaces) */
+  --app-bg: #F5F5F7;
   --outer-frame: #E5E5EA;
   --surface: #FFFFFF;
-  --surface-subtle: #EBEBF0;
-  --surface-border: #E5E5EA;
-  --ink: #111827;
-  --ink-muted: #6E6E73;
+  --surface-subtle: #EDEDF2;
+  --surface-border: rgba(15, 23, 42, 0.08);
+  --ink: #17171B;
+  --ink-muted: #888894;
 
-  /* Matte Royal Indigo Accent */
-  --brand: #4F46E5;
+  /* Matte Royal Indigo Brand Accent (#5146E5) */
+  --brand: #5146E5;
   --brand-hover: #4338CA;
   --brand-fg: #FFFFFF;
 
-  --brand-accent: #4F46E5;
+  --brand-accent: #5146E5;
   --brand-accent-fg: #FFFFFF;
   --brand-tint: #EEF2FF;
   --brand-soft: #E0E7FF;
 
-  /* Strict Hisaab Semantics (100% Solid Matte) */
-  --credit-red: #DC2626;
+  /* Strict Financial Semantics (Green = Received/Asset · Red = Outstanding/Payable · Amber = Pending) */
+  --credit-red: #EF4444;
   --credit-tint: #FEE2E2;
-  --debit-green: #15803D;
+  --debit-green: #22C55E;
   --debit-tint: #DCFCE7;
-  --alert-amber: #D97706;
+  --alert-amber: #F59E0B;
   --alert-tint: #FEF3C7;
 
   /* Solid Matte Royal Indigo Accent Fill */

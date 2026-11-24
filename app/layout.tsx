@@ -116,6 +116,8 @@ const jsonLd = {
   },
 };
 
+import { CapacitorInitializer } from '@/components/CapacitorInitializer';
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
@@ -124,6 +126,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-[var(--outer-frame)] text-[var(--ink)]" suppressHydrationWarning>
+        <CapacitorInitializer />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

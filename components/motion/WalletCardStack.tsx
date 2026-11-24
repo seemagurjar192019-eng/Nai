@@ -292,11 +292,12 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-display text-[24px] sm:text-[32px] font-extrabold leading-none tracking-tight text-white truncate max-w-[210px] sm:max-w-[270px]">
+                        <p className="font-display text-[24px] sm:text-[32px] font-extrabold leading-none tracking-tight text-white whitespace-nowrap truncate max-w-full">
                           <OdometerNumber
                             value={Math.abs(cashflow.netCashflow)}
                             hidden={hideBalance}
                             prefix={netNegative ? '-' : ''}
+                            compact
                           />
                         </p>
                         <motion.button

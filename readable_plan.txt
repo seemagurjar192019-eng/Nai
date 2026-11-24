@@ -1,0 +1,778 @@
+=== stream_98.txt ===
+
+A b   h u m   U c r e d   k a   r e d e s i g n   r a n d o m   i d e a s   s e   n a h i ,   e k   p r o p e r   p r o d u c t - d e s i g n   p r o j e c t   k i
+t a r a h   e x e c u t e   k a r e n g e .
+M a i n   t u m h a r e   C e r a m i c   F r o s t e d   G l a s s   +   S p a t i a l   D e p t h   +   A p p l e - i n s p i r e d   U X   +   N a t i v e
+A n d r o i d   c o n c e p t   k o   m a s t e r   b l u e p r i n t   m e i n   r e fi n e   k a r   r a h a   h o o n .   I s k a   o b j e c t i v e   s i r f
+b e a u t i f u l   s c r e e n s h o t s   b a n a n a   n a h i   h a i .   F i n a l   a p p   v i s u a l l y   p r e m i u m ,   f u n c t i o n a l l y   c o m p l e t e ,
+r e s p o n s i v e   a u r   a c t u a l   K o t l i n   +   J e t p a c k   C o m p o s e   n a t i v e   h o n i   c h a h i y e .
+# # #   U C R E D   —   M A S T E R   R E D E S I G N   P L A N   2 . 0
+P r o p o s e d   d e s i g n   d i r e c t i o n
+# # #   U C R E D
+# # #   B u s i n e s s ,   b e a u t i f u l l y   o r g a n i s e d .
+C E R A M I C   ·   S P A T I A L   ·   T A C T I L E   ·   I N T E L L I G E N T   ·   N A T I V E
+! [ A u r a   F i n a n c e   W e a l t h   M a n a g e m e n t   A p p   U I   D e s i g n   b y   A L I   H A M Z A   o n   D r i b b b l e ]
+( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / R 8 t n g s 2 M k L s e 1 D L 8 P f y Y 9 e g n D r W o _ 0 O j k X C 8 4 P R G Y l y y R y v W y e M r E b N D Q 5 c w 2 T z x 6 B c A Y X K
+k j O w V 9 u W v t K e l j a H k D u h S H 8 V h P Y T p U a p F P U s O V g W 9 2 I c k r I t 6 w B I _ S E E U K k V 5 p S D r T 6 R v 6 B V z F
+i 2 Z b t 5 5 E a 9 A 2 E 0 Y 1 u 2 4 w 6 t u S q f j 0 e q a n U w h 1 8 o 4 P h K D 7 F 9 Y ? p u r p o s e = f u l l s i z e )
+P r o d u c t   v i s i o n
+A n   A p p l e - i n s p i r e d   b u s i n e s s   fi n a n c e   o p e r a t i n g   s y s t e m   f o r   I n d i a n   m e r c h a n t s ,   c o m b i n i n g
+t h e   s i m p l i c i t y   o f   a   p r e m i u m   c o n s u m e r   a p p   w i t h   t h e   c a p a b i l i t i e s   o f   a   p r o f e s s i o n a l   b u s i n e s s
+l e d g e r .
+# # #   1 \ .   P r o j e c t   p r i n c i p l e s   —   n o n - n e g o t i a b l e
+=== stream_99.txt ===
+
+|   P r i n c i p l e                         |   I m p l e m e n t a t i o n   r u l e                                                                       |
+|   - - - - - - - - - - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+|   N a t i v e   fi r s t                   |   K o t l i n   +   J e t p a c k   C o m p o s e ,   n o t   a   W e b V i e w   w r a p p e r               |
+|   A p p l e - i n s p i r e d               |   B o r r o w   d e s i g n   p r i n c i p l e s ,   n o t   A p p l e ' s   e x a c t   i n t e r f a c e   |
+|   C e r a m i c   m a t e r i a l           |   G l a s s   u s e d   s e l e c t i v e l y ,   n o t   o n   e v e r y   c o m p o n e n t                 |
+|   S p a t i a l   d e p t h                 |   D e p t h   c o m m u n i c a t e s   h i e r a r c h y   a n d   i n t e r a c t i o n                     |
+|   Z e r o   s l o p                         |   N o   u n n e c e s s a r y   d e c o r a t i o n ,   p i l l s   o r   r a n d o m   g r a d i e n t s     |
+|   F i n a n c i a l   c l a r i t y         |   A m o u n t s ,   d u e s   a n d   t r a n s a c t i o n s   a l w a y s   r e a d a b l e                 |
+|   F u n c t i o n a l   i n t e g r i t y   |   N o   e x i s t i n g   f e a t u r e   s i l e n t l y   r e m o v e d                                     |
+|   R e s p o n s i v e                       |   S m a l l   A n d r o i d   s c r e e n s   s u p p o r t e d                                               |
+|   A c c e s s i b i l i t y                 |   C o n t r a s t ,   t o u c h   t a r g e t s   a n d   r e d u c e d - m o t i o n   s u p p o r t         |
+|   P e r f o r m a n c e                     |   S m o o t h   r e n d e r i n g   w i t h o u t   u n n e c e s s a r y   b l u r   o r   o v e r d r a w   |
+D e s i g n   r e f e r e n c e   c l a r i fi c a t i o n :   " i O S   2 7 - i n s p i r e d "   i s   o u r   c r e a t i v e   d i r e c t i o n ,   n o t   a   c l a i m   t h a t
+w e   a r e   r e p r o d u c i n g   a n   o ffi c i a l   i O S   2 7   d e s i g n   s p e c i fi c a t i o n .
+# # #   2 \ .   V i s u a l   i d e n t i t y   a n d   d e s i g n   s y s t e m
+# # #   2 . 1   C o l o u r   s y s t e m
+P r i m a r y   p a l e t t e
+C a n v a s # F 5 F 5 F 7
+S u r f a c e # F F F F F F
+I n k # 1 7 1 7 1 B
+I n d i g o # 5 1 4 6 E 5
+M u t e d # 8 8 8 8 9 4
+=== stream_100.txt ===
+
+S e m a n t i c   p a l e t t e
+R e c e i v e d
+D u e
+P e n d i n g
+I n f o r m a t i o n
+R u l e s :
+*   I n d i g o   i s   t h e   m a i n   b r a n d   a c c e n t ,   n o t   a   b a c k g r o u n d   c o l o u r   f o r   e v e r y t h i n g .
+*   G r e e n   m e a n s   m o n e y   r e c e i v e d   o r   p o s i t i v e   b a l a n c e .
+*   R e d   m e a n s   o u t s t a n d i n g   o r   n e g a t i v e   b a l a n c e .
+*   A m b e r   m e a n s   p e n d i n g   o r   r e q u i r e s   a t t e n t i o n .
+*   B l u e   i s   r e s e r v e d   f o r   n e u t r a l   i n f o r m a t i o n .
+*   A v o i d   u s i n g   m u l t i p l e   a c c e n t   c o l o u r s   i n   o n e   c o m p o n e n t   w i t h o u t   a   s e m a n t i c   r e a s o n .
+*   D a r k   m o d e   m u s t   b e   d e s i g n e d   a s   a   s e p a r a t e   v i s u a l   s y s t e m ,   n o t   s i m p l y   i n v e r t e d   c o l o u r s .
+# # #   2 . 2   T y p o g r a p h y
+R e c o m m e n d e d   d i r e c t i o n :   S F - i n s p i r e d   s y s t e m   t y p o g r a p h y ,   i m p l e m e n t e d   w i t h   a n
+a p p r o p r i a t e l y   l i c e n s e d   f o n t   o r   A n d r o i d   s y s t e m   f o n t .
+|   T o k e n           |   U s a g e                                                               |
+=== stream_101.txt ===
+
+|   - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+|   D i s p l a y       |   M a i n   b u s i n e s s   b a l a n c e                               |
+|   H e a d i n g   1   |   S c r e e n   t i t l e s                                               |
+|   H e a d i n g   2   |   S e c t i o n   h e a d i n g s                                         |
+|   B o d y             |   M a i n   c o n t e n t                                                 |
+|   L a b e l           |   M e t a d a t a   a n d   s e c o n d a r y   i n f o r m a t i o n     |
+|   N u m e r i c       |   C u r r e n c y ,   t o t a l s   a n d   fi n a n c i a l   d a t a   |
+|   M i c r o           |   T i m e s t a m p s   a n d   t e r t i a r y   d e t a i l s           |
+T y p o g r a p h y   r u l e s :
+*   F i n a n c i a l   n u m b e r s   s h o u l d   h a v e   s t r o n g   v i s u a l   h i e r a r c h y .
+*   U s e   t a b u l a r   n u m e r a l s   f o r   a m o u n t s   w h e r e v e r   p o s s i b l e .
+*   A v o i d   b o l d i n g   e v e r y   h e a d i n g .
+*   U s e   c o n s i s t e n t   l i n e   h e i g h t   a n d   l e t t e r   s p a c i n g .
+*   N e v e r   s a c r i fi c e   r e a d a b i l i t y   t o   fi t   m o r e   c o n t e n t .
+# # #   2 . 3   S p a c i n g   a n d   s h a p e   s y s t e m
+|   T o k e n                                       |   P r o p o s e d   v a l u e   |
+|   - - - - - - - - - - - - - - - - - - - - - - -   |   - - - - - - - - - - - - - -   |
+|   B a s e   s p a c i n g                         |   4   d p                       |
+|   C o m p a c t   s p a c i n g                   |   8   d p                       |
+|   S t a n d a r d   s p a c i n g                 |   1 6   d p                     |
+|   S e c t i o n   s p a c i n g                   |   2 4   d p                     |
+|   L a r g e   s e c t i o n   s p a c i n g       |   3 2   d p                     |
+|   S m a l l   r a d i u s                         |   1 0   d p                     |
+|   S t a n d a r d   r a d i u s                   |   1 6   d p                     |
+=== stream_102.txt ===
+
+|   L a r g e   r a d i u s                         |   2 4   d p                     |
+|   F l o a t i n g   s u r f a c e   r a d i u s   |   2 8   d p                     |
+T h e s e   a r e   s t a r t i n g   d e s i g n   t o k e n s .   F i n a l   v a l u e s   w i l l   b e   v a l i d a t e d   a g a i n s t   a c t u a l   A n d r o i d
+s c r e e n   s i z e s .
+# # #   2 . 4   C e r a m i c   m a t e r i a l   s y s t e m
+! [ A   g l i m p s e   o f   t h e   n e w   A p p l e   L i q u i d   G l a s s   U I   i n   i O S   2 6   b y   A n g e l   Z h e l y a z k o v   -   W e b   D e s i g n
+a n d   D e v e l o p m e n t   f o r   S a a S   S t a r t u p s   o n   D r i b b b l e ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / _ R 5 z V l l n x 8 Q O U u d l - _ S c - p Z - P 7 R Q p d H r u 7 e w 0 P k r L 9 P m S g u M X p c P D j p a o K O f A e -
+f h D K 8 Y 2 8 l C R L g Y H i 0 U 0 s P J 6 W Q u f U Q I h T T H i z 9 h q F L P j A S w A Y 6 x 1 0 I O 7 F M A n J u o d 1 a d 8 0 u k X f p U j
+E w d z Z V X Q 4 c F d O p S u H 6 1 M 7 6 A 4 A J y h V r S s V z 2 l H 0 j U U t 9 f k G B _ u B T X q u ? p u r p o s e = f u l l s i z e )
+! [ T r a n s p a r e n t   f r o s t e d   g l a s s   f r a m e   w i t h   r o u n d e d   c o r n e r s   a n d   g l o s s y   r e fl e c t i o n ,   i s o l a t e d   o n
+a   t r a n s p a r e n t   b a c k g r o u n d . ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c - 4 / i u 7 5 L v 9 V B -
+8 A 6 u A o Z l p z E k Q i A 8 D Q x w a f X g h C N w _ T y _ - 9 6 g n b G E O v i s i L N x S 4 I q i 3 v Z T 9 C I l q K n 4 Z M 6 W R B A -
+E M o i T J f q e K _ X X K o A d S 4 u W q a B - 8 t j _ -
+n 5 c K _ 6 0 X C 1 V P q 1 X P n u c 0 P p 7 y 4 S O o 4 u J 3 O L F p 4 K Y 9 O Z t U X L K S u O 1 Q d - 8 z w x i r F g _ c J p 4 1 k -
+O J 6 5 g 7 Y 7 k ? p u r p o s e = f u l l s i z e )
+! [ T h e   S c i e n c e   o f   T i t a n i u m :   W h y   C h o o s e   a   T i t a n i u m C o o k   B o a r d ? ]
+( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c - 4 / E 9 X J z Q y r l e Y 4 1 I X u w U g d B X S Q 6 v Z p M -
+9 r j 8 z C V S U 7 6 e g R 4 9 Z s N H r c M k I Z k A p x Q q J b E 5 1 m b c W 2 l J u K f s V 8 3 Y x L _ A G I Y _ O P 7 N b fl m j C w -
+p c 1 c 8 E k p Y F H n s K G V 3 L z 2 A z L p h F A C O P t Q b F i H X A c S o C j J N e F O z M J j v 6 4 P L j a U -
+K P g U O Q M i W l z r b R v T D O c 4 7 2 1 X U O F L 5 ? p u r p o s e = f u l l s i z e )
+! [ B r e a k i n g   D o w n   A p p l e ’s   L i q u i d   G l a s s :   T h e   T e c h ,   T h e   H y p e ,   a n d   T h e   R e a l i t y   -   R o g e r   W o n g ]
+( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c - 4 / h t O F G p - 2 H 3 M U L Z _ I t b L 7 G J Z s V 2 P P C r X I E j V t p M s j p -
+k T A i J T D 9 y d P s I A G 1 A 6 m S 9 T O j f d U E c n t d R O 1 A j U O 5 v j D o B H 6 2 w Y 8 7 P 4 p W V P X 2 S x I 0 U c T A n 4 D D K
+t c x B _ f 6 R o F _ H H D G b F y K w i p v _ w e r W Q 0 e o 8 x b 8 v L z D T Z S l n I C 7 K x l r d 5 k 6 t Z 0 S W K u 6 I y Z M T P 9 0 M 0
+C 6 f ? p u r p o s e = f u l l s i z e )
+=== stream_103.txt ===
+
+! [ G l a s s m o r p h i s m   N o t i fi c a t i o n   P a n e l   w i t h   R o u n d e d   R e c t a n g l e   T r a n s p a r e n t   G l a s s   E ff e c t   f o r
+M o b i l e   A p p   P o p u p   A l e r t   a n d   W e b   I n t e r f a c e   D e s i g n ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / D l J q Z 6 8 v a n -
+O P w 0 s 2 5 _ U 9 f 2 v j E p r q g 1 0 E J B Z h 0 o T Y q 6 y i r r u e X v i r Z Y F a 6 y I w s D 7 o g c R d m u 1 z 1 J 9 0 D z Z E W G 1 _ c p
+G b 0 - w x f 9 b G - 1 3 9 q 3 c a w D h K c _ x 2 4 E q v E v Z 4 o i E - k Z P V Z R L 6 S 5 - J l a n T Q H _ D r M h s A t 4 _ v A -
+R L 6 3 J F z j J q i o q M i 5 V I 2 0 F 2 P 4 s s 6 Y t O b 5 y P f X ? p u r p o s e = f u l l s i z e )
+! [ R E S O P A L   R e a l   M e t a l s   &   M e t a l l i c s   |   R E S O P A L ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / I F K _ j r q O 8 q x M o k h N D W z l -
+5 K _ R Q J J I O M 8 S s t v 0 S I 6 G c R z 3 i W V Z z L n M B 8 q C 2 o f U m w V c A E z 8 2 F A _ 0 l J w G U D 8 N Y 8 S y y P a Z 5 m M
+W j 1 r K D G j R z f K o K Q n R R H 6 t X 5 z 4 s U p p J m I W P g V 9 T g R U W 7 P O w V g p z 4 W 1 A u r P H o s 5 P m U 9 0 W h t
+B e 6 S U L l a p Y j - F n 1 O 0 4 5 Q 1 w z q P n y 4 m _ ? p u r p o s e = f u l l s i z e )
+! [ L i q u i d   G l a s s   B u t t o n   i O S   2 6   -   L i g h t   &   D a r k   b y   O u t l i n e   o n   D r i b b b l e ]
+( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c - 4 / p F w E S Y b A O U T _ a r 1 H k W L 1 -
+C Z v 5 H 9 p B v _ X y v Z 9 i 7 W 9 d I l 7 G C - z Z t s j X H 3 4 f r U C l s Z G P v _ D M X V 4 f T e G v -
+1 B x b u 5 A m w 2 v A y o o o D S q y N l t Z 0 T A G f 2 6 5 5 D U N -
+- 0 T M 2 8 J Z H A t m V 6 P M 8 k I Y z 0 S s v 7 x g O 6 H 6 N X b 0 F 7 P v Z -
+5 V d e B Y d x E a 5 K l u k P l K C m b W C Y t i Z b n D t n X - t ? p u r p o s e = f u l l s i z e )
+! [ G l a s s m o r p h i s m   E ff e c t   b y   R o h a n   R a n j a n   o n   D r i b b b l e ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c -
+r s c - 4 / 1 v 8 Y u I p 4 k u b D o g i y Y r E 2 e 7 Y X t U d F X 9 v s K j 2 L g D 9 - d - d p A e t v B J R h s G T Z 1 O 5 H u M H 2 z W w -
+d _ 4 4 j p q j p 4 n Y Z p H 5 M i K X W f 3 I G K u m A b U Q I b _ R f 9 d k 9 v _ a B e w g e k -
+D o r 1 _ C i 9 G f X z U S c T 9 a R g Z x C m o E 5 9 x S T U l 0 1 F 8 z H I R f s C B y - E x 9 b Q g 1 j H G - 2 L l _ - 8 1 e c K F O 1 1 b ?
+p u r p o s e = f u l l s i z e )
+! [ D e s i g n   S y s t e m   F o r   S p a t i a l   U I / U X   K i t   -   A p p l e   V i s i o n   P r o ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c -
+r s c -
+4 / b L n v 9 g 6 9 6 7 V k i 0 y z N i K N W h i x l 8 0 L P Q p X G O I 6 6 C 2 I F Q x f I v T f k e O E q D c e 8 c S p z K 3 _ P p n F o g w k V -
+c 7 7 X M E l w _ -
+I v N d V 8 o 2 5 G n k a 8 L H p 4 o 4 B E R G 9 U n x o U 0 z 9 5 Z O 6 Y 8 H 3 _ z o j L Y k H 5 4 k Y v 7 s X g 5 X u V y 0 g w n R 6 m p k
+i 7 5 L A X x 4 F O A C t d 2 T E s X e O l 9 m E m 9 S L l 6 h e Q p r ? p u r p o s e = f u l l s i z e )
+T h r e e   s u r f a c e   c l a s s e s :
+=== stream_104.txt ===
+
+|   M a t e r i a l               |   U s a g e                                                             |   V i s u a l   t r e a t m e n t                                                 |
+|   - - - - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+|   C e r a m i c   S o l i d     |   M a i n   c o n t e n t ,   l e d g e r ,   l i s t s                 |   C l e a n   s o l i d   s u r f a c e                                           |
+|   C e r a m i c   F r o s t     |   F l o a t i n g   s h e e t s ,   o v e r l a y s                     |   T r a n s l u c e n t ,   r e s t r a i n e d   b l u r                         |
+|   T i t a n i u m   D e p t h   |   W a l l e t   d e c k   a n d   s i g n a t u r e   s u r f a c e s   |   L a y e r e d   s h a d i n g   a n d   s p e c u l a r
+h i g h l i g h t s   |
+M a t e r i a l   r u l e s :
+*   I n n e r   h i g h l i g h t   s h o u l d   b e   s u b t l e .
+*   B o r d e r   o p a c i t y   m u s t   r e m a i n   l o w .
+*   S h a d o w s   s h o u l d   c o m m u n i c a t e   e l e v a t i o n ,   n o t   d e c o r a t i o n .
+*   B a c k g r o u n d   b l u r   s h o u l d   n o t   m a k e   t e x t   d i ffi c u l t   t o   r e a d .
+*   D o   n o t   p u t   e v e r y   l i s t   r o w   i n s i d e   a   g l a s s   c a r d .
+*   A v o i d   e x c e s s i v e   t r a n s p a r e n c y   o v e r   b u s y   b a c k g r o u n d s .
+C r i t i c a l   r e fi n e m e n t :   B l u r   i s   e x p e n s i v e   o n   s o m e   A n d r o i d   h a r d w a r e .   U s e   i t   s e l e c t i v e l y ,   w i t h   a
+n o n - b l u r r e d   f a l l b a c k   f o r   l o w e r - p e r f o r m a n c e   d e v i c e s .
+# # #   3 \ .   I n f o r m a t i o n   a r c h i t e c t u r e
+T h e   a p p   s h o u l d   h a v e   a   s i m p l e   n a v i g a t i o n   m o d e l .
+# # #   U C R E D   n a v i g a t i o n   m a p
+H o m e   /   B u s i n e s s   O v e r v i e w
+=== stream_105.txt ===
+
+L e d g e r
+T r a n s a c t i o n s   a n d   s u m m a r i e s
+C o n t a c t s
+C u s t o m e r s   a n d   s u p p l i e r s
+V o i c e   M u n i m
+V o i c e - fi r s t   t r a n s a c t i o n s
+M o r e
+B u s i n e s s   t o o l s   a n d   s e t t i n g s
+C o n c e p t u a l   n a v i g a t i o n   s t r u c t u r e ;   fi n a l   p l a c e m e n t   w i l l   b e   v a l i d a t e d   a g a i n s t   t h e   e x i s t i n g
+w o r k fl o w s .
+T h e   b o t t o m   n a v i g a t i o n   s h o u l d   h a v e   fi v e   p r e d i c t a b l e   d e s t i n a t i o n s :
+*   H o m e
+*   L e d g e r
+*   C e n t r a l   V o i c e   a c t i o n
+*   C o n t a c t s
+*   M o r e
+=== stream_106.txt ===
+
+T h e   c e n t r a l   V o i c e   a c t i o n   s h o u l d   b e   v i s u a l l y   p r o m i n e n t   w i t h o u t   m a k i n g   t h e   o t h e r
+d e s t i n a t i o n s   d i ffi c u l t   t o   a c c e s s .
+# # #   4 \ .   C o m p l e t e   s c r e e n - b y - s c r e e n   r e d e s i g n
+# # #   4 . 1   H o m e   d a s h b o a r d
+H i g h e s t   p r i o r i t y
+! [ J   V e n t u r e s ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c - 4 / J J l t 7 z 5 D P Q T Y i 6 K 1 H I P f - I U e k 3 f o b e t 7 -
+R t f G O M F C q 9 p j F i j D A D L G F -
+q r c e A y j E l v x o q 7 X Q L K V P Y W b j a c R 6 Q q M i J z _ h y Y Z Q _ z l z F D x r J c B g H v q 4 N r 1 n r 1 7 b U l p N w w C j k X x I e
+4 a x d r q z u B E K t k 4 q M 1 0 T H Q P G u d I X i m R _ r x 8 1 S B 7 S d 0 W 1 n F c S K Q q B s z v s 4 X D b n ?
+p u r p o s e = f u l l s i z e )
+P r o p o s e d   l a y o u t :
+*   C o m p a c t   U c r e d   h e a d e r .
+*   B u s i n e s s   s w i t c h e r .
+*   L i v e   C a p s u l e .
+*   M a i n   3 D   fi n a n c i a l   p a s s   d e c k .
+*   I n c o m e ,   o u t s t a n d i n g   a n d   c a s h   s u m m a r y .
+*   Q u i c k   a c t i o n s .
+*   R e c e n t   t r a n s a c t i o n s .
+*   B o t t o m   n a v i g a t i o n .
+=== stream_107.txt ===
+
+H o m e   s c r e e n   s h o u l d   a n s w e r   t h e s e   q u e s t i o n s   i m m e d i a t e l y :
+*   H o w   m u c h   m o n e y   i s   a v a i l a b l e ?
+*   H o w   m u c h   i s   o u t s t a n d i n g ?
+*   W h a t   h a s   r e c e n t l y   h a p p e n e d ?
+*   W h a t   a c t i o n   s h o u l d   t h e   m e r c h a n t   t a k e   n e x t ?
+A v o i d   p u t t i n g   e v e r y   b u s i n e s s   m e t r i c   o n   t h e   fi r s t   s c r e e n .
+# # #   4 . 2   3 D   W a l l e t   P a s s   D e c k
+! [ I b e r i a   C a r d s   a p p   d e s i g n     |   M a d e   b y   P l a s t i c ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / 4 J 6 K r G o W G b W 9 Q I D Z k W b N o f p R w t D q l 2 c Z 7 B y h v Q U K Y -
+F m f H J g r o g U x 0 J h B e 6 n V K C G j B U 5 f 3 Q s S F n z 9 Y E 9 v D S F l f h -
+f 9 z 0 0 i V r h f 8 t z N E k I H w F W 9 N T S c s d l X H L h O Q x D l Y r v u y n _ z J V N _ T 9 U w w f 7 d n 9 j k 4 P y i f 1 _ v s X r U z j i Z V
+s q _ M r K j s C U r C I A E 4 Z u 6 z f 4 a 9 Y ? p u r p o s e = f u l l s i z e )
+T h i s   w i l l   b e   U c r e d ' s   s i g n a t u r e   v i s u a l   c o m p o n e n t .
+T h r e e   fi n a n c i a l   p a s s e s :
+|   P a s s                 |   P u r p o s e                                                               |
+|   - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+|   N e t   B a l a n c e   |   O v e r a l l   b u s i n e s s   fi n a n c i a l   p o s i t i o n       |
+|   D u e                   |   O u t s t a n d i n g   c u s t o m e r / s u p p l i e r   a m o u n t s   |
+|   C a s h                 |   A v a i l a b l e   c a s h   b a l a n c e                                 |
+I n t e r a c t i o n s :
+=== stream_108.txt ===
+
+*   T a p   a   v i s i b l e   c a r d   t o   b r i n g   i t   f o r w a r d .
+*   S w i p e   h o r i z o n t a l l y   t o   s w i t c h   p a s s e s .
+*   S m o o t h   s p r i n g - b a s e d   d e p t h   t r a n s i t i o n s .
+*   A c t i v e   c a r d   g e t s   h i g h e s t   v i s u a l   e m p h a s i s .
+*   I n a c t i v e   c a r d s   r e m a i n   i d e n t i fi a b l e .
+*   F i n a n c i a l   fi g u r e s   u p d a t e   w i t h o u t   a b r u p t   l a y o u t   j u m p s .
+I m p o r t a n t   a c c o u n t i n g   r u l e :   N e t   b a l a n c e ,   c a s h   b a l a n c e   a n d   d u e s   m u s t   r e t a i n   t h e i r   e x i s t i n g
+b u s i n e s s   d e fi n i t i o n s .   U I   r e d e s i g n   m u s t   n o t   c h a n g e   t h e   c a l c u l a t i o n   l o g i c .
+# # #   4 . 3   L e d g e r
+! [ D o w n l o a d   t h e   T a b b y   a p p ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c - 4 / x 2 C R W k Z 1 O y l K G e G q Z -
+g 1 a c 2 _ k N u 4 w j 4 P Y B Z p b U J t p q O P 5 w I x u z O E D e b v M F j 5 R k f G u w 4 j d h N F c V t 2 o -
+b w s o 0 o v h k 1 A J l T 7 e p w W b 5 N J P -
+I n o K q Q P F G s i n 4 4 e Z _ Z g y H l f e A w c a Q S K T o 0 O E N P i h x i x j E i b _ X L c n A b U 9 0 i a z -
+e N 7 i T H q 7 0 9 u H S V l I m - u X T 6 X a c r E X ? p u r p o s e = f u l l s i z e )
+C o m p o n e n t s :
+*   D a t e - g r o u p e d   t r a n s a c t i o n   l i s t .
+*   C r e d i t   a n d   d e b i t   d i s t i n c t i o n .
+*   S e a r c h .
+=== stream_109.txt ===
+
+*   F i l t e r s .
+*   T r a n s a c t i o n   d e t a i l s .
+*   E d i t   a n d   d e l e t e   a c t i o n s ,   s u b j e c t   t o   e x i s t i n g   p e r m i s s i o n   r u l e s .
+*   E m p t y ,   l o a d i n g   a n d   e r r o r   s t a t e s .
+N o   u n n e c e s s a r y   i n d i v i d u a l   g l a s s   c a r d s   f o r   e a c h   t r a n s a c t i o n .   U s e   c l e a n   r o w s   a n d
+s e p a r a t o r s .
+# # #   4 . 4   C o n t a c t s   a n d   c u s t o m e r   p r o fi l e s
+! [ T r a s k o l i k   -   R a n d e v u   T a k i p   U y g u l a m a s ı ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / 0 F 9 B i Z a I o R j a n Q z 3 0 o f R u Y r 1 E N R Z q k M 9 P T V N M m H 3 l c h s l P e P S C F E Z X 3 6 N R c 2 2 m b r w F g V 5 6 q
+N M Z Z t r g o O u B j G G D I o W w J 2 P w r G q 0 E L 4 a C l o E m B B w r d Y b a W z f F Z y -
+Y e 8 P Z b n 2 J G 4 3 U h p o H A 3 H x 6 m r X R 4 l k W I z L O 2 a M X U P S z 0 3 3 1 n f U 9 7 U e b 9 8 s O J V V 8 f b A P M j H C ?
+p u r p o s e = f u l l s i z e )
+C o n t a c t s   l i s t :
+*   S e a r c h   a t   t h e   t o p .
+*   C u s t o m e r   a n d   s u p p l i e r   c l a s s i fi c a t i o n .
+*   N a m e   a n d   r e l e v a n t   fi n a n c i a l   s u m m a r y .
+*   L a s t   t r a n s a c t i o n   d a t e .
+*   A d d - c o n t a c t   a c t i o n .
+C u s t o m e r   p r o fi l e :
+=== stream_110.txt ===
+
+*   N a m e   a n d   c o n t a c t   i n f o r m a t i o n .
+*   C u r r e n t   o u t s t a n d i n g   b a l a n c e .
+*   T o t a l   r e c e i v e d .
+*   T r a n s a c t i o n   h i s t o r y .
+*   T r u s t   s c o r e ,   i f   s u p p o r t e d   b y   t h e   e x i s t i n g   d a t a   m o d e l .
+*   W h a t s A p p   s l i p   a n d   r e m i n d e r   a c t i o n s .
+*   E d i t   a n d   a r c h i v e   a c t i o n s .
+T r u s t   s c o r e   s h o u l d   b e   p r e s e n t e d   t r a n s p a r e n t l y ;   n e v e r   i m p l y   t h a t   i t   i s   a   v e r i fi e d   c r e d i t
+r a t i n g .
+# # #   4 . 5   V o i c e   M u n i m
+! [ A I   V o i c e   A s s i s t a n t   M o b i l e   A p p   |   S m a r t   V o i c e   I n t e r a c t i o n   |   Q u d r a   b y   M d   F o r h a d   A l a m   f o r
+Q u d r a   o n   D r i b b b l e ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / R K y j D I f 4 F 5 n h _ j d Q j s k A X M 7 4 2 _ h P l d 5 b t P a 3 J E L u 3 7 - Q h Y k B a a K Q Z 4 - i e 4 P V X X - v l x n C I u E 1 8 -
+6 U b 1 U 8 U V S x 1 - n r i _ j H n 1 R g Q V V 6 m j q v N S a k x S D D n h w R P T t H - q S - a C 6 x 2 c Y J o G q X x n 4 o -
+J u m E C j B m X 8 Z G c D Y r V 2 h w r e _ 0 M Q b n 2 j A b p V B W Y t x o m F 0 E q h m D G o g ? p u r p o s e = f u l l s i z e )
+T h i s   s h o u l d   f e e l   l i k e   a   c o r e   p r o d u c t   f e a t u r e ,   n o t   a n   o r d i n a r y   p o p u p .
+S t a t e s :
+*   I d l e .
+=== stream_111.txt ===
+
+*   L i s t e n i n g .
+*   S p e e c h   p r o c e s s i n g .
+*   P a r s e d   t r a n s a c t i o n .
+*   U s e r   c o n fi r m a t i o n .
+*   S a v e d   s u c c e s s f u l l y .
+*   E r r o r   o r   r e t r y .
+E x a m p l e   w o r k fl o w :
+*   U s e r   s p e a k s   a   t r a n s a c t i o n .
+*   S p e e c h   i s   t r a n s c r i b e d .
+*   P a r s e r   i d e n t i fi e s   a m o u n t ,   p e r s o n   a n d   t r a n s a c t i o n   t y p e .
+*   A p p   d i s p l a y s   a   r e v i e w a b l e   t r a n s a c t i o n .
+*   U s e r   c o n fi r m s .
+*   L e d g e r   i s   u p d a t e d .
+N e v e r   s a v e   a   fi n a n c i a l   t r a n s a c t i o n   f r o m   a m b i g u o u s   v o i c e   r e c o g n i t i o n   w i t h o u t
+c o n fi r m a t i o n .
+# # #   4 . 6   R e c e i p t   S c a n n e r
+=== stream_112.txt ===
+
+! [ C o l l e c t   r e c e i p t s   e a s i l y   w i t h   S p e n d e s k   S o l u t i o n ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / k T J D l i Q 4 6 o C 2 D x q t 9 V 1 p q C Q E D a W M _ y x d d L w W O S 6 8 F W I v _ 6 2 x L Q H 5 j S q -
+Q Y s W 4 J y n q L j 9 I c u j C S x -
+K 6 f p f O 0 f y s c S W Y W a a j K R 2 9 E G 7 V F P K c Y l 3 X Q 5 R J i C Q p 4 k z L 5 f C i f y 0 v x s N N p o f q a b q 4 u g m q d v v 3 m
+h R y Q o v j f D 6 K 7 I S H k D i R 4 L a V n 4 m 2 C I a A o _ S 4 f S a J 4 9 ? p u r p o s e = f u l l s i z e )
+*   C a m e r a   p r e v i e w .
+*   D o c u m e n t   b o u n d a r y   d e t e c t i o n .
+*   C a p t u r e   a n d   r e t a k e .
+*   O C R   p r o c e s s i n g   s t a t e .
+*   E x t r a c t e d   d a t a   p r e v i e w .
+*   E d i t   e x t r a c t e d   v a l u e s .
+*   C o n fi r m   a n d   s a v e .
+# # #   4 . 7   G S T   B i l l i n g
+! [ S u m U p :   E x p l o r e   o u r   c a r d   r e a d e r s   a n d   p a y m e n t   s o l u t i o n s ]
+( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / E d R F A g H 6 t l 9 G i I s C W i m o O A u 5 f 5 T U T T Y f q q O C h 4 U T y H M 7 n _ 8 J V l T 2 X g 7 4 V 1 q S b D K E S 8 i N 3 z z E r
+3 D a h k b C Y 0 3 B H e G 5 f A Z G f L C d l N D m R 2 0 o L -
+r c f k t b d 8 8 1 6 n L c X h a p O T H 8 r 7 5 W J f N 0 a I 9 v J C k U N j 8 k 2 0 m B K c X m k B J M E _ X B h Y g B Y L N 5 1 k H A t J V 7 E
+g N J A C t Q 4 C Y j ? p u r p o s e = f u l l s i z e )
+*   I n v o i c e   c r e a t i o n .
+*   C u s t o m e r   s e l e c t i o n .
+=== stream_113.txt ===
+
+*   I t e m   a n d   q u a n t i t y   e n t r y .
+*   T a x   c a l c u l a t i o n .
+*   P r e v i e w .
+*   P D F / s h a r e   w o r k fl o w .
+*   I n v o i c e   h i s t o r y .
+A l l   t a x   c a l c u l a t i o n s   m u s t   b e   p r e s e r v e d   a n d   v a l i d a t e d   s e p a r a t e l y   f r o m   v i s u a l   p r e s e n t a t i o n .
+# # #   4 . 8   G a l l a   C a s h b o o k
+*   O p e n i n g   b a l a n c e .
+*   C a s h   i n .
+*   C a s h   o u t .
+*   C l o s i n g   b a l a n c e .
+*   D a i l y   s u m m a r y .
+*   R e c o n c i l i a t i o n .
+*   C l e a r   d a t e - b a s e d   h i s t o r y .
+# # #   4 . 9   I n v e n t o r y   a n d   s t o c k
+*   P r o d u c t   l i s t .
+=== stream_114.txt ===
+
+*   S t o c k   q u a n t i t y .
+*   P u r c h a s e   a n d   s a l e   u p d a t e s .
+*   L o w - s t o c k   i n f o r m a t i o n .
+*   P r o d u c t   d e t a i l s .
+*   S e a r c h   a n d   c a t e g o r y   fi l t e r s .
+# # #   4 . 1 0   S u m m a r y ,   b a c k u p   a n d   s e t t i n g s
+*   F i n a n c i a l   s u m m a r i e s .
+*   B a c k u p   a n d   r e s t o r e .
+*   E n c r y p t i o n   s t a t u s .
+*   A c c o u n t   a n d   s e c u r i t y .
+*   L a n g u a g e .
+*   A p p e a r a n c e .
+*   B u s i n e s s   c o n fi g u r a t i o n .
+*   N o t i fi c a t i o n s .
+*   H e l p   a n d   s u p p o r t .
+# # #   5 \ .   L i v e   C a p s u l e   —   U c r e d ' s   c o n t e x t u a l   h e a d e r
+=== stream_117.txt ===
+
+! [
+ !a)
+  
+ J
+   |   s u fl y ®  
+ 1)
+ ] ( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / 3 Q H h K W 5 6 _ u j P S m e h H 5 0 I 3 4 2 F u g p t d p s T L N B -
+K m R F 7 7 g h F i B y W T z k G 7 o X 2 H E I o V m 1 e F S a 5 o 3 V a D 4 A s _ W 2 a -
+_ u K 0 w r p q q 7 0 0 1 6 l s z p 2 g 6 5 L 8 G h F i W z n V 9 E Z Z h j e y a R x 7 t y g L 6 R H m 1 j C p - M 0 o 5 0 a v P -
+q _ d r 4 X 7 S W M L i p d 5 x U d z 4 Z T 9 o n o W H K e d s l I f 6 B 1 b W B o L Q ? p u r p o s e = f u l l s i z e )
+T h e   L i v e   C a p s u l e   i s   i n s p i r e d   b y   c o n t e x t u a l   s t a t u s   i n t e r f a c e s ,   b u t   i t   m u s t   h a v e   i t s   o w n
+U c r e d   i d e n t i t y .
+|   S t a t e                     |   B e h a v i o u r                                     |
+|   - - - - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+|   D e f a u l t                 |   C o m p a c t   b u s i n e s s   c o n t e x t       |
+|   E x p a n d e d               |   Q u i c k   s e a r c h   a n d   c o n t r o l s     |
+|   V o i c e   a c t i v e       |   L i s t e n i n g   s t a t e                         |
+|   P r o c e s s i n g           |   P r o g r e s s   i n d i c a t o r                   |
+|   N o t i fi c a t i o n       |   B r i e f   c o n t e x t u a l   a l e r t           |
+|   H i d d e n   b a l a n c e   |   P r i v a c y - p r e s e r v i n g   d i s p l a y   |
+I t   s h o u l d   n o t   p e r m a n e n t l y   o c c u p y   e x c e s s i v e   s c r e e n   s p a c e .
+B a l a n c e   v i s i b i l i t y   s h o u l d   h a v e   a n   a c c e s s i b l e   t o g g l e   a n d   s h o u l d   n o t   e x p o s e   s e n s i t i v e
+i n f o r m a t i o n   u n n e c e s s a r i l y .
+# # #   6 \ .   I n t e r a c t i o n   a n d   m o t i o n   s p e c i fi c a t i o n
+# # #   6 . 1   M o t i o n   p r i n c i p l e s
+U s e   m o t i o n   t o   e x p l a i n   s t a t e   c h a n g e s ,   n o t   t o   d e c o r a t e   t h e   s c r e e n .
+|   I n t e r a c t i o n         |   P r o p o s e d   b e h a v i o u r                       |
+|   - - - - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+|   B u t t o n   p r e s s       |   S c a l e   f e e d b a c k   a r o u n d   0 . 9 6       |
+=== stream_118.txt ===
+
+|   C a r d   s e l e c t i o n   |   S m o o t h   e l e v a t i o n   a n d   d e p t h       |
+|   W a l l e t   d e c k         |   S p r i n g - b a s e d   m o v e m e n t                 |
+|   B o t t o m   s h e e t       |   D r a g - r e s p o n s i v e   e x p a n s i o n         |
+|   N a v i g a t i o n           |   C o n s i s t e n t   s c r e e n   t r a n s i t i o n   |
+|   B a l a n c e   u p d a t e   |   N u m e r i c   i n t e r p o l a t i o n                 |
+|   V o i c e                     |   L i v e   w a v e f o r m                                 |
+|   S c a n n e r                 |   P r o c e s s i n g   f e e d b a c k                     |
+|   M o d a l   c l o s e         |   S m o o t h   d i s m i s s a l                           |
+# # #   6 . 2   M o t i o n   t o k e n s
+T h e s e   a r e   i n i t i a l   d e s i g n   t a r g e t s ,   n o t   fi x e d   p r o m i s e s   o f   1 2 0   F P S   o r   1 2 0   H z   r e n d e r i n g .
+|   M o t i o n   t o k e n   |   I n i t i a l   t a r g e t                                   |
+|   - - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+|   Q u i c k                 |   1 2 0 – 1 6 0   m s                                           |
+|   S t a n d a r d           |   2 0 0 – 2 6 0   m s                                           |
+|   E x p r e s s i v e       |   3 0 0 – 4 2 0   m s                                           |
+|   S p r i n g               |   T u n e d   b y   s t i ff n e s s   a n d   d a m p i n g   |
+|   P r e s s   s c a l e     |   0 . 9 6                                                       |
+|   D r a g                   |   G e s t u r e - r e s p o n s i v e                           |
+A c t u a l   a n i m a t i o n   p e r f o r m a n c e   m u s t   b e   t e s t e d   o n   t h e   t a r g e t   A n d r o i d   h a r d w a r e .
+# # #   6 . 3   H a p t i c   f e e d b a c k
+*   L i g h t   f e e d b a c k   f o r   o r d i n a r y   s e l e c t i o n .
+*   M e d i u m   f e e d b a c k   f o r   i m p o r t a n t   c o n fi r m a t i o n .
+*   D i s t i n c t   f e e d b a c k   f o r   s u c c e s s   o r   e r r o r   w h e r e   a p p r o p r i a t e .
+=== stream_121.txt ===
+
+*   N o   u n n e c e s s a r y   v i b r a t i o n   o n   e v e r y   i n t e r a c t i o n .
+*   R e s p e c t   A n d r o i d   s y s t e m   h a p t i c   p r e f e r e n c e s .
+# # #   7 \ .   R e s p o n s i v e   a n d   fi n a n c i a l - d a t a   r u l e s
+T h i s   s e c t i o n   i s   e s p e c i a l l y   i m p o r t a n t   b e c a u s e   U c r e d   i s   a   fi n a n c e   a p p l i c a t i o n .
+# # #   C u r r e n c y   f o r m a t t i n g
+E x a m p l e s :
+|   V a l u e                 |   D i s p l a y   |
+|   - - - - - - - - - - - -   |   - - - - - - -   |
+|  
+ d
+ 4 5 0                   |  
+ d
+ 4 5 0         |
+|  
+ d
+ 1 2 , 5 0 0             |  
+ d
+ 1 2 . 5 K     |
+|  
+ d
+ 1 , 2 5 , 0 0 0         |  
+ d
+ 1 . 2 5 L     |
+|  
+ d
+ 1 , 0 0 , 0 0 , 0 0 0   |  
+ d
+ 1 C r         |
+T h e   c o m p a c t   f o r m a t   i s   f o r   o v e r v i e w   c a r d s   o n l y .   F u l l   p r e c i s e   v a l u e s   s h o u l d   r e m a i n
+a c c e s s i b l e   i n   t r a n s a c t i o n   d e t a i l s   a n d   o t h e r   r e l e v a n t   c o n t e x t s .
+R u l e s :
+*   N e v e r   a l l o w   c u r r e n c y   v a l u e s   t o   w r a p   a w k w a r d l y .
+*   A v o i d   s h r i n k i n g   n u m b e r s   u n t i l   t h e y   b e c o m e   u n r e a d a b l e .
+*   U s e   p r o p e r   I n d i a n   n u m b e r   g r o u p i n g .
+*   S u p p o r t   l a r g e   v a l u e s   a n d   n e g a t i v e   a m o u n t s .
+=== stream_122.txt ===
+
+*   K e e p   c u r r e n c y   s y m b o l   a n d   a m o u n t   v i s u a l l y   c o n n e c t e d .
+*   T e s t   l o n g   c u s t o m e r   n a m e s   a n d   u n u s u a l l y   l a r g e   v a l u e s .
+# # #   R e s p o n s i v e   l a y o u t s
+M u s t   s u p p o r t :
+*   C o m p a c t   p h o n e s .
+*   S t a n d a r d   A n d r o i d   p h o n e s .
+*   L a r g e   p h o n e s .
+*   L a n d s c a p e   w h e r e   r e l e v a n t .
+*   S y s t e m   f o n t   s c a l i n g .
+*   D i s p l a y   s c a l i n g .
+*   K e y b o a r d - v i s i b l e   s t a t e s .
+*   G e s t u r e   n a v i g a t i o n   a n d   s y s t e m   b a r s .
+# # #   8 \ .   N a t i v e   A n d r o i d   t e c h n i c a l   a r c h i t e c t u r e
+T h e   fi n a l   i m p l e m e n t a t i o n   s h o u l d   b e   a   r e a l   n a t i v e   A n d r o i d   p r o j e c t .
+R e c o m m e n d e d   a r c h i t e c t u r e
+J e t p a c k   C o m p o s e   U I
+=== stream_123.txt ===
+
+D e s i g n   s y s t e m ,   s c r e e n s   a n d   r e u s a b l e   c o m p o n e n t s
+V i e w M o d e l s   +   U I   S t a t e
+S t a t e   m a n a g e m e n t   a n d   s c r e e n   w o r k fl o w s
+D o m a i n   L a y e r
+L e d g e r ,   b i l l i n g ,   v o i c e   p a r s i n g   a n d   b u s i n e s s   r u l e s
+R e p o s i t o r y   L a y e r
+L o c a l   d a t a b a s e ,   c l o u d   s e r v i c e s   a n d   e n c r y p t i o n
+R o o m
+L o c a l   s t o r a g e
+F i r e b a s e
+C l o u d   s y n c / a u t h
+G e m i n i   b a c k e n d
+A I   p r o c e s s i n g
+S e c u r i t y
+E n c r y p t i o n   a n d   k e y s
+# # #   P r o p o s e d   t e c h n o l o g y   s t a c k
+=== stream_124.txt ===
+
+|   L a y e r                                 |   T e c h n o l o g y                                                                   |
+|   - - - - - - - - - - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+|   L a n g u a g e                           |   K o t l i n                                                                           |
+|   U I                                       |   J e t p a c k   C o m p o s e                                                         |
+|   D e s i g n                               |   M a t e r i a l   f o u n d a t i o n s   +   c u s t o m   U c r e d   s y s t e m   |
+|   N a v i g a t i o n                       |   N a v i g a t i o n   C o m p o s e                                                   |
+|   S t a t e                                 |   V i e w M o d e l   +   S t a t e F l o w                                             |
+|   L o c a l   d a t a b a s e               |   R o o m                                                                               |
+|   P r e f e r e n c e s                     |   D a t a S t o r e                                                                     |
+|   D e p e n d e n c y   i n j e c t i o n   |   H i l t                                                                               |
+|   B a c k e n d                             |   E x i s t i n g   F i r e b a s e   s e r v i c e s ,   a f t e r   a u d i t         |
+|   A u t h e n t i c a t i o n               |   F i r e b a s e   A u t h                                                             |
+|   C l o u d   d a t a b a s e               |   C l o u d   F i r e s t o r e                                                         |
+|   A I   p r o c e s s i n g                 |   S e c u r e   h o s t e d   b a c k e n d                                             |
+|   C a m e r a                               |   C a m e r a X                                                                         |
+|   I m a g e   p r o c e s s i n g           |   M L   K i t   o r   e x i s t i n g   v e r i fi e d   O C R   s e r v i c e         |
+|   E n c r y p t i o n                       |   A u d i t e d   c r y p t o g r a p h i c   i m p l e m e n t a t i o n               |
+|   B u i l d                                 |   G r a d l e   +   A n d r o i d   G r a d l e   P l u g i n                           |
+E x a c t   d e p e n d e n c y   v e r s i o n s   w i l l   b e   l o c k e d   a f t e r   c h e c k i n g   c o m p a t i b i l i t y   d u r i n g
+i m p l e m e n t a t i o n .
+# # #   B a c k e n d   a n d   s e c u r i t y   r u l e s
+T h i s   i s   a   c r i t i c a l   m i g r a t i o n   a r e a :
+*   N e v e r   e m b e d   G e m i n i   A P I   s e c r e t s   i n   t h e   A P K .
+*   K e e p   p r i v i l e g e d   o p e r a t i o n s   o n   a   t r u s t e d   b a c k e n d .
+*   P r e s e r v e   F i r e b a s e   a u t h e n t i c a t i o n   r u l e s .
+=== stream_125.txt ===
+
+*   V e r i f y   F i r e s t o r e   s e c u r i t y   r u l e s .
+*   K e e p   e n c r y p t i o n   k e y s   o u t   o f   p l a i n - t e x t   p r e f e r e n c e s .
+*   P r e s e r v e   g u e s t   v a u l t   f u n c t i o n a l i t y .
+*   A u d i t   l o c a l   e n c r y p t i o n   a n d   b a c k u p   r e c o v e r y .
+*   T e s t   a c c o u n t   s w i t c h i n g   a n d   d a t a   i s o l a t i o n .
+T h e   e x i s t i n g   N e x t . j s   A P I   r o u t e s   c a n n o t   s i m p l y   b e   a s s u m e d   t o   w o r k   i n s i d e   n a t i v e   A n d r o i d .
+T h e i r   s e r v e r - s i d e   r e s p o n s i b i l i t i e s   m u s t   r e m a i n   h o s t e d   o r   b e   m i g r a t e d   t o   a n   a p p r o p r i a t e
+b a c k e n d .
+# # #   9 \ .   C o m p o n e n t   l i b r a r y
+B u i l d   r e u s a b l e   c o m p o n e n t s   b e f o r e   c r e a t i n g   a l l   s c r e e n s .
+|   C o m p o n e n t                 |   R e s p o n s i b i l i t y                           |
+|   - - - - - - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+|   C e r a m i c S u r f a c e       |   S o l i d   a n d   f r o s t e d   s u r f a c e s   |
+|   T i t a n i u m S u r f a c e     |   P r e m i u m   d e p t h   s u r f a c e             |
+|   W a l l e t P a s s D e c k       |   T h r e e   fi n a n c i a l   p a s s e s           |
+|   W a l l e t P a s s               |   I n d i v i d u a l   fi n a n c i a l   p a s s     |
+|   L i v e C a p s u l e             |   C o n t e x t u a l   h e a d e r                     |
+|   U c r e d T o p B a r             |   C o n s i s t e n t   s c r e e n   h e a d e r       |
+|   U c r e d B o t t o m B a r       |   P r i m a r y   n a v i g a t i o n                   |
+|   F i n a n c i a l A m o u n t     |   C u r r e n c y   f o r m a t t i n g                 |
+|   T r a n s a c t i o n R o w       |   L e d g e r   d a t a                                 |
+|   C o n t a c t R o w               |   C o n t a c t   s u m m a r y                         |
+|   V o i c e W a v e f o r m         |   L i s t e n i n g   a n i m a t i o n                 |
+|   U c r e d B o t t o m S h e e t   |   S h a r e d   s h e e t   b e h a v i o u r           |
+=== stream_126.txt ===
+
+|   P r i m a r y A c t i o n         |   M a i n   C T A                                       |
+|   E m p t y S t a t e               |   N o - d a t a   e x p e r i e n c e                   |
+|   E r r o r S t a t e               |   F a i l u r e   f e e d b a c k                       |
+|   L o a d i n g S t a t e           |   L o a d i n g   e x p e r i e n c e                   |
+|   C o n fi r m D i a l o g         |   I m p o r t a n t   c o n fi r m a t i o n s         |
+E v e r y   c o m p o n e n t   s h o u l d   s u p p o r t   l i g h t   m o d e ,   d a r k   m o d e ,   a c c e s s i b i l i t y   a n d   r e s p o n s i v e
+c o n s t r a i n t s   w h e r e   r e l e v a n t .
+# # #   1 0 \ .   I m p l e m e n t a t i o n   p h a s e s
+T h i s   i s   t h e   e x e c u t i o n   s e q u e n c e   I   r e c o m m e n d .
+*   P h a s e   0   —   S o u r c e   a u d i t   a n d   f e a t u r e   i n v e n t o r y
+*   I n s p e c t   t h e   l a t e s t   c o m p l e t e   p r o j e c t .
+*   I d e n t i f y   e v e r y   e x i s t i n g   s c r e e n .
+*   M a p   e x i s t i n g   b u s i n e s s   l o g i c .
+*   I d e n t i f y   A P I   r o u t e s ,   F i r e b a s e   d e p e n d e n c i e s   a n d   e n c r y p t i o n .
+*   R e c o r d   a l l   f e a t u r e s   t h a t   m u s t   s u r v i v e   m i g r a t i o n .
+D e l i v e r a b l e :   F e a t u r e   a n d   a r c h i t e c t u r e   i n v e n t o r y
+*   P h a s e   1   —   D e s i g n   f o u n d a t i o n
+*   F i n a l i z e   c o l o u r   t o k e n s .
+*   F i n a l i z e   t y p o g r a p h y .
+=== stream_127.txt ===
+
+*   F i n a l i z e   s p a c i n g   a n d   s h a p e s .
+*   B u i l d   c e r a m i c   m a t e r i a l   v a r i a n t s .
+*   D e fi n e   m o t i o n   t o k e n s .
+*   D e fi n e   c o m p o n e n t   b e h a v i o u r .
+*   E s t a b l i s h   a c c e s s i b i l i t y   r u l e s .
+D e l i v e r a b l e :   U c r e d   D e s i g n   S y s t e m   2 . 0
+*   P h a s e   2   —   V i s u a l   p r o t o t y p e
+*   H o m e   d a s h b o a r d .
+*   W a l l e t   p a s s   d e c k .
+*   L i v e   C a p s u l e .
+*   L e d g e r .
+*   C o n t a c t s .
+*   V o i c e   M u n i m .
+T e s t   t h e   v i s u a l   d i r e c t i o n   b e f o r e   m i g r a t i n g   t h e   e n t i r e   a p p l i c a t i o n .
+D e l i v e r a b l e :   A p p r o v e d   s c r e e n   d e s i g n s
+*   P h a s e   3   —   N a t i v e   A n d r o i d   f o u n d a t i o n
+=== stream_128.txt ===
+
+*   C r e a t e   K o t l i n   p r o j e c t .
+*   C o n fi g u r e   G r a d l e .
+*   S e t   u p   C o m p o s e .
+*   C o n fi g u r e   n a v i g a t i o n .
+*   A d d   t h e m e   a n d   r e u s a b l e   c o m p o n e n t s .
+*   A d d   s t a t e   m a n a g e m e n t .
+*   E s t a b l i s h   r e p o s i t o r y   s t r u c t u r e .
+D e l i v e r a b l e :   R u n n i n g   n a t i v e   a p p   s h e l l
+*   P h a s e   4   —   C o r e   s c r e e n s
+*   H o m e .
+*   L e d g e r .
+*   C o n t a c t s .
+*   C u s t o m e r   d e t a i l s .
+*   F i n a n c i a l   s u m m a r y .
+*   L i v e   C a p s u l e .
+D e l i v e r a b l e :   F u n c t i o n a l   c o r e   e x p e r i e n c e
+=== stream_129.txt ===
+
+*   P h a s e   5   —   A d v a n c e d   t o o l s
+*   V o i c e   M u n i m .
+*   R e c e i p t   S c a n n e r .
+*   G S T   B i l l i n g .
+*   G a l l a   C a s h b o o k .
+*   I n v e n t o r y .
+*   W h a t s A p p   s l i p s .
+*   T h e r m a l   r e c e i p t s .
+D e l i v e r a b l e :   F e a t u r e - c o m p l e t e   n a t i v e   w o r k fl o w s
+*   P h a s e   6   —   D a t a   a n d   s e c u r i t y   m i g r a t i o n
+*   F i r e b a s e   i n t e g r a t i o n .
+*   L o c a l   p e r s i s t e n c e .
+*   G u e s t   d a t a .
+*   E 2 E E .
+*   B a c k u p   a n d   r e s t o r e .
+*   O ffl i n e   b e h a v i o u r .
+=== stream_130.txt ===
+
+*   A u t h e n t i c a t i o n .
+*   A c c e s s - c o n t r o l   t e s t i n g .
+D e l i v e r a b l e :   V e r i fi e d   d a t a   a n d   s e c u r i t y   l a y e r
+*   P h a s e   7   —   M o t i o n   a n d   p o l i s h
+*   S p r i n g   i n t e r a c t i o n s .
+*   H a p t i c   f e e d b a c k .
+*   G e s t u r e   b e h a v i o u r .
+*   S h e e t   t r a n s i t i o n s .
+*   L o a d i n g   a n d   e r r o r   a n i m a t i o n s .
+*   P e r f o r m a n c e   o p t i m i s a t i o n .
+D e l i v e r a b l e :   F i n a l   i n t e r a c t i o n   s y s t e m
+*   P h a s e   8   —   Q A   a n d   r e l e a s e   p r e p a r a t i o n
+*   F u n c t i o n a l   t e s t i n g .
+*   R e g r e s s i o n   t e s t i n g .
+*   U I   t e s t i n g .
+*   F i n a n c i a l   c a l c u l a t i o n   v a l i d a t i o n .
+=== stream_131.txt ===
+
+*   A c c e s s i b i l i t y   c h e c k s .
+*   S m a l l - s c r e e n   c h e c k s .
+*   A P K   b u i l d   v e r i fi c a t i o n .
+*   R e l e a s e   c o n fi g u r a t i o n .
+D e l i v e r a b l e :   R e l e a s e   c a n d i d a t e
+# # #   1 1 \ .   Q u a l i t y   a c c e p t a n c e   c r i t e r i a
+N o   p h a s e   s h o u l d   b e   c o n s i d e r e d   c o m p l e t e   j u s t   b e c a u s e   t h e   s c r e e n   l o o k s   c o r r e c t .
+|   C a t e g o r y               |   A c c e p t a n c e   c r i t e r i a                                                                 |
+|   - - - - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+|   V i s u a l                   |   C o n s i s t e n t   t y p o g r a p h y ,   s p a c i n g   a n d   m a t e r i a l   s y s t e m   |
+|   N a v i g a t i o n           |   A l l   d e s t i n a t i o n s   w o r k                                                             |
+|   F i n a n c i a l   d a t a   |   E x i s t i n g   c a l c u l a t i o n s   m a t c h   e x p e c t e d   r e s u l t s               |
+|   C u r r e n c y               |   N o   c l i p p i n g   o r   u n i n t e n d e d   w r a p p i n g                                   |
+|   W a l l e t   d e c k         |   A l l   p a s s e s   s w i t c h   a n d   d i s p l a y   c o r r e c t   d a t a                   |
+|   V o i c e                     |   A m b i g u o u s   t r a n s a c t i o n s   r e q u i r e   c o n fi r m a t i o n                 |
+|   L e d g e r                   |   C r e a t e ,   e d i t   a n d   v i e w   w o r k fl o w s   w o r k                               |
+|   P e r s i s t e n c e         |   D a t a   s u r v i v e s   a p p   r e s t a r t                                                     |
+|   O ffl i n e                 |   S u p p o r t e d   l o c a l   w o r k fl o w s   f u n c t i o n   o ffl i n e                   |
+|   S e c u r i t y               |   N o   e x p o s e d   A P I   s e c r e t s   o r   u n a u t h o r i s e d   d a t a   a c c e s s   |
+|   M o t i o n                   |   N o   s t u c k   g e s t u r e s   o r   d e a d   i n t e r a c t i o n s                           |
+|   P e r f o r m a n c e         |   N o   p e r s i s t e n t   j a n k   d u r i n g   n o r m a l   n a v i g a t i o n                 |
+|   A c c e s s i b i l i t y     |   U s a b l e   c o n t r a s t   a n d   t o u c h   t a r g e t s                                     |
+|   R e g r e s s i o n           |   E x i s t i n g   f e a t u r e s   r e m a i n   a v a i l a b l e                                   |
+=== stream_132.txt ===
+
+# # #   1 2 \ .   W h a t   w e   m u s t   n o t   d o
+T h e s e   a r e   e x p l i c i t   a n t i - p a t t e r n s   f o r   t h e   r e d e s i g n :
+*   N o   r a n d o m   g r a d i e n t s   o n   e v e r y   s c r e e n .
+*   N o   e x c e s s i v e   b l u r   e v e r y w h e r e .
+*   N o   g i a n t   fl o a t i n g   b u t t o n s   c o v e r i n g   i m p o r t a n t   c o n t e n t .
+*   N o   d e c o r a t i v e   p i l l s   a r o u n d   o r d i n a r y   m e t a d a t a .
+*   N o   f a k e   3 D   e ff e c t s   t h a t   o b s c u r e   i n f o r m a t i o n .
+*   N o   u n n e c e s s a r y   a n i m a t i o n s   o n   fi n a n c i a l   fi g u r e s .
+*   N o   t i n y   t e x t   t o   fi t   m o r e   i n f o r m a t i o n .
+*   N o   i n c o n s i s t e n t   i c o n   f a m i l i e s .
+*   N o   r e p l a c i n g   r e a l   f e a t u r e s   w i t h   v i s u a l   p l a c e h o l d e r s .
+*   N o   c l a i m i n g   a   n a t i v e   c o n v e r s i o n   w h e n   t h e   r e s u l t   i s   s t i l l   a   W e b V i e w .
+*   N o   c h a n g i n g   fi n a n c i a l   c a l c u l a t i o n s   a s   p a r t   o f   U I   w o r k .
+# # #   1 3 \ .   P r o j e c t   d e l i v e r a b l e s
+T h e   p r o j e c t   s h o u l d   m a i n t a i n   t h e s e   d o c u m e n t s   a s   i t s   s o u r c e   o f   t r u t h :
+|   F i l e                                   |   P u r p o s e                                                                 |
+|   - - - - - - - - - - - - - - - - - - - -   |   - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   |
+=== stream_133.txt ===
+
+|   p r d . m d                               |   P r o d u c t   r e q u i r e m e n t s                                       |
+|   f e a t u r e _ i n v e n t o r y . m d   |   E x i s t i n g   f e a t u r e   p r e s e r v a t i o n                     |
+|   a r c h i t e c t u r e . m d             |   N a t i v e   a p p   a r c h i t e c t u r e                                 |
+|   d e s i g n _ s y s t e m . m d           |   V i s u a l   t o k e n s   a n d   m a t e r i a l   r u l e s               |
+|   c o m p o n e n t s . m d                 |   C o m p o n e n t   l i b r a r y                                             |
+|   s c r e e n _ s p e c s . m d             |   S c r e e n - b y - s c r e e n   s p e c i fi c a t i o n s                 |
+|   m o t i o n _ s y s t e m . m d           |   M o t i o n   a n d   i n t e r a c t i o n   r u l e s                       |
+|   d a t a _ m i g r a t i o n . m d         |   E x i s t i n g - t o - n a t i v e   d a t a   m a p p i n g                 |
+|   s e c u r i t y . m d                     |   A u t h e n t i c a t i o n   a n d   e n c r y p t i o n                     |
+|   t e s t i n g . m d                       |   A c c e p t a n c e   a n d   r e g r e s s i o n   t e s t s                 |
+|   p h a s e s . m d                         |   E x e c u t i o n   m i l e s t o n e s                                       |
+|   m e m o r y . m d                         |   P r o j e c t   d e c i s i o n s   a n d   c u r r e n t   p r o g r e s s   |
+#   U C R E D   —   M A S T E R   P R O J E C T   R U L E S
+# #   P r o d u c t   i d e n t i t y
+U c r e d   i s   a   p r e m i u m ,   A p p l e - i n s p i r e d   I n d i a n   b u s i n e s s   fi n a n c e   o p e r a t i n g   s y s t e m .
+# #   D e s i g n   d i r e c t i o n
+C e r a m i c   s u r f a c e s ,   r e s t r a i n e d   f r o s t e d   g l a s s ,   s p a t i a l   d e p t h ,   p r e m i u m   t y p o g r a p h y ,   t a c t i l e
+n a t i v e   i n t e r a c t i o n s   a n d   a   d i s t i n c t i v e   U c r e d   v i s u a l   i d e n t i t y .
+# #   T e c h n i c a l   d i r e c t i o n
+T h e   fi n a l   A n d r o i d   a p p l i c a t i o n   m u s t   b e   i m p l e m e n t e d   i n   K o t l i n   a n d   J e t p a c k   C o m p o s e .   A
+W e b V i e w   w r a p p e r   i s   n o t   a n   a c c e p t a b l e   s u b s t i t u t e   f o r   t h e   i n t e n d e d   n a t i v e   a p p l i c a t i o n .
+# #   P r e s e r v a t i o n   r u l e
+A l l   e x i s t i n g   b u s i n e s s   w o r k fl o w s ,   fi n a n c i a l   c a l c u l a t i o n s ,   a u t h e n t i c a t i o n ,   l o c a l   s t o r a g e ,   c l o u d
+s y n c ,   e n c r y p t i o n ,   b a c k u p ,   r e c e i p t   p r o c e s s i n g ,   b i l l i n g   a n d   l e d g e r   f e a t u r e s   m u s t   b e
+i n v e n t o r i e d   b e f o r e   m i g r a t i o n .   D o   n o t   r e m o v e   o r   s i l e n t l y   s i m p l i f y   a n y   f e a t u r e .
+# #   D e s i g n   r u l e s
+=== stream_134.txt ===
+
+1 .   U s e   g l a s s   s e l e c t i v e l y .
+2 .   P r i o r i t i s e   c o n t e n t   c l a r i t y   o v e r   d e c o r a t i o n .
+3 .   U s e   c o n s i s t e n t   s p a c i n g ,   t y p o g r a p h y   a n d   c o l o u r   t o k e n s .
+4 .   A v o i d   u n n e c e s s a r y   p i l l s   a n d   fl o a t i n g   c a r d s .
+5 .   K e e p   a l l   fi n a n c i a l   fi g u r e s   r e a d a b l e .
+6 .   P r e s e r v e   a c c e s s i b l e   c o n t r a s t   a n d   t o u c h   t a r g e t s .
+7 .   S u p p o r t   l i g h t   a n d   d a r k   t h e m e s .
+8 .   U s e   n a t i v e ,   i n t e r r u p t i b l e   m o t i o n .
+9 .   R e s p e c t   r e d u c e d - m o t i o n   p r e f e r e n c e s .
+1 0 .   N e v e r   s a c r i fi c e   p e r f o r m a n c e   f o r   v i s u a l   e ff e c t s .
+# #   E n g i n e e r i n g   r u l e s
+1 .   K e e p   U I ,   d o m a i n   l o g i c   a n d   d a t a   l a y e r s   s e p a r a t e .
+2 .   K e e p   s e c r e t s   o u t s i d e   t h e   A P K .
+3 .   V a l i d a t e   a l l   fi n a n c i a l   c a l c u l a t i o n s .
+4 .   P r e s e r v e   e x i s t i n g   d a t a   s e m a n t i c s .
+5 .   I m p l e m e n t   e x p l i c i t   l o a d i n g ,   e m p t y ,   s u c c e s s   a n d   e r r o r   s t a t e s .
+6 .   T e s t   e v e r y   i m p o r t a n t   w o r k fl o w .
+7 .   N e v e r   c l a i m   c o m p l e t i o n   w i t h o u t   v e r i fi c a t i o n .
+# #   R e v i e w   r u l e
+E v e r y   s c r e e n   m u s t   p a s s   v i s u a l   r e v i e w ,   i n t e r a c t i o n   r e v i e w ,   f u n c t i o n a l   t e s t i n g ,   a c c e s s i b i l i t y
+c h e c k s   a n d   r e g r e s s i o n   t e s t i n g   b e f o r e   b e i n g   m a r k e d   c o m p l e t e .
+# # #   1 4 \ .   I m m e d i a t e   n e x t   m i l e s t o n e
+M e r i   r e c o m m e n d a t i o n   h a i   k i   a b h i   p o o r i   a p p   c o d e   m e i n   c o n v e r t   k a r n e   s e   p e h l e   e k   h i
+s c r e e n   k o   r e f e r e n c e - q u a l i t y   b a n a y a   j a y e .
+F i r s t   d e s i g n   m i l e s t o n e
+# # #   U c r e d   H o m e   2 . 0
+=== stream_135.txt ===
+
+! [ L i e z   t o u s   v o s   c o m p t e s   s u r   u n e   a p p l i c a t i o n   |   O p e n   B a n k i n g   |   R e v o l u t   B e l g i q u e ]
+( h t t p s : / / i m a g e s . o p e n a i . c o m / s t a t i c - r s c -
+4 / X g a f g V V M 9 7 U u b T C n A X g f U l v F P 4 E D o I b C i c 4 e 1 3 s n K z 0 f O m T O N a - D Y R 6 l g B p A L u I 8 0 a T i -
+V H b x G X O 2 8 z V B C e m L w D Z 3 t - a 6 L t L 6 r A c x y P N w r p F 3 N p M -
+9 y 3 m s 1 7 g t H s U e o B R T b k Y w H p G _ z F d g T q W b V k o 0 T l 6 7 Z m 5 v h t E F 4 B I Q L k p p 8 9 V O 8 y 0 I L 1 A _ O 8 o Z
+J 7 P 6 Q E ? p u r p o s e = f u l l s i z e )
+I s   m i l e s t o n e   m e i n :
+*   C o m p l e t e   h o m e - s c r e e n   c o m p o s i t i o n .
+*   3 D   w a l l e t   d e c k .
+*   L i v e   C a p s u l e .
+*   F i n a n c i a l   s u m m a r y .
+*   Q u i c k   a c t i o n s .
+*   R e c e n t   t r a n s a c t i o n s .
+*   B o t t o m   n a v i g a t i o n .
+*   L i g h t   a n d   d a r k   t h e m e .
+*   R e s p o n s i v e   l a y o u t .
+*   I n t e r a c t i o n   s p e c i fi c a t i o n s .
+M e r a   e x e c u t i o n   r u l e :   H o m e   s c r e e n   k o   r e f e r e n c e   q u a l i t y   t a k   p a h u n c h a n e   k e   b a a d   u s k e
+d e s i g n   s y s t e m   k o   r e m a i n i n g   s c r e e n s   p a r   e x t e n d   k a r e n g e .   I s s e   h a r   s c r e e n   a l a g   d e s i g n e r   k i
+=== stream_136.txt ===
+
+b a n a y i   h u i   n a h i   l a g e g i .
+# # #   E k   c h e e z   a b   c h a h i y e
+P i c h h l i   Z I P   k e   b a j a y   l a t e s t   G o o g l e   A I   S t u d i o   p r o j e c t   Z I P   c h a h i y e ,   j i s m e   t u m h a r e   r e c e n t
+c h a n g e s   b h i   i n c l u d e d   h o n .   U s i   k o   s o u r c e   o f   t r u t h   b a n a y e n g e .
+U s k e   b a a d   p e h l a   a c t u a l   d e l i v e r a b l e   h o g a :   U c r e d   D e s i g n   S y s t e m   2 . 0   +   H o m e   S c r e e n
+i m p l e m e n t a t i o n   s p e c i fi c a t i o n ,   p h i r   n a t i v e   K o t l i n   m i g r a t i o n .
+T u m h a r e   p a a n c h   d i n   k e   e x i s t i n g   w o r k   k o   d i s c a r d   n a h i   k a r e n g e ;   p e h l e   u s k a   f e a t u r e
+i n v e n t o r y   b a n a y e n g e   a u r   s i r f   U I   l a y e r   k o   s y s t e m a t i c a l l y   r e p l a c e   k a r e n g e .

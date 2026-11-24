@@ -26,6 +26,8 @@ import {
 import {
   formatDateTime,
   formatINR,
+  formatINRCompact,
+  getAvatarColor,
   getLocalDateKey,
   getUIStrings,
   isValidIndianMobile,
@@ -250,6 +252,12 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
     amount: number;
     direction: TxDirection;
   } | null>(null);
+
+  const recentTransactions = useMemo(() => {
+    return [...transactions]
+      .sort((a, b) => (b.billDate || '').localeCompare(a.billDate || ''))
+      .slice(0, 4);
+  }, [transactions]);
 
   // Empty-state Instant Inline Quick Add state (zero demo button, Fitts's Law muscle memory)
   const [inlineName, setInlineName] = useState('');
@@ -547,7 +555,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   const hasSecondaryFilter = filterChip !== 'customer' && filterChip !== 'supplier';
 
   return (
-    <div className="pb-32">
+    <div className="pb-44">
       <div className="space-y-4 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start lg:space-y-0">
         {/* LEFT COLUMN (Mobile Full / Desktop 5-col Sticky Stage): Collapsing Title + 3D Wallet Stack + Control Center Matrix */}
         <div className="space-y-3.5 lg:col-span-5 lg:sticky lg:top-2">
@@ -632,6 +640,66 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
             onSelectAccount={onSelectAccount}
             onQuickCollect={openQuickEntrySheet}
           />
+
+          {/* Master Plan 2.0: Income, Outstanding & Cash Summary Strip */}
+          <div className="grid grid-cols-3 gap-2 font-tabular" aria-label="Financial Summary">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                if (capabilities.showGalla) onOpenGalla();
+              }}
+              className="ios27-ceramic-tile rounded-[20px] p-2.5 text-left active:scale-95 transition"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)] truncate">
+                Available Cash
+              </p>
+              <p className="font-display text-sm sm:text-base font-extrabold text-[var(--ink)] font-tabular truncate mt-0.5 whitespace-nowrap">
+                {hideBalance ? '₹••••' : formatINRCompact(gallaPulse.cashDrawerBalance + gallaPulse.upiBankBalance)}
+              </p>
+              <p className="text-[9px] font-semibold text-[var(--debit-green)] truncate">
+                Drawer + UPI
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                handleSelectSegment('customer');
+              }}
+              className="ios27-ceramic-tile rounded-[20px] p-2.5 text-left active:scale-95 transition"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--debit-green)] truncate">
+                To Collect
+              </p>
+              <p className="font-display text-sm sm:text-base font-extrabold text-[var(--debit-green)] font-tabular truncate mt-0.5 whitespace-nowrap">
+                {hideBalance ? '₹••••' : formatINRCompact(cashflow.totalReceivable)}
+              </p>
+              <p className="text-[9px] font-semibold text-[var(--ink-muted)] truncate">
+                {topDueParties.length} due
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                if (capabilities.showSuppliers) handleSelectSegment('supplier');
+              }}
+              className="ios27-ceramic-tile rounded-[20px] p-2.5 text-left active:scale-95 transition"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--credit-red)] truncate">
+                To Pay
+              </p>
+              <p className="font-display text-sm sm:text-base font-extrabold text-[var(--credit-red)] font-tabular truncate mt-0.5 whitespace-nowrap">
+                {hideBalance ? '₹••••' : formatINRCompact(cashflow.totalPayable)}
+              </p>
+              <p className="text-[9px] font-semibold text-[var(--ink-muted)] truncate">
+                Suppliers
+              </p>
+            </button>
+          </div>
 
           {/* 3. Compact 4-Column iOS Quick Action Bar */}
           <div className="grid grid-cols-4 gap-2" aria-label="Quick Actions">
@@ -765,6 +833,68 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                   </button>
                 );
               })}
+            </div>
+          )}
+
+          {/* Master Plan 2.0: Recent Activity Section */}
+          {segment !== 'galla' && !searchQuery && recentTransactions.length > 0 && (
+            <div className="ios27-inset-group rounded-[26px] p-4 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display text-sm font-extrabold text-[var(--ink)]">
+                  Recent Activity
+                </h3>
+                <span className="text-xs font-bold text-[var(--ink-muted)]">
+                  Latest Entries
+                </span>
+              </div>
+              <div className="divide-y divide-[var(--surface-border)]">
+                {recentTransactions.map((tx) => {
+                  const party = accounts.find((a) => a.id === tx.accountId);
+                  const isGiven = tx.direction === 'given';
+                  return (
+                    <button
+                      key={tx.id}
+                      type="button"
+                      onClick={() => {
+                        if (party) {
+                          haptics.tap();
+                          onSelectAccount(party);
+                        }
+                      }}
+                      className="w-full py-2 flex items-center justify-between gap-3 text-left hover:bg-[var(--app-bg)]/45 transition-colors rounded-xl px-2 -mx-2"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          style={{ backgroundColor: party ? getAvatarColor(party.name) : 'var(--brand)' }}
+                          className="w-7 h-7 rounded-full text-white text-[11px] font-extrabold flex items-center justify-center shrink-0"
+                        >
+                          {party?.name ? party.name.charAt(0).toUpperCase() : 'P'}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[var(--ink)] truncate">
+                            {party?.name || 'Party'}
+                          </p>
+                          <p className="text-[10px] text-[var(--ink-muted)] truncate">
+                            {tx.note || (isGiven ? 'Credit' : 'Payment')} · {formatDateTime(tx.billDate).split('·')[0]}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 whitespace-nowrap">
+                        <span
+                          className={`font-display text-xs sm:text-sm font-extrabold font-tabular whitespace-nowrap ${
+                            isGiven ? 'text-[var(--credit-red)]' : 'text-[var(--debit-green)]'
+                          }`}
+                        >
+                          {isGiven ? '+' : '-'}{formatINRCompact(tx.amount)}
+                        </span>
+                        <p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--ink-muted)]">
+                          {isGiven ? 'Credit' : 'Received'}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 

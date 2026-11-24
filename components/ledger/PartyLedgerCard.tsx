@@ -337,9 +337,9 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
             </p>
           </div>
 
-          <div className="text-right shrink-0 pl-1 max-w-[130px] sm:max-w-[160px] truncate">
+          <div className="text-right shrink-0 pl-1 max-w-[140px] sm:max-w-[170px] whitespace-nowrap truncate">
             <p
-              className={`font-display text-sm sm:text-base font-extrabold leading-tight truncate ${
+              className={`font-display text-sm sm:text-base font-extrabold leading-tight whitespace-nowrap truncate ${
                 account.balance > 0
                   ? 'text-[var(--credit-red)]'
                   : account.balance < 0
@@ -347,7 +347,7 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
                     : 'text-[var(--ink-muted)]'
               }`}
             >
-              <OdometerNumber value={absBal} hidden={hideBalance} />
+              <OdometerNumber value={absBal} hidden={hideBalance} compact={absBal >= 10000000} />
             </p>
             <p
               className={`text-[10px] font-extrabold uppercase tracking-wider inline-flex items-center justify-end gap-0.5 ${
