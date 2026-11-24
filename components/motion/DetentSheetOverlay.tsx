@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AnimatePresence,
   motion,
@@ -11,6 +12,7 @@ import {
 } from 'framer-motion';
 import { Maximize2, Minimize2, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { SPATIAL_SPRING } from './SpatialMotionEngine';
 
 export type SheetDetent = 'peek' | 'full';
 
@@ -25,11 +27,12 @@ export interface DetentSheetOverlayProps {
   children: React.ReactNode;
 }
 
-const SHEET_SPRING = { type: 'spring' as const, stiffness: 360, damping: 32, mass: 0.88 };
+const emptySubscribe = () => () => {};
 
 /**
  * iOS 27 Interactive Two-Detent Sheet Presentation (`68%` Peek <-> `94%` Full)
- * with live drag-coupled backdrop dimming, Escape key dismissal, and matte ceramic geometry.
+ * Rendered via React Portal directly into `document.body` to avoid CSS transform containing block
+ * trapping, ensuring instant response and 60fps physics across all parent tabs and scroll views.
  */
 export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
   open,
@@ -41,28 +44,51 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
   maxWidthClass = 'max-w-[460px]',
   children,
 }) => {
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const prefersReducedMotion = useReducedMotion();
   const dragControls = useDragControls();
-  const [detent, setDetent] = useState<SheetDetent>(initialDetent);
+  const [manualDetent, setManualDetent] = useState<SheetDetent | null>(null);
   const dragY = useMotionValue(0);
   const backdropFade = useTransform(dragY, [0, 260], [1, 0.25]);
+
+  const detent = manualDetent ?? initialDetent;
+
+  const handleClose = React.useCallback(() => {
+    setManualDetent(null);
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
     dragY.set(0);
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        handleClose();
       }
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose, dragY]);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open, dragY, handleClose]);
+
+  if (!isClient || typeof document === 'undefined') {
+    return null;
+  }
 
   const heightTarget = detent === 'full' ? '94dvh' : '68dvh';
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -71,8 +97,8 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.16, ease: 'easeOut' } }}
           style={prefersReducedMotion ? undefined : { opacity: backdropFade }}
-          onClick={onClose}
-          className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center p-0 sm:p-4 sm:items-center"
+          onClick={handleClose}
+          className="fixed inset-0 z-[100] bg-black/60 flex items-end justify-center p-0 sm:p-4 sm:items-center touch-none select-none"
         >
           <motion.section
             role="dialog"
@@ -89,30 +115,32 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
                 ? { opacity: 0 }
                 : { y: '100%', transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }
             }
-            transition={SHEET_SPRING}
+            transition={SPATIAL_SPRING}
             drag={prefersReducedMotion ? false : 'y'}
             dragControls={dragControls}
             dragListener={false}
             dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0.14, bottom: 0.42 }}
+            dragElastic={{ top: 0.12, bottom: 0.4 }}
+            onDrag={(_, info) => {
+              dragY.set(Math.max(0, info.offset.y));
+            }}
             onDragEnd={(_, info) => {
               dragY.set(0);
               if (info.offset.y > 125 || info.velocity.y > 460) {
                 haptics.swipe();
-                onClose();
+                handleClose();
               } else if (info.offset.y < -65 || info.velocity.y < -360) {
                 if (allowDetentToggle && detent !== 'full') {
                   haptics.tap();
-                  setDetent('full');
+                  setManualDetent('full');
                 }
               } else if (info.offset.y > 55 && detent === 'full' && allowDetentToggle) {
                 haptics.tap();
-                setDetent('peek');
+                setManualDetent('peek');
               }
             }}
             onClick={(e) => e.stopPropagation()}
-            style={prefersReducedMotion ? undefined : { y: dragY }}
-            className={`w-full ${maxWidthClass} rounded-t-[34px] sm:rounded-[34px] spatial-sheet flex flex-col overflow-hidden pb-safe will-change-transform`}
+            className={`w-full ${maxWidthClass} rounded-t-[34px] sm:rounded-[34px] spatial-sheet flex flex-col overflow-hidden pb-safe will-change-transform shadow-2xl touch-auto select-auto`}
           >
             {/* Interactive Grab Handle */}
             <div
@@ -128,7 +156,7 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
                 if ((e.target as HTMLElement).closest('button, input, a')) return;
                 dragControls.start(e);
               }}
-              className="px-5 pt-1 pb-3 flex items-center justify-between gap-3 border-b border-[var(--surface-border)] shrink-0"
+              className="px-5 pt-1 pb-3 flex items-center justify-between gap-3 border-b border-[var(--surface-border)] shrink-0 touch-none"
             >
               <div className="min-w-0">
                 <h3 className="font-display text-base font-extrabold text-[var(--ink)] truncate">
@@ -147,7 +175,7 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
                     type="button"
                     onClick={() => {
                       haptics.tap();
-                      setDetent((d) => (d === 'full' ? 'peek' : 'full'));
+                      setManualDetent(detent === 'full' ? 'peek' : 'full');
                     }}
                     aria-label={detent === 'full' ? 'Compact sheet size' : 'Expand sheet'}
                     className="w-9 h-9 rounded-full bg-[var(--surface-subtle)] text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center active:scale-90 transition"
@@ -163,7 +191,7 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
                   type="button"
                   onClick={() => {
                     haptics.tap();
-                    onClose();
+                    handleClose();
                   }}
                   aria-label={`Close ${title}`}
                   className="w-9 h-9 rounded-full bg-[var(--surface-subtle)] text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center active:scale-90 transition"
@@ -174,12 +202,13 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
             </div>
 
             {/* Scrollable Detent Content */}
-            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-5 py-4">
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-5 py-4 overscroll-contain">
               {children}
             </div>
           </motion.section>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

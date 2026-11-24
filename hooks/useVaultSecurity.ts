@@ -137,19 +137,16 @@ export function useVaultSecurity({
       return;
     }
 
-    const showCurtain = () => setPrivacyCurtainVisible(true);
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        showCurtain();
+        setPrivacyCurtainVisible(true);
       }
     };
 
     document.addEventListener('visibilitychange', onVisibilityChange);
-    window.addEventListener('blur', showCurtain);
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      window.removeEventListener('blur', showCurtain);
     };
   }, [privacyCurtainEnabled]);
 

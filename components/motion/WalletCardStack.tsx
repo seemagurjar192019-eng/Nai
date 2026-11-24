@@ -17,7 +17,6 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
-  Layers,
   ShieldCheck,
   Users,
   Volume2,
@@ -94,7 +93,6 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
 }) => {
   const prefersReducedMotion = useReducedMotion();
   const [frontPass, setFrontPass] = useState<PassId>('balance');
-  const [fanned, setFanned] = useState(false);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
   const rawRotateX = useMotionValue(0);
@@ -115,7 +113,7 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
   const netNegative = cashflow.netCashflow < 0;
 
   const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
-    if (prefersReducedMotion || fanned) return;
+    if (prefersReducedMotion) return;
     const rect = e.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const nx = (e.clientX - rect.left) / rect.width - 0.5;
@@ -132,7 +130,6 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
   const bringToFront = (id: PassId) => {
     haptics.swipe();
     setFrontPass(id);
-    setFanned(false);
   };
 
   const cycleNextPass = () => {
@@ -185,46 +182,58 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
     >
       {/* Wallet Deck Header Strip */}
       <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--ink-muted)]">
-          <span>Wallet Passes</span>
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--ink-muted)]">
+          <span className="font-extrabold text-[var(--ink)]">Passes</span>
           <span aria-hidden="true">·</span>
-          <span className="text-[var(--ink)]">{getPassMeta(frontPass).label}</span>
+          <span className="text-[var(--brand-accent)]">{getPassMeta(frontPass).label}</span>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              setFanned((v) => !v);
-            }}
-            aria-pressed={fanned}
-            className="min-h-[30px] px-2.5 rounded-full bg-[var(--surface)] border border-[var(--surface-border)] text-[11px] font-extrabold text-[var(--ink)] inline-flex items-center gap-1 active:scale-95 transition"
-          >
-            <Layers className="w-3 h-3 text-[var(--brand-accent)]" />
-            <span>{fanned ? 'Stack' : 'Fan Deck'}</span>
-          </button>
+        {/* 1-Tap Direct Pass Switcher (Zero height jump, stable Apple Wallet tabs) */}
+        <div className="flex items-center gap-1 bg-[var(--surface-subtle)] p-0.5 rounded-full border border-[var(--surface-border)]">
+          {(['balance', 'collection', 'cashbook'] as PassId[]).map((pid) => {
+            const active = frontPass === pid;
+            const shortLabel = pid === 'balance' ? 'Net' : pid === 'collection' ? 'Due' : 'Cash';
+            return (
+              <button
+                key={pid}
+                type="button"
+                onClick={() => bringToFront(pid)}
+                className={`min-h-[26px] px-2.5 rounded-full text-[10px] font-extrabold transition-all active:scale-95 ${
+                  active
+                    ? 'bg-[var(--surface)] text-[var(--ink)] shadow-xs'
+                    : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
+                }`}
+              >
+                <span>{shortLabel}</span>
+                {pid === 'collection' && overdueCount > 0 ? (
+                  <span className="ml-1 px-1 py-0.2 rounded-full bg-[var(--credit-tint)] text-[var(--credit-red)] text-[9px] font-bold">
+                    {overdueCount}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Interactive 3D Card Stack / Fanned Deck */}
+      {/* Interactive 3D Card Stack (Apple Wallet Presentation) */}
       <div
-        className={fanned ? 'flex flex-col gap-3' : 'relative'}
+        className="relative"
         style={{
           perspective: 1100,
-          minHeight: fanned ? undefined : breakdownOpen && frontPass === 'balance' ? 316 : 232,
+          minHeight: breakdownOpen && frontPass === 'balance' ? 316 : 232,
           transition: 'min-height 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         {passOrder.map((id, stackPos) => {
           const isFront = stackPos === 0;
           const meta = getPassMeta(id);
-          const showBody = isFront || fanned;
+          const showBody = isFront;
 
           // In stacked mode: Back cards peek 28px crisply above the front card (Apple Wallet style)
-          const targetY = fanned ? 0 : (2 - stackPos) * 28;
-          const targetScale = fanned ? 1 : 1 - stackPos * 0.04;
-          const targetRotateX = fanned ? -2.5 : isFront ? 0 : -4;
+          const targetY = (2 - stackPos) * 28;
+          const targetScale = 1 - stackPos * 0.04;
+          const targetRotateX = isFront ? 0 : -4;
           const zIndex = 30 - stackPos * 10;
 
           return (
@@ -238,7 +247,7 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
                 rotateX: prefersReducedMotion ? 0 : targetRotateX,
               }}
               transition={STACK_SPRING}
-              drag={isFront && !fanned && !prefersReducedMotion ? 'y' : false}
+              drag={isFront && !prefersReducedMotion ? 'y' : false}
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={0.18}
               onDragEnd={(_, info) => {
@@ -247,11 +256,11 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
                   cycleNextPass();
                 }
               }}
-              onPointerMove={isFront && !fanned ? handlePointerMove : undefined}
-              onPointerLeave={isFront && !fanned ? resetTilt : undefined}
-              onPointerCancel={isFront && !fanned ? resetTilt : undefined}
+              onPointerMove={isFront ? handlePointerMove : undefined}
+              onPointerLeave={isFront ? resetTilt : undefined}
+              onPointerCancel={isFront ? resetTilt : undefined}
               onClick={() => {
-                if (!isFront || fanned) {
+                if (!isFront) {
                   bringToFront(id);
                 } else if (id === 'balance') {
                   haptics.tap();
@@ -260,14 +269,12 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
               }}
               style={{
                 zIndex,
-                ...(isFront && !fanned && !prefersReducedMotion
+                ...(isFront && !prefersReducedMotion
                   ? { y: dragY, scale: dragScale, rotateX, rotateY }
                   : {}),
                 transformOrigin: 'top center',
               }}
-              className={`${
-                fanned ? 'relative w-full' : 'absolute inset-x-0 top-0 min-h-[164px]'
-              } rounded-[28px] ${meta.surfaceClass} px-4 pt-2.5 pb-3.5 cursor-pointer select-none will-change-transform overflow-hidden`}
+              className={`absolute inset-x-0 top-0 min-h-[164px] rounded-[28px] ${meta.surfaceClass} px-4 pt-2.5 pb-3.5 cursor-pointer select-none will-change-transform overflow-hidden shadow-lg`}
             >
               {/* Wallet Peeking Top Header Strip (Always visible even when tucked behind) */}
               <div className="flex items-center justify-between gap-2 pb-1.5 leading-none">
@@ -285,7 +292,7 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-display text-[34px] font-extrabold leading-none tracking-tight text-white">
+                        <p className="font-display text-[24px] sm:text-[32px] font-extrabold leading-none tracking-tight text-white truncate max-w-[210px] sm:max-w-[270px]">
                           <OdometerNumber
                             value={Math.abs(cashflow.netCashflow)}
                             hidden={hideBalance}
@@ -388,7 +395,7 @@ export const WalletCardStack: React.FC<WalletCardStackProps> = ({
 
                   {/* Inline Expandable Breakdown Drawer */}
                   <AnimatePresence initial={false}>
-                    {breakdownOpen && isFront && !fanned && (
+                    {breakdownOpen && isFront && (
                       <motion.div
                         key="wallet-balance-breakdown"
                         initial={{ height: 0, opacity: 0 }}

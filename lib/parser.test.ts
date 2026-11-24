@@ -19,11 +19,11 @@ import {
 } from './ucred-intelligence';
 import type { BillDocument, CashbookEntry, LedgerAccount, LedgerTransaction, StockItem } from './types';
 
-test('contains at least 50 test phrases', () => {
-  assert.equal(TEST_CASES.length, 50);
+test('contains at least 60 test phrases', () => {
+  assert.equal(TEST_CASES.length, 60);
 });
 
-test('all 50 Hinglish, Devanagari, and digit phrases parse accurately', () => {
+test('all 60 Hinglish, Devanagari, and digit phrases parse accurately', () => {
   let passCount = 0;
   const failures: string[] = [];
 
@@ -41,7 +41,7 @@ test('all 50 Hinglish, Devanagari, and digit phrases parse accurately', () => {
   }
 
   assert.equal(failures.length, 0, `Parser failures:\n${failures.join('\n')}`);
-  assert.equal(passCount, 50);
+  assert.equal(passCount, 60);
 });
 
 test('amountToHinglishWords formats read-back cleanly', () => {

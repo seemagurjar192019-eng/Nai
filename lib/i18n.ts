@@ -136,6 +136,12 @@ export function getAvatarColor(name: string): string {
 export function formatINR(num: number): string {
   const n = Math.round(Number(num) || 0);
   const abs = Math.abs(n);
+  if (abs >= 100000000000) {
+    return (n < 0 ? '-₹' : '₹') + (abs / 10000000).toFixed(0) + ' Cr';
+  }
+  if (abs >= 10000000) {
+    return (n < 0 ? '-₹' : '₹') + (abs / 10000000).toFixed(2).replace(/\.?0+$/, '') + ' Cr';
+  }
   let formatted = String(abs);
   try {
     formatted = abs.toLocaleString('en-IN');

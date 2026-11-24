@@ -8,11 +8,12 @@ import { formatINR, getAvatarColor } from '@/lib/i18n';
 import type { CustomerTrustScore, LedgerAccount, TxDirection } from '@/types';
 import { haptics } from '@/utils/haptics';
 import { OdometerNumber } from '../motion/OdometerNumber';
+import { SNAPPY_SPRING } from '../motion/SpatialMotionEngine';
 
 const RING_RADIUS = 19;
 const SWIPE_ARC_RADIUS = 8;
 const SWIPE_ARC_CIRCUMFERENCE = 2 * Math.PI * SWIPE_ARC_RADIUS;
-const SPRING_FAST = { type: 'spring' as const, stiffness: 460, damping: 26 };
+const SPRING_FAST = SNAPPY_SPRING;
 const SWIPE_THRESHOLD = 58;
 
 export function TrustAvatarRing({
@@ -336,9 +337,9 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
             </p>
           </div>
 
-          <div className="text-right shrink-0 pl-1">
+          <div className="text-right shrink-0 pl-1 max-w-[130px] sm:max-w-[160px] truncate">
             <p
-              className={`font-display text-base font-extrabold leading-tight ${
+              className={`font-display text-sm sm:text-base font-extrabold leading-tight truncate ${
                 account.balance > 0
                   ? 'text-[var(--credit-red)]'
                   : account.balance < 0

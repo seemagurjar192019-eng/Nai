@@ -17,7 +17,6 @@ import {
   Delete,
   Filter,
   Mic,
-  Plus,
   Repeat,
   UserPlus,
   Volume2,
@@ -591,25 +590,6 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
 
             <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
               <motion.button
-                whileTap={{ scale: 0.94, rotate: 4, y: 1 }}
-                transition={SPRING_FAST}
-                type="button"
-                onClick={() => {
-                  haptics.tap();
-                  if (capabilities.focus === 'personal') {
-                    handleOpenAddModal('customer');
-                  } else {
-                    setShowQuickMenuSheet(true);
-                  }
-                }}
-                aria-label="New party or quick entry"
-                className="min-h-[34px] px-3 rounded-full bg-[#111827] dark:bg-white text-white dark:text-[#0B0C0E] text-xs font-extrabold inline-flex items-center gap-1 shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.7]" />
-                <span>New</span>
-              </motion.button>
-
-              <motion.button
                 whileTap={{ scale: 0.94, rotate: -4, y: 1 }}
                 transition={SPRING_FAST}
                 type="button"
@@ -617,7 +597,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                   haptics.tap();
                   setShowFilterSortSheet(true);
                 }}
-                className={`min-h-[34px] px-2.5 sm:px-3 rounded-full text-xs font-extrabold inline-flex items-center gap-1 shrink-0 ${
+                className={`min-h-[34px] px-3 rounded-full text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 ${
                   hasSecondaryFilter || showAllModes || sortBy !== 'latest-activity'
                     ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] border border-[var(--brand-accent)]/25'
                     : 'ios27-ceramic-tile text-[var(--ink)]'

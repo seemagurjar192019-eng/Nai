@@ -82,7 +82,6 @@ export default function createNextConfig(phase: string): NextConfig {
         },
       ];
     },
-    output: 'standalone',
     transpilePackages: ['motion', 'framer-motion'],
     webpack: (config, { dev }) => {
       // HMR is disabled via DISABLE_HMR env var; file watching stays disabled during edits.

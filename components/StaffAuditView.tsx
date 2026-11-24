@@ -543,7 +543,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
             value={switchPinInput}
             onChange={(e) => setSwitchPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
             placeholder="••••"
-            className="w-full min-h-[50px] rounded-2xl bg-[var(--surface-subtle)] ring-2 ring-[var(--brand-accent)] text-center text-2xl font-extrabold font-tabular tracking-[0.4em] text-[var(--ink)] outline-none"
+            className="w-full min-h-[50px] rounded-2xl bg-[var(--surface-subtle)] px-4 text-center text-xl sm:text-2xl font-extrabold font-tabular tracking-wider sm:tracking-[0.3em] text-[var(--ink)] outline-none whitespace-nowrap overflow-hidden text-ellipsis"
           />
           {switchPinError && (
             <p className="text-xs font-bold text-[var(--credit-red)]">{switchPinError}</p>

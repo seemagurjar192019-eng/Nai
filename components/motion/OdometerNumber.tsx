@@ -61,6 +61,10 @@ export const OdometerNumber: React.FC<OdometerNumberProps> = ({
   const formattedText = hidden ? '₹••••' : `${prefix}${formatINR(value)}`;
   const chars = formattedText.split('');
 
+  if (prefersReducedMotion || chars.length > 8) {
+    return <span className={`inline-block font-tabular ${className}`}>{formattedText}</span>;
+  }
+
   return (
     <span
       aria-label={formattedText}

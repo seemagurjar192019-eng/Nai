@@ -148,7 +148,7 @@ export function transliterateDevanagari(word: string): string {
 }
 
 const UNITS: Record<string, number> = {
-  ek: 1, do: 2, teen: 3, char: 4, chaar: 4, paanch: 5, panch: 5,
+  ek: 1, do: 2, teen: 3, tin: 3, char: 4, chaar: 4, paanch: 5, panch: 5,
   chhe: 6, che: 6, chhah: 6, saat: 7, sat: 7, aath: 8, ath: 8,
   nau: 9, das: 10, gyarah: 11, gyara: 11, barah: 12, bara: 12,
   terah: 13, tera: 13, chaudah: 14, chauda: 14, pandrah: 15, pandra: 15,
@@ -555,4 +555,14 @@ export const TEST_CASES: ParserTestCase[] = [
   { input: 'संजय 1500 बाकी', name: 'Sanjay', amount: 1500, type: 'credit' },
   { input: 'पंकज से २५०० मिला', name: 'Pankaj', amount: 2500, type: 'debit' },
   { input: 'Haan Ramesh ko panch sau rupaye udhaar tha', name: 'Ramesh', amount: 500, type: 'credit' },
+  { input: 'Rahul ugrahi se 4000 mila', name: 'Rahul', amount: 4000, type: 'debit' },
+  { input: 'Karan se pachaas sau jama', name: 'Karan', amount: 5000, type: 'debit' },
+  { input: 'Amit ko do hazaar khata likho', name: 'Amit', amount: 2000, type: 'credit' },
+  { input: 'Sahil se tin hazaar cash mila', name: 'Sahil', amount: 3000, type: 'debit' },
+  { input: 'Pooja ko chhe sau udhaar diya', name: 'Pooja', amount: 600, type: 'credit' },
+  { input: 'Neha se saat sau payment aayi', name: 'Neha', amount: 700, type: 'debit' },
+  { input: 'Tarun aath hazaar udhar baki', name: 'Tarun', amount: 8000, type: 'credit' },
+  { input: 'Varun se nau sau wapas mila', name: 'Varun', amount: 900, type: 'debit' },
+  { input: 'Manish das hazar rupay diya', name: 'Manish', amount: 10000, type: 'credit' },
+  { input: 'Deepak gyarah hazaar udhaar', name: 'Deepak', amount: 11000, type: 'credit' },
 ];

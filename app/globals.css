@@ -584,3 +584,26 @@ body {
     border: none !important;
   }
 }
+
+/* Sprint 6: Thermal Receipt Printer 58mm & 80mm Media Optimizations */
+@media print {
+  @page thermal-58mm {
+    size: 58mm auto;
+    margin: 2mm;
+  }
+  @page thermal-80mm {
+    size: 80mm auto;
+    margin: 3mm;
+  }
+  .print-thermal-58 {
+    width: 54mm !important;
+    font-family: monospace !important;
+    font-size: 11px !important;
+  }
+  .print-thermal-80 {
+    width: 72mm !important;
+    font-family: monospace !important;
+    font-size: 12px !important;
+  }
+}
+

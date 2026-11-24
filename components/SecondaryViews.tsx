@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
+  Activity,
   AlertTriangle,
   ArrowLeft,
   Bell,
@@ -23,6 +24,7 @@ import {
   LogOut,
   Moon,
   QrCode,
+  Server,
   Share2,
   ShieldCheck,
   SlidersHorizontal,
@@ -687,9 +689,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="rounded-2xl bg-[var(--app-bg)] p-3.5 space-y-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <p className="text-xs font-extrabold text-[var(--ink)]">Recovery Key</p>
+                  <p className="text-xs font-extrabold text-[var(--ink)]">Offline Recovery Key</p>
                   <p className="text-[11px] text-[var(--ink-muted)]">
-                    Keep offline for multi-device account restore
+                    Save offline to restore your account on any device
                   </p>
                 </div>
                 <button
@@ -727,14 +729,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   void runSafely(
                     'e2ee',
                     () => onConfigureVaultMode('auto'),
-                    'Auto device key active',
+                    'Auto sync across devices active',
                     true
                   )
                 }
                 className="w-full p-3.5 flex items-center justify-between gap-3 text-left"
               >
                 <div>
-                  <p className="text-sm font-bold text-[var(--ink)]">Auto Sync Device Key</p>
+                  <p className="text-sm font-bold text-[var(--ink)]">Auto-Sync Across Devices</p>
                   <p className="text-[11px] text-[var(--ink-muted)]">
                     Instant unlock on signed-in devices
                   </p>
@@ -753,9 +755,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-bold text-[var(--ink)]">Cloud Sync Vault PIN</p>
+                    <p className="text-sm font-bold text-[var(--ink)]">Multi-Device Secret PIN</p>
                     <p className="text-[11px] text-[var(--ink-muted)]">
-                      Require a 4+ char secret PIN on new devices
+                      Require secret PIN when logging in on new devices
                     </p>
                   </div>
                   {vaultMode === 'pin' && (
@@ -838,7 +840,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
               placeholder={appLockPin ? 'Enter new 4-digit PIN' : 'e.g. 1234'}
-              className="w-full min-h-[50px] rounded-2xl bg-[var(--surface-subtle)] px-4 text-center text-2xl font-extrabold font-tabular tracking-[0.4em] text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[50px] rounded-2xl bg-[var(--surface-subtle)] px-4 text-center text-base sm:text-2xl font-extrabold font-tabular tracking-wider sm:tracking-[0.3em] text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)] whitespace-nowrap overflow-hidden text-ellipsis"
             />
             <div className="flex gap-2">
               <button
@@ -1704,15 +1706,15 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 font-tabular">
-          <div className="rounded-2xl bg-[var(--debit-tint)] p-4">
+          <div className="rounded-2xl bg-[var(--debit-tint)] p-4 truncate">
             <p className="text-xs font-bold text-[var(--debit-green)]">You Get</p>
-            <p className="text-xl font-extrabold text-[var(--debit-green)] mt-0.5">
+            <p className="text-base sm:text-xl font-extrabold text-[var(--debit-green)] mt-0.5 truncate">
               {formatINR(custDue)}
             </p>
           </div>
-          <div className="rounded-2xl bg-[var(--brand-tint)] p-4">
+          <div className="rounded-2xl bg-[var(--brand-tint)] p-4 truncate">
             <p className="text-xs font-bold text-[var(--brand-accent)]">Advance</p>
-            <p className="text-xl font-extrabold text-[var(--brand-accent)] mt-0.5">
+            <p className="text-base sm:text-xl font-extrabold text-[var(--brand-accent)] mt-0.5 truncate">
               {formatINR(custAdv)}
             </p>
           </div>
@@ -1728,7 +1730,7 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
             {suppliers.length} suppliers
           </span>
         </div>
-        <p className="text-2xl font-extrabold font-tabular text-[var(--credit-red)]">
+        <p className="text-base sm:text-2xl font-extrabold font-tabular text-[var(--credit-red)] truncate">
           {formatINR(suppDue)}
         </p>
         <p className="text-xs text-[var(--ink-muted)] font-tabular">

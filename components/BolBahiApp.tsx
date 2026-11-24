@@ -3737,7 +3737,7 @@ function BolBahiAppInner() {
                       }
                     }}
                     placeholder="● ● ● ● ● ●"
-                    className="w-full min-h-[54px] rounded-2xl bg-[var(--app-bg)] ring-2 ring-[var(--brand)] text-center text-2xl font-extrabold font-tabular tracking-[0.35em] outline-none"
+                    className="w-full min-h-[54px] rounded-2xl bg-[var(--app-bg)] ring-2 ring-[var(--brand)] text-center text-xl sm:text-2xl font-extrabold font-tabular tracking-wider sm:tracking-[0.3em] outline-none whitespace-nowrap overflow-hidden text-ellipsis"
                   />
 
                   {authError && (
@@ -4486,7 +4486,7 @@ function BolBahiAppInner() {
               value={reauthOtpCode}
               onChange={(e) => setReauthOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="● ● ● ● ● ●"
-              className="w-full min-h-[52px] rounded-2xl bg-[var(--surface-subtle)] ring-2 ring-transparent focus:ring-[var(--brand-accent)] text-center text-xl font-extrabold font-tabular tracking-[0.3em] outline-none transition"
+              className="w-full min-h-[52px] rounded-2xl bg-[var(--surface-subtle)] px-4 ring-2 ring-transparent focus:ring-[var(--brand-accent)] text-center text-xl font-extrabold font-tabular tracking-wider sm:tracking-[0.3em] outline-none transition whitespace-nowrap overflow-hidden text-ellipsis"
             />
 
             {reauthError && (

@@ -1010,7 +1010,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                           </div>
 
                           {(tx.note || tx.voiceRaw) && (
-                            <p className="text-sm font-bold text-[var(--ink)] leading-snug break-words">
+                            <p className="text-sm font-bold text-[var(--ink)] leading-snug break-words [overflow-wrap:anywhere]">
                               {tx.note || `"${tx.voiceRaw}"`}
                             </p>
                           )}
