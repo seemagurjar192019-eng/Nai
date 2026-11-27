@@ -59,7 +59,7 @@ jobs:
           fi
           npm run build
 
-      - name: Setup Capacitor Android
+      - name: Setup Capacitor Android & Microphone Permissions
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
           WEB_DIR="out"
@@ -70,11 +70,59 @@ jobs:
           {
             "appId": "com.ucred.app",
             "appName": "Ucred",
-            "webDir": "$WEB_DIR"
+            "webDir": "$WEB_DIR",
+            "server": {
+              "androidScheme": "https"
+            }
           }
           EOF
           rm -rf android
           npx cap add android
+
+          # 1. AndroidManifest.xml mein Microphone & Audio permissions add karein
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          sed -i 's/<\/manifest>/    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" \/>\n<\/manifest>/' "$MANIFEST"
+
+          # 2. MainActivity mein WebView WebChromeClient ko Mic permission auto-grant karne ke liye configure karein
+          MAIN_ACT=$(find android/app/src/main/java -name "MainActivity.java" -o -name "MainActivity.kt" | head -n 1)
+          if [[ "$MAIN_ACT" == *.java ]]; then
+            cat << 'EOF' > "$MAIN_ACT"
+          package com.ucred.app;
+
+          import android.Manifest;
+          import android.content.pm.PackageManager;
+          import android.os.Bundle;
+          import android.webkit.PermissionRequest;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebView;
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.content.ContextCompat;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                      ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, 101);
+                  }
+              }
+
+              @Override
+              public void onStart() {
+                  super.onStart();
+                  WebView webView = getBridge().getWebView();
+                  webView.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onPermissionRequest(final PermissionRequest request) {
+                          runOnUiThread(() -> request.grant(request.getResources()));
+                      }
+                  });
+              }
+          }
+          EOF
+          fi
+
           npx cap sync android
 
       - name: Setup Java 21
