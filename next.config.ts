@@ -2,10 +2,8 @@ import type { NextConfig } from 'next';
 import { PHASE_DEVELOPMENT_SERVER } from 'next/constants';
 
 export default function createNextConfig(phase: string): NextConfig {
-  const isStaticExport = process.env.CAPACITOR_BUILD === 'true' || process.env.STATIC_EXPORT === 'true';
-
   return {
-    output: isStaticExport ? 'export' : undefined,
+    output: 'export',
     distDir: phase === PHASE_DEVELOPMENT_SERVER ? '.next-dev' : '.next',
     reactStrictMode: true,
     poweredByHeader: false,
