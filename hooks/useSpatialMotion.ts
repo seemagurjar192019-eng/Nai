@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type RefObject } from 'react';
+import { useState, useRef, type RefObject } from 'react';
 import {
   useMotionValueEvent,
   useScroll,
@@ -24,25 +24,54 @@ export interface SpatialMotionValues {
   jellySkew: MotionValue<number>;
   /** Fires only at the 84px threshold boundary — never continuously on scroll */
   isHeroDocked: boolean;
+  isHeaderVisible: boolean;
 }
 
 const DOCK_THRESHOLD_PX = 84;
+const HIDE_SCROLL_MIN_Y = 96;
+const HIDE_DELTA_ACCUM_PX = 20;
+const SHOW_DELTA_ACCUM_PX = -12;
 
 /**
  * 60fps GPU-Accelerated iOS 27 Scroll & Depth Motion Engine.
- * All frame-by-frame visual interpolation (`opacity`, `scale`, `y`, `skewY`) flows exclusively
- * through Framer Motion `MotionValue` transforms on compositor layers — zero scroll-loop setState.
+ * Includes directional hysteresis so micro-jitter never causes abrupt header/dock popping.
  */
 export function useSpatialMotion(
   scrollContainerRef: RefObject<HTMLElement | null>
 ): SpatialMotionValues {
   const { scrollY } = useScroll({ container: scrollContainerRef });
   const [isHeroDocked, setIsHeroDocked] = useState(false);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
+  const directionalAccumRef = useRef(0);
 
-  // Discrete threshold crossing only updates React state when crossing threshold
   useMotionValueEvent(scrollY, 'change', (latest) => {
     const nextDocked = latest >= DOCK_THRESHOLD_PX;
     setIsHeroDocked((prev) => (prev === nextDocked ? prev : nextDocked));
+
+    const prev = lastScrollYRef.current;
+    const diff = latest - prev;
+    lastScrollYRef.current = latest;
+
+    if (latest <= 36) {
+      directionalAccumRef.current = 0;
+      setIsHeaderVisible(true);
+      return;
+    }
+
+    if (diff === 0) return;
+
+    // Reset accumulator when scroll direction flips so tiny bounce/jitter is ignored
+    if ((diff > 0 && directionalAccumRef.current < 0) || (diff < 0 && directionalAccumRef.current > 0)) {
+      directionalAccumRef.current = 0;
+    }
+    directionalAccumRef.current += diff;
+
+    if (directionalAccumRef.current >= HIDE_DELTA_ACCUM_PX && latest > HIDE_SCROLL_MIN_Y) {
+      setIsHeaderVisible(false);
+    } else if (directionalAccumRef.current <= SHOW_DELTA_ACCUM_PX) {
+      setIsHeaderVisible(true);
+    }
   });
 
   // iOS 27 Collapsing Large Title (0px -> 56px)
@@ -62,7 +91,7 @@ export function useSpatialMotion(
 
   // Tactile scroll-velocity jelly physics on party list rows
   const scrollVelocity = useVelocity(scrollY);
-  const rawJellySkew = useTransform(scrollVelocity, [-1600, 0, 1600], [-1.35, 0, 1.35]);
+  const rawJellySkew = useTransform(scrollVelocity, [-1600, 0, 1600], [-1.2, 0, 1.2]);
   const jellySkew = useSpring(rawJellySkew, { stiffness: 320, damping: 28 });
 
   return {
@@ -78,5 +107,6 @@ export function useSpatialMotion(
     dockedPillY,
     jellySkew,
     isHeroDocked,
+    isHeaderVisible,
   };
 }

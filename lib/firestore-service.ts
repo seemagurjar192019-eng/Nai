@@ -315,7 +315,7 @@ export async function createBusiness(
       name: clampStr(input.name || 'My Shop', 120) || 'My Shop',
       phone: clampStr(input.phone, 20),
       gstNumber: '',
-      businessType: 'Retail / Kirana',
+      businessType: 'Retail Store',
       category: 'General Store',
       address: '',
       email: '',

@@ -67,13 +67,22 @@ export function createStarterGuestBusiness(name = 'My Store'): Business {
     name: clampStr(name, 120) || 'My Store',
     phone: '',
     gstNumber: '',
-    businessType: 'Retail / Kirana',
+    businessType: 'Retail Store',
     category: 'General Store',
     address: '',
     email: '',
     about: '',
     upiId: '',
   };
+}
+
+function normalizeAppearance(
+  raw: unknown,
+  fallback?: unknown
+): AppearanceMode {
+  if (raw === 'dark' || raw === 'light' || raw === 'system') return raw;
+  if (fallback === 'dark' || fallback === 'light' || fallback === 'system') return fallback;
+  return 'system';
 }
 
 export function createInitialGuestVault(
@@ -85,7 +94,7 @@ export function createInitialGuestVault(
     profile: {
       mobileNumber: clampStr(prelogin?.mobileNumber, 20),
       language: prelogin?.language || 'en',
-      appearance: prelogin?.appearance === 'dark' ? 'dark' : 'light',
+      appearance: normalizeAppearance(prelogin?.appearance),
       activeBusinessId: starter.id,
       appLockPin: '',
     },
@@ -132,14 +141,7 @@ export function loadGuestVault(
       profile: {
         mobileNumber: clampStr(parsed.profile?.mobileNumber ?? prelogin?.mobileNumber, 20),
         language: parsed.profile?.language || prelogin?.language || 'en',
-        appearance:
-          parsed.profile?.appearance === 'dark'
-            ? 'dark'
-            : parsed.profile?.appearance === 'light'
-              ? 'light'
-              : prelogin?.appearance === 'dark'
-                ? 'dark'
-                : 'light',
+        appearance: normalizeAppearance(parsed.profile?.appearance, prelogin?.appearance),
         activeBusinessId: activeId,
         appLockPin: clampStr(parsed.profile?.appLockPin, 128),
       },
@@ -190,14 +192,7 @@ function normalizeGuestVault(
     profile: {
       mobileNumber: clampStr(parsed?.profile?.mobileNumber ?? prelogin?.mobileNumber, 20),
       language: parsed?.profile?.language || prelogin?.language || 'en',
-      appearance:
-        parsed?.profile?.appearance === 'dark'
-          ? 'dark'
-          : parsed?.profile?.appearance === 'light'
-            ? 'light'
-            : prelogin?.appearance === 'dark'
-              ? 'dark'
-              : 'light',
+      appearance: normalizeAppearance(parsed?.profile?.appearance, prelogin?.appearance),
       activeBusinessId: activeId,
       appLockPin: clampStr(parsed?.profile?.appLockPin, 128),
     },
@@ -326,7 +321,7 @@ export function applyCreateBusiness(
     name: clampStr(input.name || 'My Shop', 120) || 'My Shop',
     phone: clampStr(input.phone, 20),
     gstNumber: '',
-    businessType: 'Retail / Kirana',
+    businessType: 'Retail Store',
     category: clampStr(input.category, 60) || 'General Store',
     address: '',
     email: '',

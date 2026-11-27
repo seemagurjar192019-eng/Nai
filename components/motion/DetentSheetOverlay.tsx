@@ -12,7 +12,7 @@ import {
 } from 'framer-motion';
 import { Maximize2, Minimize2, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { SPATIAL_SPRING } from './SpatialMotionEngine';
+import { APPLE_EASE, SNAPPY_SPRING, SPATIAL_SPRING } from './SpatialMotionEngine';
 
 export type SheetDetent = 'peek' | 'full';
 
@@ -29,11 +29,6 @@ export interface DetentSheetOverlayProps {
 
 const emptySubscribe = () => () => {};
 
-/**
- * iOS 27 Interactive Two-Detent Sheet Presentation (`68%` Peek <-> `94%` Full)
- * Rendered via React Portal directly into `document.body` to avoid CSS transform containing block
- * trapping, ensuring instant response and 60fps physics across all parent tabs and scroll views.
- */
 export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
   open,
   onClose,
@@ -86,7 +81,11 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
     return null;
   }
 
-  const heightTarget = detent === 'full' ? '94dvh' : '68dvh';
+  const sheetHeightClass = allowDetentToggle
+    ? detent === 'full'
+      ? 'h-[90dvh]'
+      : 'h-[70dvh]'
+    : 'max-h-[90dvh]';
 
   return createPortal(
     <AnimatePresence>
@@ -95,38 +94,34 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
           key="ios27-detent-backdrop"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.16, ease: 'easeOut' } }}
+          exit={{ opacity: 0, transition: { duration: 0.16, ease: APPLE_EASE } }}
           style={prefersReducedMotion ? undefined : { opacity: backdropFade }}
           onClick={handleClose}
-          className="fixed inset-0 z-[100] bg-black/60 flex items-end justify-center p-0 sm:p-4 sm:items-center touch-none select-none"
+          className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] flex items-end justify-center p-0 sm:p-4 sm:items-center touch-none select-none"
         >
           <motion.section
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            initial={prefersReducedMotion ? { opacity: 0 } : { y: '100%' }}
-            animate={
-              prefersReducedMotion
-                ? { opacity: 1 }
-                : { y: 0, maxHeight: heightTarget }
-            }
+            initial={prefersReducedMotion ? { opacity: 0 } : { y: '100%', opacity: 0.9 }}
+            animate={prefersReducedMotion ? { opacity: 1 } : { y: 0, opacity: 1 }}
             exit={
               prefersReducedMotion
                 ? { opacity: 0 }
-                : { y: '100%', transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }
+                : { y: '100%', opacity: 0.85, transition: { duration: 0.2, ease: APPLE_EASE } }
             }
             transition={SPATIAL_SPRING}
             drag={prefersReducedMotion ? false : 'y'}
             dragControls={dragControls}
             dragListener={false}
             dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0.12, bottom: 0.4 }}
+            dragElastic={{ top: 0.08, bottom: 0.42 }}
             onDrag={(_, info) => {
               dragY.set(Math.max(0, info.offset.y));
             }}
             onDragEnd={(_, info) => {
               dragY.set(0);
-              if (info.offset.y > 125 || info.velocity.y > 460) {
+              if (info.offset.y > 120 || info.velocity.y > 460) {
                 haptics.swipe();
                 handleClose();
               } else if (info.offset.y < -65 || info.velocity.y < -360) {
@@ -140,23 +135,21 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
               }
             }}
             onClick={(e) => e.stopPropagation()}
-            className={`w-full ${maxWidthClass} rounded-t-[34px] sm:rounded-[34px] spatial-sheet flex flex-col overflow-hidden pb-safe will-change-transform shadow-2xl touch-auto select-auto`}
+            className={`w-full ${maxWidthClass} ${sheetHeightClass} rounded-t-[30px] sm:rounded-[30px] liquid-glass-elevated flex flex-col overflow-hidden pb-safe will-change-transform touch-auto select-auto`}
           >
-            {/* Interactive Grab Handle */}
             <div
               onPointerDown={(e) => dragControls.start(e)}
               className="pt-2.5 pb-1 flex justify-center cursor-grab active:cursor-grabbing touch-none shrink-0"
             >
-              <span className="w-11 h-1.5 rounded-full bg-[var(--surface-border)]" />
+              <span className="w-10 h-1 rounded-full bg-[var(--ink-muted)]/30" />
             </div>
 
-            {/* Crisp Header Bar */}
             <div
               onPointerDown={(e) => {
                 if ((e.target as HTMLElement).closest('button, input, a')) return;
                 dragControls.start(e);
               }}
-              className="px-5 pt-1 pb-3 flex items-center justify-between gap-3 border-b border-[var(--surface-border)] shrink-0 touch-none"
+              className="px-5 pt-1 pb-3 flex items-center justify-between gap-3 border-b border-[var(--glass-border)] shrink-0 touch-none"
             >
               <div className="min-w-0">
                 <h3 className="font-display text-base font-extrabold text-[var(--ink)] truncate">
@@ -171,37 +164,40 @@ export const DetentSheetOverlay: React.FC<DetentSheetOverlayProps> = ({
 
               <div className="flex items-center gap-1.5 shrink-0">
                 {allowDetentToggle && (
-                  <button
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    transition={SNAPPY_SPRING}
                     type="button"
                     onClick={() => {
                       haptics.tap();
                       setManualDetent(detent === 'full' ? 'peek' : 'full');
                     }}
                     aria-label={detent === 'full' ? 'Compact sheet size' : 'Expand sheet'}
-                    className="w-9 h-9 rounded-full bg-[var(--surface-subtle)] text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center active:scale-90 transition"
+                    className="w-11 h-11 rounded-full bg-[var(--surface-subtle)]/80 text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center transition"
                   >
                     {detent === 'full' ? (
-                      <Minimize2 className="w-3.5 h-3.5" />
+                      <Minimize2 className="w-4 h-4" />
                     ) : (
-                      <Maximize2 className="w-3.5 h-3.5" />
+                      <Maximize2 className="w-4 h-4" />
                     )}
-                  </button>
+                  </motion.button>
                 )}
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  transition={SNAPPY_SPRING}
                   type="button"
                   onClick={() => {
                     haptics.tap();
                     handleClose();
                   }}
                   aria-label={`Close ${title}`}
-                  className="w-9 h-9 rounded-full bg-[var(--surface-subtle)] text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center active:scale-90 transition"
+                  className="w-11 h-11 rounded-full bg-[var(--surface-subtle)]/80 text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center transition"
                 >
                   <X className="w-4 h-4" />
-                </button>
+                </motion.button>
               </div>
             </div>
 
-            {/* Scrollable Detent Content */}
             <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-5 py-4 overscroll-contain">
               {children}
             </div>

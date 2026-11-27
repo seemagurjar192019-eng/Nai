@@ -10,6 +10,7 @@ import {
 } from 'framer-motion';
 import { Mic } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { APPLE_EASE, BOUNCY_SPRING, SNAPPY_SPRING } from '../motion/SpatialMotionEngine';
 
 export interface MunimVoiceOrbProps {
   size?: 'dock' | 'mini' | 'hero';
@@ -18,13 +19,11 @@ export interface MunimVoiceOrbProps {
   ariaLabel?: string;
 }
 
-const ORB_SPRING = { type: 'spring' as const, stiffness: 440, damping: 24, mass: 0.8 };
 const MAGNETIC_SPRING = { stiffness: 320, damping: 22, mass: 0.5 };
 
 /**
- * Centered Matte Royal Indigo (#4F46E5) Mic Orb.
- * Features a 60fps GPU CSS breathing halo ring (`orb-halo-breath`) and subtle ±5px magnetic pull.
- * Zero cartoon faces, zero cyan neon gradients, zero glass/backdrop blur.
+ * Flagship Apple Monochrome Liquid Glass Voice Munim Orb.
+ * GPU magnetic pull physics, Siri-grade concentric harmonic ripples, and zero color slop.
  */
 export const MunimVoiceOrb: React.FC<MunimVoiceOrbProps> = ({
   size = 'dock',
@@ -43,7 +42,7 @@ export const MunimVoiceOrb: React.FC<MunimVoiceOrbProps> = ({
 
   const isDock = size === 'dock';
   const isHero = size === 'hero';
-  const dim = isHero ? 'w-[80px] h-[80px]' : isDock ? 'w-[60px] h-[60px]' : 'w-12 h-12';
+  const dim = isHero ? 'w-[76px] h-[76px]' : isDock ? 'w-[58px] h-[58px]' : 'w-11 h-11';
   const iconDim = isHero ? 'w-7 h-7' : isDock ? 'w-6 h-6' : 'w-5 h-5';
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -51,8 +50,8 @@ export const MunimVoiceOrb: React.FC<MunimVoiceOrbProps> = ({
     const rect = orbRef.current.getBoundingClientRect();
     const dx = e.clientX - (rect.left + rect.width / 2);
     const dy = e.clientY - (rect.top + rect.height / 2);
-    const clampedX = Math.max(-5, Math.min(5, (dx / (rect.width / 2)) * 5));
-    const clampedY = Math.max(-5, Math.min(5, (dy / (rect.height / 2)) * 5));
+    const clampedX = Math.max(-4, Math.min(4, (dx / (rect.width / 2)) * 4));
+    const clampedY = Math.max(-4, Math.min(4, (dy / (rect.height / 2)) * 4));
     rawPullX.set(clampedX);
     rawPullY.set(clampedY);
   };
@@ -76,51 +75,60 @@ export const MunimVoiceOrb: React.FC<MunimVoiceOrbProps> = ({
       onPointerCancel={handlePointerLeave}
       className="relative inline-flex items-center justify-center select-none"
     >
-      {/* Continuous 60fps GPU CSS Breathing Halo Ring (Zero Blur) */}
+      {/* Siri-Grade Concentric Acoustic Harmonic Ripples (Listening & Tap States) */}
       {!prefersReducedMotion && (
-        <span
-          aria-hidden="true"
-          className="orb-halo-breath absolute inset-0 rounded-full border-2 border-[#4F46E5] pointer-events-none will-change-transform"
-        />
+        <AnimatePresence>
+          {listening ? (
+            <>
+              <motion.span
+                key="ripple-1"
+                aria-hidden="true"
+                animate={{ scale: [1, 1.48, 1.8], opacity: [0.45, 0.18, 0] }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut' }}
+                className="absolute inset-0 rounded-full border border-[var(--ink)] pointer-events-none will-change-transform"
+              />
+              <motion.span
+                key="ripple-2"
+                aria-hidden="true"
+                animate={{ scale: [1, 1.35, 1.62], opacity: [0.38, 0.14, 0] }}
+                transition={{ duration: 1.8, delay: 0.55, repeat: Infinity, ease: 'easeOut' }}
+                className="absolute inset-0 rounded-full border border-[var(--ink)] pointer-events-none will-change-transform"
+              />
+            </>
+          ) : (
+            pulseSeq > 0 && (
+              <motion.span
+                key={pulseSeq}
+                aria-hidden="true"
+                initial={{ scale: 0.95, opacity: 0.38 }}
+                animate={{ scale: 1.45, opacity: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.42, ease: APPLE_EASE }}
+                className="absolute inset-0 rounded-full border border-[var(--ink)] pointer-events-none will-change-transform"
+              />
+            )
+          )}
+        </AnimatePresence>
       )}
 
-      {/* Active Listening / Tap Ripple Ring */}
-      <AnimatePresence>
-        {(listening || pulseSeq > 0) && !prefersReducedMotion && (
-          <motion.span
-            key={pulseSeq}
-            aria-hidden="true"
-            initial={{ scale: 0.92, opacity: 0.55 }}
-            animate={{ scale: listening ? 1.7 : 1.55, opacity: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute inset-0 rounded-full border-2 border-[#4F46E5] pointer-events-none will-change-transform"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Crisp Matte Royal Indigo Orb with white Mic icon */}
+      {/* Pure Monochrome Apple Voice Orb (Jet Black on Light / Crisp White on Dark) */}
       <motion.button
         type="button"
-        style={
-          prefersReducedMotion
-            ? { backgroundColor: 'var(--brand)' }
-            : { backgroundColor: 'var(--brand)', x: pullX, y: pullY }
-        }
-        whileTap={prefersReducedMotion ? undefined : { scale: 0.9 }}
+        style={prefersReducedMotion ? undefined : { x: pullX, y: pullY }}
+        whileTap={prefersReducedMotion ? undefined : { scale: 0.92 }}
         whileHover={prefersReducedMotion ? undefined : { scale: 1.04 }}
-        transition={ORB_SPRING}
+        transition={isDock ? BOUNCY_SPRING : SNAPPY_SPRING}
         onClick={handlePress}
         aria-label={ariaLabel}
-        className={`relative ${dim} rounded-full text-white flex items-center justify-center cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#4F46E5] shadow-[0_10px_24px_-4px_rgba(79,70,229,0.42)] will-change-transform ${
-          isDock
-            ? 'ring-[5px] ring-[#F5F6F8] dark:ring-[#0B0C0E]'
-            : isHero
-              ? 'ring-4 ring-[#EEF2FF] dark:ring-[#1E1B4B]'
-              : 'ring-2 ring-[var(--surface)]'
+        className={`relative ${dim} rounded-full bg-[var(--brand)] text-[var(--brand-fg)] flex items-center justify-center cursor-pointer border border-black/10 dark:border-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--ink)] will-change-transform ${
+          isHero
+            ? 'ring-4 ring-[var(--brand-tint)]'
+            : isDock
+              ? 'shadow-[0_10px_24px_-6px_rgba(10,10,10,0.34),inset_0_1px_0_rgba(255,255,255,0.22)] dark:shadow-[0_10px_24px_-6px_rgba(0,0,0,0.75)]'
+              : 'ring-1 ring-[var(--glass-border)]'
         }`}
       >
-        <Mic className={`${iconDim} relative z-10 stroke-[2.3]`} />
+        <Mic className={`${iconDim} relative z-10 stroke-[2]`} />
       </motion.button>
     </div>
   );

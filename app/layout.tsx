@@ -45,7 +45,10 @@ function resolveMetadataBase(): URL {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#4F46E5',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FFFFFF' },
+    { media: '(prefers-color-scheme: dark)', color: '#000000' },
+  ],
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',

@@ -1,18 +1,18 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, ChevronDown, Copy, Scale } from 'lucide-react';
 import { formatINR } from '@/lib/i18n';
 import { calculateMandiAadatTotals } from '@/lib/persona';
 import { haptics } from '@/utils/haptics';
-
-const SPRING_SHEET = { type: 'spring' as const, stiffness: 360, damping: 30 };
+import { SNAPPY_SPRING } from '../motion/SpatialMotionEngine';
 
 /**
  * Compact inline Bori / Wazan / Aadat Commission Calculator rendered strictly in Mandi / Vyapari mode.
  */
 export const MandiAadatHelper: React.FC = () => {
+  const prefersReducedMotion = useReducedMotion();
   const [expanded, setExpanded] = useState(false);
   const [boriCount, setBoriCount] = useState('10');
   const [weightKg, setWeightKg] = useState('500');
@@ -33,7 +33,7 @@ export const MandiAadatHelper: React.FC = () => {
 
   const handleCopySummary = () => {
     haptics.tap();
-    const summary = `${calc.formattedNote} = ${formatINR(calc.netTotal)} (Aadat ${formatINR(calc.aadatFee)})`;
+    const summary = `${calc.formattedNote} = ${formatINR(calc.netTotal)} (Fee ${formatINR(calc.aadatFee)})`;
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(summary).catch(() => {});
     }
@@ -43,8 +43,8 @@ export const MandiAadatHelper: React.FC = () => {
 
   return (
     <section
-      aria-label="Mandi Bori Wazan Aadat Calculator"
-      className="rounded-[24px] spatial-card p-3.5 space-y-2"
+      aria-label="Grain and Produce Trade Calculator"
+      className="rounded-[22px] ios27-ceramic-tile p-3.5 space-y-2"
     >
       <button
         type="button"
@@ -53,18 +53,18 @@ export const MandiAadatHelper: React.FC = () => {
           setExpanded((v) => !v);
         }}
         aria-expanded={expanded}
-        className="w-full flex items-center justify-between gap-2 text-left"
+        className="w-full min-h-[44px] flex items-center justify-between gap-2 text-left"
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="w-9 h-9 rounded-2xl bg-[var(--alert-tint)] text-[var(--alert-amber)] flex items-center justify-center shrink-0">
+          <span className="w-9 h-9 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
             <Scale className="w-4 h-4" />
           </span>
           <div className="min-w-0">
             <p className="text-xs font-extrabold text-[var(--ink)] truncate">
-              Bori · Wazan · Aadat Calculator
+              Batch · Weight · Commission Calculator
             </p>
             <p className="text-[11px] font-semibold text-[var(--ink-muted)] truncate font-tabular">
-              Sample Lot: {formatINR(calc.netTotal)} ({aadatPct || '0'}% Aadat)
+              Sample Lot: {formatINR(calc.netTotal)} ({aadatPct || '0'}% fee)
             </p>
           </div>
         </div>
@@ -78,17 +78,25 @@ export const MandiAadatHelper: React.FC = () => {
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0, transition: { duration: 0.16, ease: 'easeOut' } }}
-            transition={SPRING_SHEET}
-            className="overflow-hidden"
+            initial={
+              prefersReducedMotion
+                ? { opacity: 0 }
+                : { opacity: 0, y: -6, clipPath: 'inset(0% 0% 100% 0%)' }
+            }
+            animate={{ opacity: 1, y: 0, clipPath: 'inset(0% 0% 0% 0%)' }}
+            exit={
+              prefersReducedMotion
+                ? { opacity: 0 }
+                : { opacity: 0, y: -4, clipPath: 'inset(0% 0% 100% 0%)' }
+            }
+            transition={SNAPPY_SPRING}
+            className="overflow-hidden will-change-transform"
           >
             <div className="pt-2 space-y-2.5">
               <div className="grid grid-cols-2 gap-2">
-                <label className="rounded-2xl bg-[var(--app-bg)] px-3 py-2 space-y-0.5">
+                <label className="rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 py-2 space-y-0.5">
                   <span className="block text-[10px] font-bold uppercase text-[var(--ink-muted)]">
-                    Bori Count
+                    Bags Count
                   </span>
                   <input
                     type="number"
@@ -99,9 +107,9 @@ export const MandiAadatHelper: React.FC = () => {
                   />
                 </label>
 
-                <label className="rounded-2xl bg-[var(--app-bg)] px-3 py-2 space-y-0.5">
+                <label className="rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 py-2 space-y-0.5">
                   <span className="block text-[10px] font-bold uppercase text-[var(--ink-muted)]">
-                    Wazan (kg)
+                    Weight (kg)
                   </span>
                   <input
                     type="number"
@@ -112,9 +120,9 @@ export const MandiAadatHelper: React.FC = () => {
                   />
                 </label>
 
-                <label className="rounded-2xl bg-[var(--app-bg)] px-3 py-2 space-y-0.5">
+                <label className="rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 py-2 space-y-0.5">
                   <span className="block text-[10px] font-bold uppercase text-[var(--ink-muted)]">
-                    Rate / Quintal (₹)
+                    Rate / 100kg (₹)
                   </span>
                   <input
                     type="number"
@@ -125,9 +133,9 @@ export const MandiAadatHelper: React.FC = () => {
                   />
                 </label>
 
-                <label className="rounded-2xl bg-[var(--app-bg)] px-3 py-2 space-y-0.5">
+                <label className="rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 py-2 space-y-0.5">
                   <span className="block text-[10px] font-bold uppercase text-[var(--ink-muted)]">
-                    Aadat (%)
+                    Commission (%)
                   </span>
                   <input
                     type="number"
@@ -141,22 +149,22 @@ export const MandiAadatHelper: React.FC = () => {
                 </label>
               </div>
 
-              <div className="rounded-2xl bg-[var(--brand-tint)] px-3.5 py-2.5 flex items-center justify-between gap-2">
+              <div className="rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 py-2.5 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold text-[var(--ink-muted)] font-tabular">
-                    Gross {formatINR(calc.grossAmount)} + Aadat {formatINR(calc.aadatFee)}
+                    Gross {formatINR(calc.grossAmount)} + Fee {formatINR(calc.aadatFee)}
                   </p>
-                  <p className="font-display text-base font-extrabold text-[var(--brand-accent)] font-tabular">
+                  <p className="font-display text-base font-extrabold text-[var(--ink)] font-tabular">
                     Net: {formatINR(calc.netTotal)}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={handleCopySummary}
-                  className="min-h-[34px] px-3 rounded-xl bg-[var(--surface)] text-[11px] font-extrabold text-[var(--ink)] inline-flex items-center gap-1 shadow-xs active:scale-95 transition shrink-0"
+                  className="min-h-[40px] px-3.5 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] text-[11px] font-semibold inline-flex items-center gap-1 shadow-xs active:scale-95 transition shrink-0"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-[var(--debit-green)]" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'Copied' : 'Copy Hisaab'}</span>
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? 'Copied' : 'Copy Summary'}</span>
                 </button>
               </div>
             </div>

@@ -9,5 +9,5 @@ export type {
   PersonaPrefs,
 } from '@/lib/persona';
 
-export type MainTab = 'ledger' | 'collection' | 'bills' | 'stock' | 'more';
+export type MainTab = 'ledger' | 'collection' | 'bills' | 'stock' | 'account-summary' | 'more';
 export type CashKhataSegment = 'customer' | 'supplier' | 'galla';

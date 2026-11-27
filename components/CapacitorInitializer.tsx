@@ -9,26 +9,39 @@ export function CapacitorInitializer() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
-    // Configure Status Bar for Royal Indigo dark theme
-    try {
-      StatusBar.setStyle({ style: Style.Dark });
-      StatusBar.setBackgroundColor({ color: '#0F172A' });
-    } catch (e) {
-      console.warn('StatusBar configuration not supported', e);
-    }
+    const syncStatusBar = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      try {
+        void StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
+        void StatusBar.setBackgroundColor({ color: isDark ? '#06070A' : '#F5F5F8' });
+      } catch {
+        // Ignore on unsupported devices
+      }
+    };
 
-    // Handle Android hardware back button gracefully
+    syncStatusBar();
+
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.attributeName === 'class') {
+          syncStatusBar();
+          break;
+        }
+      }
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
     const backButtonListener = App.addListener('backButton', ({ canGoBack }) => {
       if (canGoBack) {
         window.history.back();
       } else {
-        // Confirm exit or minimize app on root
-        App.minimizeApp();
+        void App.minimizeApp();
       }
     });
 
     return () => {
-      backButtonListener.then((listener) => listener.remove());
+      observer.disconnect();
+      void backButtonListener.then((listener) => listener.remove());
     };
   }, []);
 

@@ -304,6 +304,8 @@ export type AutoLockSeconds = 0 | 60 | 300 | 900;
 const AUTO_LOCK_STORAGE_KEY = 'ucred_auto_lock_sec_v1';
 const PRIVACY_CURTAIN_STORAGE_KEY = 'ucred_privacy_curtain_v1';
 const PASSKEY_CRED_STORAGE_KEY = 'ucred_passkey_cred_v1';
+const LAST_BACKUP_STORAGE_KEY = 'ucred_last_backup_at_v1';
+const SCRAMBLE_PIN_PAD_KEY = 'ucred_scramble_pin_pad_v1';
 
 export function normalizeAutoLockSeconds(raw: unknown): AutoLockSeconds {
   const n = Number(raw);
@@ -352,6 +354,46 @@ export function setPrivacyCurtainEnabled(enabled: boolean): boolean {
   return enabled;
 }
 
+export function getScramblePinPadEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(SCRAMBLE_PIN_PAD_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function setScramblePinPadEnabled(enabled: boolean): boolean {
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(SCRAMBLE_PIN_PAD_KEY, enabled ? '1' : '0');
+    } catch {
+      // Ignore storage write errors
+    }
+  }
+  return enabled;
+}
+
+export function getLastBackupAt(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem(LAST_BACKUP_STORAGE_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function recordLastBackupAt(iso = new Date().toISOString()): string {
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(LAST_BACKUP_STORAGE_KEY, iso);
+    } catch {
+      // Ignore storage write errors
+    }
+  }
+  return iso;
+}
+
 export function getStoredPasskeyId(): string {
   if (typeof window === 'undefined') return '';
   try {
@@ -381,6 +423,8 @@ export function clearDeviceSecurityPrefs(): void {
     window.localStorage.removeItem(AUTO_LOCK_STORAGE_KEY);
     window.localStorage.removeItem(PRIVACY_CURTAIN_STORAGE_KEY);
     window.localStorage.removeItem(PASSKEY_CRED_STORAGE_KEY);
+    window.localStorage.removeItem(SCRAMBLE_PIN_PAD_KEY);
+    window.localStorage.removeItem(LAST_BACKUP_STORAGE_KEY);
   } catch {
     // Ignore storage cleanup errors
   }

@@ -2,11 +2,12 @@
 
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertTriangle, Edit3, Minus, Package, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Edit3, Minus, Package, Plus, Search, Trash2, X } from 'lucide-react';
 import { formatINR } from '@/lib/i18n';
 import type { StockItem } from '@/lib/types';
 import { haptics } from '@/utils/haptics';
 import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
+import { SNAPPY_SPRING, calculateStaggerDelay } from './motion/SpatialMotionEngine';
 
 interface StockViewProps {
   items: StockItem[];
@@ -22,7 +23,7 @@ interface StockViewProps {
   onDeleteItem: (itemId: string) => Promise<void>;
 }
 
-const SEG_SPRING = { type: 'spring' as const, stiffness: 420, damping: 30 };
+const SEG_SPRING = SNAPPY_SPRING;
 
 export const StockView: React.FC<StockViewProps> = ({
   items,
@@ -92,7 +93,7 @@ export const StockView: React.FC<StockViewProps> = ({
   const handleSave = async () => {
     setErrorMsg('');
     if (!name.trim()) {
-      setErrorMsg('Please enter item name.');
+      setErrorMsg('Please enter an item name.');
       return;
     }
     setSaving(true);
@@ -144,30 +145,32 @@ export const StockView: React.FC<StockViewProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-32">
+    <div className="space-y-4 pb-8">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
-            Stock Management
+          <h2 className="font-display text-2xl font-extrabold tracking-tight text-[var(--ink)]">
+            Stock Inventory
           </h2>
-          <p className="text-xs text-[var(--ink-muted)] font-tabular">
+          <p className="text-xs font-medium text-[var(--ink-muted)] font-tabular mt-0.5">
             {items.length} products · {lowCount} low stock · {formatINR(totalRetailValue)}
           </p>
         </div>
 
-        <button
+        <motion.button
+          whileTap={prefersReducedMotion ? undefined : { scale: 0.95 }}
+          transition={SEG_SPRING}
           type="button"
           onClick={openAddModal}
-          className="min-h-[44px] px-3.5 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 tactile-key-primary active:scale-95 transition"
+          className="min-h-[44px] px-4 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 tactile-key-primary transition"
         >
           <Plus className="w-4 h-4" />
           <span>Add Item</span>
-        </button>
+        </motion.button>
       </div>
 
-      {/* Spring Filter Tabs + Search */}
+      {/* Unified Pill Filter Tabs + Search */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-        <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 sm:w-[270px] shrink-0">
+        <div className="relative grid grid-cols-2 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] p-1 sm:w-[270px] shrink-0">
           {(
             [
               { id: 'all', label: `All (${items.length})` },
@@ -183,11 +186,11 @@ export const StockView: React.FC<StockViewProps> = ({
                   haptics.tap();
                   setStockFilter(tab.id);
                 }}
-                className={`relative z-10 min-h-[38px] px-3 rounded-xl text-xs font-extrabold transition-colors ${
+                className={`relative z-10 min-h-[40px] px-3 rounded-full text-xs font-semibold transition-colors ${
                   active
-                    ? tab.id === 'low'
+                    ? tab.id === 'low' && lowCount > 0
                       ? 'text-[var(--alert-amber)]'
-                      : 'text-[var(--brand-accent)]'
+                      : 'text-[var(--ink)]'
                     : 'text-[var(--ink-muted)]'
                 }`}
               >
@@ -195,7 +198,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   <motion.span
                     layoutId={prefersReducedMotion ? undefined : 'stockFilterSeg'}
                     transition={SEG_SPRING}
-                    className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
+                    className="absolute inset-0 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--glass-border)]"
                   />
                 )}
                 <span className="relative z-10">{tab.label}</span>
@@ -204,13 +207,16 @@ export const StockView: React.FC<StockViewProps> = ({
           })}
         </div>
 
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search inventory item..."
-          className="flex-1 min-h-[46px] rounded-2xl ios27-inset-group px-4 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)] transition"
-        />
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-[var(--ink-muted)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search inventory items..."
+            className="w-full min-h-[44px] rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] pl-10 pr-4 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)] transition"
+          />
+        </div>
       </div>
 
       {errorMsg && !modalOpen && (
@@ -223,7 +229,7 @@ export const StockView: React.FC<StockViewProps> = ({
             type="button"
             onClick={() => setErrorMsg('')}
             aria-label="Dismiss error"
-            className="min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center"
+            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center"
           >
             <X className="w-4 h-4" />
           </button>
@@ -231,30 +237,30 @@ export const StockView: React.FC<StockViewProps> = ({
       )}
 
       {filtered.length === 0 ? (
-        <div className="rounded-[28px] ios27-inset-group p-8 text-center space-y-3">
-          <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
-            <Package className="w-7 h-7" />
+        <div className="rounded-[22px] ios27-inset-group p-8 text-center space-y-3">
+          <div className="mx-auto w-12 h-12 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center">
+            <Package className="w-5 h-5" />
           </div>
           <p className="font-display text-base font-bold text-[var(--ink)]">
             {stockFilter === 'low'
-              ? 'All items are comfortably stocked!'
-              : 'Manage your shop inventory & get low-stock alerts'}
+              ? 'All items are comfortably stocked'
+              : 'Manage shop inventory and low-stock alerts'}
           </p>
           {stockFilter !== 'low' && (
             <button
               type="button"
               onClick={openAddModal}
-              className="min-h-[46px] px-5 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold inline-flex items-center gap-1.5 tactile-key-primary active:scale-95 transition"
+              className="min-h-[44px] px-5 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-semibold inline-flex items-center gap-1.5 tactile-key-primary active:scale-95 transition"
             >
               <Plus className="w-4 h-4" />
-              <span>Add New Item</span>
+              <span>Add First Item</span>
             </button>
           )}
         </div>
       ) : (
-        <div className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
+        <div className="ios27-inset-group rounded-[22px] divide-y divide-[var(--glass-border)] overflow-hidden">
           <AnimatePresence mode="popLayout">
-            {filtered.map((item) => {
+            {filtered.map((item, idx) => {
               const isLow = item.quantity <= item.lowStockThreshold;
               const armed = armedDeleteId === item.id;
               return (
@@ -263,20 +269,20 @@ export const StockView: React.FC<StockViewProps> = ({
                   layout={!prefersReducedMotion}
                   initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className="px-4 py-3.5 flex items-center justify-between gap-2.5"
+                  exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                  transition={{ ...SEG_SPRING, delay: calculateStaggerDelay(idx) }}
+                  className="px-4 py-3.5 min-h-[64px] flex items-center justify-between gap-2.5 hover:bg-[var(--surface-subtle)]/50 transition-colors will-change-transform"
                 >
                   <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="font-extrabold text-sm text-[var(--ink)] leading-snug truncate">
+                    <p className="font-semibold text-sm text-[var(--ink)] leading-snug truncate">
                       {item.name}
                     </p>
-                    <p className="text-xs font-tabular font-semibold text-[var(--ink-muted)]">
+                    <p className="text-xs font-tabular font-medium text-[var(--ink-muted)]">
                       Sale: {formatINR(item.salePrice)} / {item.unit}
                       {item.purchasePrice ? ` · Cost: ${formatINR(item.purchasePrice)}` : ''}
                     </p>
                     {isLow && (
-                      <p className="text-[11px] font-bold text-[var(--alert-amber)] inline-flex items-center gap-1">
+                      <p className="text-[11px] font-semibold text-[var(--alert-amber)] inline-flex items-center gap-1">
                         <AlertTriangle className="w-3.5 h-3.5" />
                         <span>{item.quantity === 0 ? 'Out of Stock' : 'Low Stock'}</span>
                       </p>
@@ -284,30 +290,32 @@ export const StockView: React.FC<StockViewProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleAdjustQty(item, -1)}
-                      aria-label={`Decrease stock for ${item.name}`}
-                      className="w-10 h-10 rounded-xl bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <span className="min-w-[44px] text-center font-extrabold font-tabular text-xs text-[var(--ink)]">
-                      {item.quantity} {item.unit}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleAdjustQty(item, 1)}
-                      aria-label={`Increase stock for ${item.name}`}
-                      className="w-10 h-10 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center active:scale-95 transition"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
+                    <div className="inline-flex items-center rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleAdjustQty(item, -1)}
+                        aria-label={`Decrease stock for ${item.name}`}
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface)] active:scale-90 transition"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="min-w-[44px] px-1 text-center font-semibold font-tabular text-xs text-[var(--ink)]">
+                        {item.quantity} {item.unit}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleAdjustQty(item, 1)}
+                        aria-label={`Increase stock for ${item.name}`}
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface)] active:scale-90 transition"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     <button
                       type="button"
                       onClick={() => openEditModal(item)}
                       aria-label={`Edit ${item.name}`}
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--brand-accent)] hover:bg-[var(--brand-tint)] active:scale-95 transition"
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
@@ -318,7 +326,7 @@ export const StockView: React.FC<StockViewProps> = ({
                         else setArmedDeleteId(item.id);
                       }}
                       aria-label={`Delete ${item.name}`}
-                      className={`min-w-[40px] min-h-[40px] px-2 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
+                      className={`min-w-[40px] min-h-[40px] px-2 rounded-full text-xs font-semibold flex items-center justify-center active:scale-95 transition ${
                         armed
                           ? 'bg-[var(--credit-red)] text-white shadow-sm'
                           : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
@@ -354,8 +362,8 @@ export const StockView: React.FC<StockViewProps> = ({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Toor Dal - 1 kg"
-                className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                placeholder="Lentils - 1 kg"
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
               />
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -369,7 +377,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   value={salePrice}
                   onChange={(e) => setSalePrice(e.target.value)}
                   placeholder="165"
-                  className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 />
               </div>
               <div>
@@ -382,7 +390,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   value={purchasePrice}
                   onChange={(e) => setPurchasePrice(e.target.value)}
                   placeholder="Opt."
-                  className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 />
               </div>
               <div>
@@ -392,7 +400,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
                   placeholder="kg"
-                  className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 />
               </div>
             </div>
@@ -407,7 +415,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   placeholder="25"
-                  className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 />
               </div>
               <div>
@@ -419,7 +427,7 @@ export const StockView: React.FC<StockViewProps> = ({
                   min="0"
                   value={lowStockThreshold}
                   onChange={(e) => setLowStockThreshold(e.target.value)}
-                  className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                  className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 />
               </div>
             </div>
@@ -431,7 +439,7 @@ export const StockView: React.FC<StockViewProps> = ({
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold tactile-key-primary disabled:opacity-60 active:scale-95 transition"
+            className="w-full min-h-[48px] rounded-full bg-[var(--brand)] text-[var(--brand-fg)] font-semibold tactile-key-primary disabled:opacity-60 active:scale-95 transition"
           >
             {saving ? 'Saving...' : editingItemId ? 'Update Stock Item' : 'Save Stock Item'}
           </button>

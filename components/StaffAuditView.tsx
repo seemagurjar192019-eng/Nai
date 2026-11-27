@@ -16,7 +16,6 @@ import {
 import {
   formatDateTime,
   formatINR,
-  getAvatarColor,
   hashPinForUid,
   isValidIndianMobile,
   verifyStoredPin,
@@ -30,6 +29,7 @@ import type {
 } from '@/lib/types';
 import { haptics } from '@/utils/haptics';
 import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
+import { SNAPPY_SPRING } from './motion/SpatialMotionEngine';
 
 interface StaffAuditViewProps {
   uid: string;
@@ -49,7 +49,7 @@ interface StaffAuditViewProps {
   onBack?: () => void;
 }
 
-const SEG_SPRING = { type: 'spring' as const, stiffness: 420, damping: 30 };
+const SEG_SPRING = SNAPPY_SPRING;
 
 export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
   uid,
@@ -122,7 +122,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
   const handleSaveStaff = async () => {
     setFormError('');
     if (!name.trim()) {
-      setFormError('Enter staff or munim name.');
+      setFormError('Enter staff member name.');
       return;
     }
     if (phone && !isValidIndianMobile(phone)) {
@@ -187,7 +187,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-32">
+    <div className="space-y-4 pb-16">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           {onBack && (
@@ -195,17 +195,17 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
               type="button"
               onClick={onBack}
               aria-label="Back to Ledger"
-              className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card flex items-center justify-center active:scale-95 transition shrink-0"
+              className="min-w-[44px] min-h-[44px] rounded-full liquid-glass flex items-center justify-center active:scale-95 transition shrink-0"
             >
               <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
             </button>
           )}
           <div className="min-w-0">
-            <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
-              Staff &amp; Counter Logs
+            <h2 className="font-display text-2xl font-extrabold tracking-tight text-[var(--ink)]">
+              Staff &amp; Activity Logs
             </h2>
-            <p className="text-xs text-[var(--ink-muted)] leading-snug">
-              Multi-operator accountability stamped automatically
+            <p className="text-xs font-medium text-[var(--ink-muted)] leading-snug">
+              Operator accountability stamped on every record
             </p>
           </div>
         </div>
@@ -213,7 +213,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
         <button
           type="button"
           onClick={openCreateStaff}
-          className="min-h-[44px] px-3.5 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 tactile-key-primary active:scale-95 transition"
+          className="min-h-[44px] px-4 rounded-full bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 tactile-key-primary active:scale-95 transition"
         >
           <Plus className="w-4 h-4" />
           <span>Add Staff</span>
@@ -226,30 +226,30 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
         <section className="lg:col-span-5 space-y-2">
           <div className="flex items-center justify-between gap-2 px-1">
             <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)] flex items-center gap-1.5">
-              <UserCheck className="w-4 h-4 text-[var(--brand-accent)]" />
+              <UserCheck className="w-4 h-4 text-[var(--ink)]" />
               <span>Active Operator</span>
             </p>
-            <span className="text-xs font-extrabold text-[var(--brand-accent)]">
-              {activeOperator.name} ({activeOperator.role})
+            <span className="text-xs font-semibold text-[var(--ink)]">
+              {activeOperator.name} ({activeOperator.role === 'munim' ? 'manager' : activeOperator.role})
             </span>
           </div>
 
-          <div className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
+          <div className="ios27-inset-group rounded-[22px] divide-y divide-[var(--glass-border)] overflow-hidden">
             <button
               type="button"
               onClick={() => handleSelectOperator(null)}
               className={`w-full px-4 py-3.5 flex items-center justify-between gap-2 text-left transition-colors ${
-                activeOperator.staffId === 'owner' ? 'bg-[var(--brand-tint)]/45' : ''
+                activeOperator.staffId === 'owner' ? 'bg-[var(--surface-subtle)]' : ''
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="w-10 h-10 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center shrink-0">
+                <span className="w-10 h-10 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] font-semibold text-sm flex items-center justify-center shrink-0">
                   O
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-extrabold text-[var(--ink)]">Shop Owner</p>
+                  <p className="text-sm font-semibold text-[var(--ink)]">Shop Owner</p>
                   <p className="text-[11px] font-medium text-[var(--ink-muted)]">
-                    owner · Full access
+                    Owner · Full access
                   </p>
                 </div>
               </div>
@@ -268,8 +268,9 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                     layout={!prefersReducedMotion}
                     initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                    className={`px-4 py-3.5 flex items-center justify-between gap-2 transition ${
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                    transition={SEG_SPRING}
+                    className={`px-4 py-3.5 min-h-[68px] flex items-center justify-between gap-2 transition will-change-transform ${
                       isSelected ? 'bg-[var(--brand-tint)]/45' : ''
                     } ${!stf.active ? 'opacity-55' : ''}`}
                   >
@@ -278,21 +279,18 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                       onClick={() => handleSelectOperator(stf)}
                       className="flex items-center gap-3 min-w-0 flex-1 text-left active:scale-95 transition"
                     >
-                      <div
-                        style={{ backgroundColor: getAvatarColor(stf.name) }}
-                        className="w-10 h-10 rounded-xl text-white font-extrabold text-sm flex items-center justify-center shrink-0"
-                      >
+                      <div className="w-10 h-10 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] font-semibold text-sm flex items-center justify-center shrink-0">
                         {stf.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-extrabold text-[var(--ink)] flex items-center gap-1">
+                        <p className="text-sm font-semibold text-[var(--ink)] flex items-center gap-1">
                           <span className="truncate">{stf.name}</span>
                           {stf.pinHash && (
                             <KeyRound className="w-3 h-3 text-[var(--ink-muted)] shrink-0" />
                           )}
                         </p>
-                        <p className="text-[11px] font-medium text-[var(--ink-muted)]">
-                          {stf.role}
+                        <p className="text-[11px] font-medium text-[var(--ink-muted)] capitalize">
+                          {stf.role === 'munim' ? 'Manager' : stf.role}
                           {!stf.active ? ' · Paused' : ''}
                         </p>
                       </div>
@@ -302,7 +300,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                       <button
                         type="button"
                         onClick={() => openEditStaff(stf)}
-                        className="min-h-[40px] px-3 rounded-xl text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--brand-accent)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+                        className="min-h-[44px] px-3 rounded-full text-xs font-semibold text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
                       >
                         Edit
                       </button>
@@ -318,7 +316,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                           }
                         }}
                         aria-label={`Remove ${stf.name}`}
-                        className={`min-w-[40px] min-h-[40px] px-2.5 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
+                        className={`min-w-[44px] min-h-[44px] px-2.5 rounded-full text-xs font-semibold flex items-center justify-center active:scale-95 transition ${
                           armed
                             ? 'bg-[var(--credit-red)] text-white shadow-sm'
                             : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
@@ -335,10 +333,10 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
         </section>
 
         {/* Immutable Audit Timeline */}
-        <section className="lg:col-span-7 ios27-inset-group rounded-[26px] p-4 space-y-3">
+        <section className="lg:col-span-7 ios27-inset-group rounded-[22px] p-4 space-y-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <h3 className="font-display text-sm font-extrabold flex items-center gap-2 text-[var(--ink)]">
-              <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
+              <span className="w-8 h-8 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center">
                 <History className="w-4 h-4" />
               </span>
               <span className="font-tabular">Audit Trail ({filteredLogs.length})</span>
@@ -348,7 +346,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
               aria-label="Filter logs by staff"
               value={actorFilter}
               onChange={(e) => setActorFilter(e.target.value)}
-              className="min-h-[38px] rounded-xl bg-[var(--surface-subtle)] px-3 text-xs font-bold text-[var(--ink)] outline-none"
+              className="min-h-[40px] rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-xs font-semibold text-[var(--ink)] outline-none"
             >
               <option value="all">All Operators</option>
               {actorOptions.map((nameOpt) => (
@@ -359,13 +357,13 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
             </select>
           </div>
 
-          <div className="relative grid grid-cols-6 rounded-2xl bg-[var(--surface-subtle)] p-1">
+          <div className="relative grid grid-cols-6 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] p-1">
             {(
               [
                 { id: 'all', label: 'All' },
-                { id: 'ledger', label: 'Khata' },
+                { id: 'ledger', label: 'Ledger' },
                 { id: 'bill', label: 'Bills' },
-                { id: 'galla', label: 'Galla' },
+                { id: 'galla', label: 'Cash' },
                 { id: 'stock', label: 'Stock' },
                 { id: 'staff', label: 'Staff' },
               ] as const
@@ -375,8 +373,11 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                 <button
                   key={f.id}
                   type="button"
-                  onClick={() => setActionFilter(f.id)}
-                  className={`relative min-h-[36px] px-1 rounded-xl text-[11px] font-extrabold z-10 transition-colors ${
+                  onClick={() => {
+                    haptics.tap();
+                    setActionFilter(f.id);
+                  }}
+                  className={`relative min-h-[38px] px-1 rounded-full text-[11px] font-semibold z-10 transition-colors ${
                     active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
                   }`}
                 >
@@ -384,7 +385,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                     <motion.span
                       layoutId={prefersReducedMotion ? undefined : 'auditFilterSeg'}
                       transition={SEG_SPRING}
-                      className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
+                      className="absolute inset-0 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--glass-border)]"
                     />
                   )}
                   <span className="relative z-10">{f.label}</span>
@@ -395,28 +396,28 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
 
           {filteredLogs.length === 0 ? (
             <div className="py-8 text-center space-y-2">
-              <div className="mx-auto w-12 h-12 rounded-2xl bg-[var(--surface-subtle)] text-[var(--ink-muted)] flex items-center justify-center">
-                <Users className="w-6 h-6" />
+              <div className="mx-auto w-12 h-12 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink-muted)] flex items-center justify-center">
+                <Users className="w-5 h-5" />
               </div>
               <p className="text-sm font-bold text-[var(--ink)]">
-                No counter activity logs recorded yet.
+                No activity logs recorded yet
               </p>
               <p className="text-xs text-[var(--ink-muted)]">
-                Add a khata entry, GST bill, stock change, or switch operator to create an audit
-                trail.
+                Add a ledger entry, bill, stock change, or switch operator to create an audit trail.
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-[var(--surface-border)]">
+            <div className="divide-y divide-[var(--glass-border)]">
               {filteredLogs.map((log) => (
                 <div
                   key={log.id}
                   className="py-3 flex items-center justify-between gap-3 text-xs"
                 >
                   <div className="min-w-0 space-y-0.5">
-                    <p className="font-bold text-[var(--ink)] leading-snug">{log.summary}</p>
+                    <p className="font-semibold text-[var(--ink)] leading-snug">{log.summary}</p>
                     <p className="text-[11px] text-[var(--ink-muted)] leading-snug">
-                      {log.actorName} · {log.actorRole} · {log.actionType.toUpperCase()}
+                      {log.actorName} · {log.actorRole === 'munim' ? 'Manager' : log.actorRole} ·{' '}
+                      {log.actionType.toUpperCase()}
                       {log.targetName ? ` · ${log.targetName}` : ''}
                       {typeof log.createdAt === 'string'
                         ? ` · ${formatDateTime(log.createdAt)}`
@@ -424,7 +425,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                     </p>
                   </div>
                   {typeof log.amount === 'number' && log.amount > 0 && (
-                    <span className="font-extrabold font-tabular text-sm text-[var(--brand-accent)] shrink-0">
+                    <span className="font-semibold font-tabular text-sm text-[var(--ink)] shrink-0">
                       {formatINR(log.amount)}
                     </span>
                   )}
@@ -441,8 +442,8 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
         onClose={() => {
           if (!saving) setShowAddStaff(false);
         }}
-        title={editingStaff ? `Edit ${editingStaff.name}` : 'Add Counter Staff'}
-        subtitle="Counter role & optional 4-digit PIN"
+        title={editingStaff ? `Edit ${editingStaff.name}` : 'Add Team Member'}
+        subtitle="Role & optional 4-digit PIN"
         initialDetent="peek"
       >
         <div className="space-y-4">
@@ -456,25 +457,31 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ramesh Kumar"
-                className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
               />
             </div>
 
             <div>
               <span className="block text-xs font-bold text-[var(--ink-muted)] mb-1">Role</span>
               <div className="grid grid-cols-3 gap-2">
-                {(['munim', 'cashier', 'owner'] as const).map((r) => (
+                {(
+                  [
+                    { id: 'munim', label: 'Manager' },
+                    { id: 'cashier', label: 'Cashier' },
+                    { id: 'owner', label: 'Owner' },
+                  ] as const
+                ).map((r) => (
                   <button
-                    key={r}
+                    key={r.id}
                     type="button"
-                    onClick={() => setRole(r)}
-                    className={`min-h-[44px] rounded-xl text-xs font-extrabold capitalize active:scale-95 transition ${
-                      role === r
-                        ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]'
-                        : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
+                    onClick={() => setRole(r.id)}
+                    className={`min-h-[44px] rounded-full text-xs font-semibold active:scale-95 transition border ${
+                      role === r.id
+                        ? 'bg-[var(--brand)] text-[var(--brand-fg)] border-transparent'
+                        : 'bg-[var(--surface-subtle)] border-[var(--glass-border)] text-[var(--ink)]'
                     }`}
                   >
-                    {r}
+                    {r.label}
                   </button>
                 ))}
               </div>
@@ -490,7 +497,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 placeholder="9876543210"
-                className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
               />
             </div>
 
@@ -505,7 +512,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 placeholder={editingStaff?.pinHash ? 'Enter 4 digits to update PIN' : 'e.g. 4321'}
-                className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
               />
             </div>
           </div>
@@ -516,7 +523,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
             type="button"
             disabled={saving}
             onClick={handleSaveStaff}
-            className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
+            className="w-full min-h-[48px] rounded-full bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
           >
             {saving ? 'Saving...' : editingStaff ? 'Update Staff' : 'Save Staff Member'}
           </button>
@@ -533,7 +540,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
         allowDetentToggle={false}
       >
         <div className="space-y-4 text-center">
-          <div className="mx-auto w-12 h-12 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
+          <div className="mx-auto w-12 h-12 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center">
             <ShieldCheck className="w-6 h-6" />
           </div>
           <input
@@ -543,7 +550,7 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
             value={switchPinInput}
             onChange={(e) => setSwitchPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
             placeholder="••••"
-            className="w-full min-h-[50px] rounded-2xl bg-[var(--surface-subtle)] px-4 text-center text-xl sm:text-2xl font-extrabold font-tabular tracking-wider sm:tracking-[0.3em] text-[var(--ink)] outline-none whitespace-nowrap overflow-hidden text-ellipsis"
+            className="w-full min-h-[50px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-4 text-center text-xl sm:text-2xl font-extrabold font-tabular tracking-wider sm:tracking-[0.3em] text-[var(--ink)] outline-none whitespace-nowrap overflow-hidden text-ellipsis"
           />
           {switchPinError && (
             <p className="text-xs font-bold text-[var(--credit-red)]">{switchPinError}</p>
@@ -552,14 +559,14 @@ export const StaffAuditView: React.FC<StaffAuditViewProps> = ({
             <button
               type="button"
               onClick={handleVerifySwitchPin}
-              className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold tactile-key-primary active:scale-95 transition"
+              className="min-h-[46px] rounded-full bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold tactile-key-primary active:scale-95 transition"
             >
               Switch Counter
             </button>
             <button
               type="button"
               onClick={() => setPendingSwitch(null)}
-              className="min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)] active:scale-95 transition"
+              className="min-h-[46px] rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-xs font-bold text-[var(--ink)] active:scale-95 transition"
             >
               Cancel
             </button>

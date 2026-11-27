@@ -17,17 +17,16 @@ import {
   Delete,
   Filter,
   Mic,
+  Plus,
   Repeat,
+  ShieldCheck,
   UserPlus,
-  Volume2,
   Wallet,
   X,
 } from 'lucide-react';
 import {
   formatDateTime,
   formatINR,
-  formatINRCompact,
-  getAvatarColor,
   getLocalDateKey,
   getUIStrings,
   isValidIndianMobile,
@@ -41,14 +40,14 @@ import {
 import {
   applyKeypadKey,
   computeNetCashflowSummary,
-  getTopDuePartiesToday,
+  computeWeeklyCashVelocity,
+  filterAndSuggestAccounts,
   type KeypadKey,
 } from '@/lib/ucred-intelligence';
 import type {
   AccountKind,
   CashbookEntry,
   CashbookMode,
-  CustomerTrustScore,
   DailyGallaPulse,
   LanguageCode,
   LedgerAccount,
@@ -61,12 +60,14 @@ import type {
 import { haptics } from '@/utils/haptics';
 import { OdometerNumber } from '../motion/OdometerNumber';
 import { DetentSheetOverlay } from '../motion/DetentSheetOverlay';
-import { WalletCardStack, type WalletSegment } from '../motion/WalletCardStack';
+import { HeroBalanceCard } from '../motion/HeroBalanceCard';
+import { SNAPPY_SPRING, SPATIAL_SPRING } from '../motion/SpatialMotionEngine';
 import { SmartEntrySavedStage } from '../SmartEntrySavedStage';
-import { PartyLedgerCard, TrustAvatarRing } from '../ledger/PartyLedgerCard';
+import { PartyLedgerCard } from '../ledger/PartyLedgerCard';
 import { MandiAadatHelper } from './MandiAadatHelper';
+import { NoticeBoardBanner } from './NoticeBoardBanner';
 
-export type CashKhataSegment = WalletSegment;
+export type CashKhataSegment = 'customer' | 'supplier' | 'galla';
 
 export interface CashKhataFeedProps {
   accounts: LedgerAccount[];
@@ -76,7 +77,6 @@ export interface CashKhataFeedProps {
   language: LanguageCode;
   searchQuery: string;
   gallaPulse: DailyGallaPulse;
-  trustScoresByAccount: Record<string, CustomerTrustScore>;
   selectedAccountId?: string | null;
   recentlyUpdatedAccountId?: string | null;
   hideBalance: boolean;
@@ -134,19 +134,17 @@ const FILTER_OPTIONS: Array<{ id: LedgerFilterChip; label: string }> = [
   { id: 'pending-due', label: 'Pending Due' },
   { id: 'upcoming-due', label: 'Upcoming Due' },
   { id: 'defaulters', label: 'Overdue Parties' },
-  { id: 'high-risk', label: 'High Trust Risk (<50)' },
 ];
 
 const SORT_OPTIONS: Array<{ id: SortByOption; label: string }> = [
   { id: 'recommended', label: 'Recommended' },
-  { id: 'recovery-priority', label: 'Recovery Priority (Smart)' },
   { id: 'latest-activity', label: 'Latest Activity' },
   { id: 'due-amount', label: 'Due Amount (Highest First)' },
   { id: 'last-payment', label: 'Last Payment' },
 ];
 
-const SPRING_FAST = { type: 'spring' as const, stiffness: 480, damping: 26 };
-const SPRING_SHEET = { type: 'spring' as const, stiffness: 360, damping: 32 };
+const SPRING_FAST = SNAPPY_SPRING;
+const SPRING_SHEET = SPATIAL_SPRING;
 const KEYPAD_KEYS: KeypadKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'backspace'];
 
 /**
@@ -156,12 +154,11 @@ const KEYPAD_KEYS: KeypadKey[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '
  */
 export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   accounts,
-  transactions,
+  transactions = [],
   cashbookEntries = [],
   language,
   searchQuery,
   gallaPulse,
-  trustScoresByAccount,
   selectedAccountId,
   recentlyUpdatedAccountId,
   hideBalance,
@@ -171,9 +168,6 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   heroOpacity,
   heroScale,
   heroY,
-  largeTitleOpacity,
-  largeTitleScale,
-  largeTitleY,
   jellySkew,
   addPartySignal = 0,
   onToggleHideBalance,
@@ -184,7 +178,6 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   onSwipeRemind,
   onOpenCollection,
   onOpenVoiceEntry,
-  onInlineQuickAdd,
   onOpenCounterMode,
   onOpenParchiScanner,
   onOpenGalla,
@@ -201,12 +194,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   );
   const prefersReducedMotion = useReducedMotion();
   const fallbackSkew = useMotionValue(0);
-  const fallbackOne = useMotionValue(1);
-  const fallbackZero = useMotionValue(0);
   const activeJellySkew = jellySkew || fallbackSkew;
-  const activeTitleOpacity = largeTitleOpacity || fallbackOne;
-  const activeTitleScale = largeTitleScale || fallbackOne;
-  const activeTitleY = largeTitleY || fallbackZero;
 
   const [rawSegment, setRawSegment] = useState<CashKhataSegment>('customer');
   const [rawFilterChip, setRawFilterChip] = useState<LedgerFilterChip>('customer');
@@ -215,6 +203,14 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   const [showQuickMenuSheet, setShowQuickMenuSheet] = useState(false);
   const [activeHoverIdx, setActiveHoverIdx] = useState<number | null>(null);
   const [visibleCount, setVisibleCount] = useState(60);
+  const [dismissedNoticeKey, setDismissedNoticeKey] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return window.sessionStorage.getItem('ucred_dismissed_notice') || null;
+    } catch {
+      return null;
+    }
+  });
 
   // Sanitize active segment/filter whenever persona gates off Suppliers or Galla
   const segment: CashKhataSegment =
@@ -252,63 +248,6 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
     amount: number;
     direction: TxDirection;
   } | null>(null);
-
-  const recentTransactions = useMemo(() => {
-    return [...transactions]
-      .sort((a, b) => (b.billDate || '').localeCompare(a.billDate || ''))
-      .slice(0, 4);
-  }, [transactions]);
-
-  // Empty-state Instant Inline Quick Add state (zero demo button, Fitts's Law muscle memory)
-  const [inlineName, setInlineName] = useState('');
-  const [inlineAmount, setInlineAmount] = useState('');
-  const [inlineNote, setInlineNote] = useState('');
-  const [inlineBusy, setInlineBusy] = useState(false);
-  const [inlineError, setInlineError] = useState('');
-
-  const handleInlineSubmit = async (dir: TxDirection) => {
-    setInlineError('');
-    const cleanName = inlineName.trim();
-    const numericAmount = Math.round((Number(inlineAmount) || 0) * 100) / 100;
-    if (!cleanName) {
-      setInlineError(
-        capabilities.focus === 'personal' ? 'Enter contact name.' : 'Enter party or customer name.'
-      );
-      return;
-    }
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      setInlineError('Enter an amount greater than ₹0.');
-      return;
-    }
-    setInlineBusy(true);
-    try {
-      const targetKind: AccountKind =
-        capabilities.showSuppliers && segment === 'supplier' ? 'supplier' : 'customer';
-      if (onInlineQuickAdd) {
-        await onInlineQuickAdd({
-          customerName: cleanName,
-          direction: dir,
-          amount: numericAmount,
-          kind: targetKind,
-          note: inlineNote.trim() || undefined,
-        });
-      } else {
-        await onCreateAccount({
-          kind: targetKind,
-          name: cleanName,
-          phone: '',
-          dueDate: '',
-        });
-      }
-      setInlineName('');
-      setInlineAmount('');
-      setInlineNote('');
-    } catch (err) {
-      setInlineError(err instanceof Error ? err.message : 'Could not save entry.');
-    } finally {
-      setInlineBusy(false);
-    }
-  };
 
   const segmentRef = useRef<CashKhataSegment>(segment);
   const todayStr = getLocalDateKey();
@@ -355,20 +294,26 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
 
   const cashflow = useMemo(() => computeNetCashflowSummary(accounts), [accounts]);
 
-  const topDueParties = useMemo(
-    () => getTopDuePartiesToday(accounts, trustScoresByAccount, todayStr, 3),
-    [accounts, trustScoresByAccount, todayStr]
-  );
+  const { overdueCount, overdueTotal } = useMemo(() => {
+    const dueList = accounts.filter(
+      (a) => a.kind === 'customer' && a.balance > 0 && a.dueDate !== '' && a.dueDate <= todayStr
+    );
+    return {
+      overdueCount: dueList.length,
+      overdueTotal: dueList.reduce((sum, a) => sum + a.balance, 0),
+    };
+  }, [accounts, todayStr]);
 
-  const overdueCount = useMemo(
-    () =>
-      accounts.filter(
-        (a) => a.kind === 'customer' && a.balance > 0 && a.dueDate !== '' && a.dueDate <= todayStr
-      ).length,
-    [accounts, todayStr]
-  );
+  const handleDismissNotice = (key: string) => {
+    setDismissedNoticeKey(key);
+    try {
+      window.sessionStorage.setItem('ucred_dismissed_notice', key);
+    } catch {
+      // Ignore storage error
+    }
+  };
 
-  const filteredAccounts = useMemo(() => {
+  const { filteredAccounts, isFuzzySuggestion } = useMemo(() => {
     let list = [...accounts];
 
     if (filterChip === 'customer') {
@@ -383,33 +328,45 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
       list = list.filter((a) => a.balance > 0 && a.dueDate > todayStr);
     } else if (filterChip === 'defaulters') {
       list = list.filter((a) => a.balance > 0 && a.dueDate !== '' && a.dueDate < todayStr);
-    } else if (filterChip === 'high-risk') {
-      list = list.filter(
-        (a) => a.balance > 0 && (trustScoresByAccount[a.id]?.score ?? 100) < 50
-      );
     }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(
-        (a) => a.name.toLowerCase().includes(q) || a.phone.toLowerCase().includes(q)
-      );
+    const searchRes = filterAndSuggestAccounts(list, searchQuery);
+    list = [...searchRes.matches];
+
+    if (!searchRes.isFuzzySuggestion) {
+      list.sort((a, b) => {
+        if (sortBy === 'due-amount') return b.balance - a.balance;
+        if (sortBy === 'last-payment') return (a.balance || 0) - (b.balance || 0);
+        if (sortBy === 'recommended') return Math.abs(b.balance) - Math.abs(a.balance);
+        return (b.lastActivityAt || '').localeCompare(a.lastActivityAt || '');
+      });
     }
 
-    list.sort((a, b) => {
-      if (sortBy === 'recovery-priority') {
-        const pa = trustScoresByAccount[a.id]?.priorityScore || 0;
-        const pb = trustScoresByAccount[b.id]?.priorityScore || 0;
-        return pb - pa;
-      }
-      if (sortBy === 'due-amount') return b.balance - a.balance;
-      if (sortBy === 'last-payment') return (a.balance || 0) - (b.balance || 0);
-      if (sortBy === 'recommended') return Math.abs(b.balance) - Math.abs(a.balance);
-      return (b.lastActivityAt || '').localeCompare(a.lastActivityAt || '');
-    });
+    return {
+      filteredAccounts: list,
+      isFuzzySuggestion: searchRes.isFuzzySuggestion,
+    };
+  }, [accounts, filterChip, searchQuery, sortBy, todayStr]);
 
-    return list;
-  }, [accounts, filterChip, searchQuery, sortBy, todayStr, trustScoresByAccount]);
+  const duplicateNameCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const acc of filteredAccounts) {
+      const key = acc.name.trim().toLowerCase();
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  }, [filteredAccounts]);
+
+  const duplicateNameMatches = useMemo(() => {
+    const q = newName.trim().toLowerCase();
+    if (!q) return [];
+    return accounts.filter((a) => a.name.trim().toLowerCase() === q);
+  }, [accounts, newName]);
+
+  const weeklyVelocity = useMemo(
+    () => computeWeeklyCashVelocity(transactions, todayStr),
+    [transactions, todayStr]
+  );
 
   const sortedCashbookEntries = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -426,7 +383,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   }, [cashbookEntries, searchQuery]);
 
   const handleSelectSegment = (nextSeg: CashKhataSegment) => {
-    haptics.tap();
+    haptics.select();
     if (nextSeg === 'supplier' && !capabilities.showSuppliers) return;
     if (nextSeg === 'galla' && !capabilities.showGalla) return;
     setRawSegment(nextSeg);
@@ -435,10 +392,10 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
     }
   };
 
-  const handleOpenAddModal = (kind: AccountKind) => {
+  const handleOpenAddModal = (kind: AccountKind, prefillName = '') => {
     haptics.tap();
     setNewKind(capabilities.showSuppliers ? kind : 'customer');
-    setNewName('');
+    setNewName(prefillName);
     setNewPhone('');
     setNewDueDate('');
     setNewCreditLimit('');
@@ -451,6 +408,22 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
     if (!newName.trim()) {
       setAddError('Enter party name first.');
       return;
+    }
+    const cleanPhone = newPhone.trim().replace(/\D/g, '');
+    if (cleanPhone && cleanPhone.length >= 6) {
+      const existing = accounts.find(
+        (a) => a.phone && a.phone.replace(/\D/g, '') === cleanPhone
+      );
+      if (existing) {
+        setAddError(`Party "${existing.name}" with this phone number already exists! Opening ledger.`);
+        haptics.tap();
+        setAddingBusy(false);
+        setTimeout(() => {
+          setShowAddModal(false);
+          onSelectAccount(existing);
+        }, 1000);
+        return;
+      }
     }
     if (newPhone && !isValidIndianMobile(newPhone)) {
       setAddError('Enter a valid 10-digit Indian mobile number.');
@@ -554,258 +527,151 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
     FILTER_OPTIONS.find((f) => f.id === filterChip)?.label || capabilities.primarySegmentLabel;
   const hasSecondaryFilter = filterChip !== 'customer' && filterChip !== 'supplier';
 
+  const addBtnLabel =
+    capabilities.showSuppliers && segment === 'supplier'
+      ? 'Add Supplier'
+      : capabilities.focus === 'personal'
+        ? 'Add Contact'
+        : 'Add Party';
+
   return (
-    <div className="pb-44">
-      <div className="space-y-4 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start lg:space-y-0">
-        {/* LEFT COLUMN (Mobile Full / Desktop 5-col Sticky Stage): Collapsing Title + 3D Wallet Stack + Control Center Matrix */}
-        <div className="space-y-3.5 lg:col-span-5 lg:sticky lg:top-2">
-          {/* 1. iOS 27 Collapsing Large Title Row */}
-          <motion.div
-            style={
-              prefersReducedMotion
-                ? undefined
-                : {
-                    opacity: activeTitleOpacity,
-                    scale: activeTitleScale,
-                    y: activeTitleY,
-                  }
-            }
-            className="flex items-end justify-between gap-2 px-0.5 origin-left will-change-transform"
-          >
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--ink-muted)]">
-                <span className="truncate">{activeAdaptation.focusBadge}</span>
-                {overdueCount > 0 && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptics.tap();
-                        onOpenCollection();
-                      }}
-                      className="text-[var(--credit-red)] font-extrabold hover:underline shrink-0"
-                    >
-                      {overdueCount} due
-                    </button>
-                  </>
-                )}
-              </div>
-              <h2 className="font-display text-[19px] sm:text-[25px] leading-tight font-extrabold tracking-tight text-[var(--ink)] whitespace-nowrap">
-                {capabilities.feedTitle}
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0 pb-0.5">
-              <motion.button
-                whileTap={{ scale: 0.94, rotate: -4, y: 1 }}
-                transition={SPRING_FAST}
-                type="button"
-                onClick={() => {
-                  haptics.tap();
-                  setShowFilterSortSheet(true);
-                }}
-                className={`min-h-[34px] px-3 rounded-full text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 ${
-                  hasSecondaryFilter || showAllModes || sortBy !== 'latest-activity'
-                    ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] border border-[var(--brand-accent)]/25'
-                    : 'ios27-ceramic-tile text-[var(--ink)]'
-                }`}
-              >
-                <Filter className="w-3.5 h-3.5" />
-                <span>{hasSecondaryFilter ? activeFilterLabel : 'Filter'}</span>
-              </motion.button>
-            </div>
-          </motion.div>
-
-          {/* 2. Flagship Interactive 3-Pass Apple Wallet Stack */}
-          <WalletCardStack
+    <div className="pb-44 pt-1">
+      <div className="space-y-3.5 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start lg:space-y-0">
+        {/* LEFT COLUMN (Mobile Top / Desktop 5-col Sticky): Apple Monochrome Balance Slab + Quick Counter Bar */}
+        <div className="space-y-3 lg:col-span-5 lg:sticky lg:top-2">
+          <HeroBalanceCard
             cashflow={cashflow}
-            gallaPulse={gallaPulse}
             partyCount={accounts.length}
-            overdueCount={overdueCount}
+            cashDrawerBalance={gallaPulse.cashDrawerBalance + gallaPulse.upiBankBalance}
+            todayInflow={gallaPulse.todayInflow}
+            todayOutflow={gallaPulse.todayOutflow}
+            weeklyVelocity={weeklyVelocity}
             hideBalance={hideBalance}
-            segment={segment}
-            hasSecondaryFilter={hasSecondaryFilter}
             capabilities={capabilities}
             personaAdaptation={activeAdaptation}
-            topDueParties={topDueParties}
             heroOpacity={heroOpacity}
             heroScale={heroScale}
             heroY={heroY}
             onToggleHideBalance={onToggleHideBalance}
-            onSelectSegment={handleSelectSegment}
             onOpenDailySummary={onOpenDailySummary}
-            onOpenCollection={onOpenCollection}
-            onOpenGalla={onOpenGalla}
-            onSelectAccount={onSelectAccount}
-            onQuickCollect={openQuickEntrySheet}
+            onSelectReceivable={() => handleSelectSegment('customer')}
+            onSelectPayable={() => {
+              if (capabilities.showSuppliers) handleSelectSegment('supplier');
+            }}
+            onSelectGalla={() => {
+              if (capabilities.showGalla) onOpenGalla();
+            }}
           />
 
-          {/* Master Plan 2.0: Income, Outstanding & Cash Summary Strip */}
-          <div className="grid grid-cols-3 gap-2 font-tabular" aria-label="Financial Summary">
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                if (capabilities.showGalla) onOpenGalla();
-              }}
-              className="ios27-ceramic-tile rounded-[20px] p-2.5 text-left active:scale-95 transition"
-            >
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)] truncate">
-                Available Cash
-              </p>
-              <p className="font-display text-sm sm:text-base font-extrabold text-[var(--ink)] font-tabular truncate mt-0.5 whitespace-nowrap">
-                {hideBalance ? '₹••••' : formatINRCompact(gallaPulse.cashDrawerBalance + gallaPulse.upiBankBalance)}
-              </p>
-              <p className="text-[9px] font-semibold text-[var(--debit-green)] truncate">
-                Drawer + UPI
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                handleSelectSegment('customer');
-              }}
-              className="ios27-ceramic-tile rounded-[20px] p-2.5 text-left active:scale-95 transition"
-            >
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--debit-green)] truncate">
-                To Collect
-              </p>
-              <p className="font-display text-sm sm:text-base font-extrabold text-[var(--debit-green)] font-tabular truncate mt-0.5 whitespace-nowrap">
-                {hideBalance ? '₹••••' : formatINRCompact(cashflow.totalReceivable)}
-              </p>
-              <p className="text-[9px] font-semibold text-[var(--ink-muted)] truncate">
-                {topDueParties.length} due
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                if (capabilities.showSuppliers) handleSelectSegment('supplier');
-              }}
-              className="ios27-ceramic-tile rounded-[20px] p-2.5 text-left active:scale-95 transition"
-            >
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--credit-red)] truncate">
-                To Pay
-              </p>
-              <p className="font-display text-sm sm:text-base font-extrabold text-[var(--credit-red)] font-tabular truncate mt-0.5 whitespace-nowrap">
-                {hideBalance ? '₹••••' : formatINRCompact(cashflow.totalPayable)}
-              </p>
-              <p className="text-[9px] font-semibold text-[var(--ink-muted)] truncate">
-                Suppliers
-              </p>
-            </button>
-          </div>
-
-          {/* 3. Compact 4-Column iOS Quick Action Bar */}
-          <div className="grid grid-cols-4 gap-2" aria-label="Quick Actions">
+          {/* Compact 3-Action Monochrome Counter Strip */}
+          <div className="grid grid-cols-3 gap-2">
             <motion.button
-              whileTap={{ scale: 0.94, y: 1 }}
-              transition={SPRING_FAST}
-              type="button"
-              onClick={() =>
-                handleOpenAddModal(
-                  capabilities.showSuppliers && segment === 'supplier' ? 'supplier' : 'customer'
-                )
-              }
-              className="ios27-ceramic-tile rounded-[20px] px-2 py-2.5 flex flex-col items-center justify-center gap-1.5"
-            >
-              <span className="w-9 h-9 rounded-[12px] bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                <UserPlus className="w-4 h-4 stroke-[2.3]" />
-              </span>
-              <span className="text-[11px] font-extrabold text-[var(--ink)] truncate max-w-full">
-                {capabilities.focus === 'personal' ? 'Contact' : 'New Party'}
-              </span>
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.94, y: 1 }}
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
               transition={SPRING_FAST}
               type="button"
               onClick={() => {
-                haptics.orbTap();
-                onOpenVoiceEntry();
+                haptics.tap();
+                setShowQuickMenuSheet(true);
               }}
-              className="ios27-ceramic-tile rounded-[20px] px-2 py-2.5 flex flex-col items-center justify-center gap-1.5"
+              className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
             >
-              <span className="w-9 h-9 rounded-[12px] bg-[var(--brand)] text-white flex items-center justify-center shrink-0">
-                <Mic className="w-4 h-4 stroke-[2.3]" />
-              </span>
-              <span className="text-[11px] font-extrabold text-[var(--ink)] truncate max-w-full">
-                Voice
-              </span>
+              <Plus className="w-3.5 h-3.5 stroke-[2.2] shrink-0" />
+              <span className="truncate">Quick Entry</span>
             </motion.button>
 
             {capabilities.focus !== 'personal' ? (
               <motion.button
-                whileTap={{ scale: 0.94, y: 1 }}
+                whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
                 transition={SPRING_FAST}
                 type="button"
                 onClick={() => {
                   haptics.tap();
                   onOpenParchiScanner();
                 }}
-                className="ios27-ceramic-tile rounded-[20px] px-2 py-2.5 flex flex-col items-center justify-center gap-1.5"
+                className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
               >
-                <span className="w-9 h-9 rounded-[12px] bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
-                  <Camera className="w-4 h-4 stroke-[2.3]" />
-                </span>
-                <span className="text-[11px] font-extrabold text-[var(--ink)] truncate max-w-full">
-                  Scan
-                </span>
+                <Camera className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
+                <span className="truncate">Scan Bill</span>
               </motion.button>
             ) : (
               <motion.button
-                whileTap={{ scale: 0.94, y: 1 }}
+                whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
                 transition={SPRING_FAST}
                 type="button"
                 onClick={() => {
                   haptics.tap();
-                  onOpenDailySummary();
+                  onOpenVoiceEntry();
                 }}
-                className="ios27-ceramic-tile rounded-[20px] px-2 py-2.5 flex flex-col items-center justify-center gap-1.5"
+                className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
               >
-                <span className="w-9 h-9 rounded-[12px] bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shrink-0">
-                  <Volume2 className="w-4 h-4 stroke-[2.3]" />
-                </span>
-                <span className="text-[11px] font-extrabold text-[var(--ink)] truncate max-w-full">
-                  Audio
-                </span>
+                <Mic className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
+                <span className="truncate">Voice Log</span>
               </motion.button>
             )}
 
-            <motion.button
-              whileTap={{ scale: 0.94, y: 1 }}
-              transition={SPRING_FAST}
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                onOpenCollection();
-              }}
-              className="ios27-ceramic-tile rounded-[20px] px-2 py-2.5 flex flex-col items-center justify-center gap-1.5 relative"
-            >
-              <span className="w-9 h-9 rounded-[12px] bg-[var(--credit-tint)] text-[var(--credit-red)] flex items-center justify-center shrink-0">
-                <Repeat className="w-4 h-4 stroke-[2.3]" />
-              </span>
-              <span className="text-[11px] font-extrabold text-[var(--ink)] truncate max-w-full">
-                {overdueCount > 0 ? `Due (${overdueCount})` : 'Collect'}
-              </span>
-            </motion.button>
+            {capabilities.showGalla ? (
+              <motion.button
+                whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+                transition={SPRING_FAST}
+                type="button"
+                onClick={() => {
+                  haptics.tap();
+                  onOpenGalla();
+                }}
+                className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
+              >
+                <Wallet className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
+                <span className="truncate">Cashbook</span>
+              </motion.button>
+            ) : (
+              <motion.button
+                whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+                transition={SPRING_FAST}
+                type="button"
+                onClick={() => {
+                  haptics.tap();
+                  onOpenCollection();
+                }}
+                className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
+              >
+                <Repeat className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
+                <span className="truncate">Dues</span>
+              </motion.button>
+            )}
           </div>
 
-          {/* 4. Inline Mandi Bori / Wazan / Aadat Calculator (Mandi Mode Only) */}
+          {/* Desktop Counter Pulse Snapshot (Balances 2-column weight cleanly) */}
+          <div className="hidden lg:block ios27-inset-group rounded-[22px] p-4 space-y-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-[var(--ink)]">Today&apos;s Counter</span>
+              <span className="text-[11px] text-[var(--ink-muted)] font-tabular">
+                {overdueCount > 0 ? `${overdueCount} Overdue` : 'All Clear'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-1 border-t border-[var(--glass-border)] font-tabular">
+              <div>
+                <p className="text-[11px] text-[var(--ink-muted)]">Cash Inflow</p>
+                <p className="font-display text-sm font-semibold text-[var(--debit-green)] mt-0.5">
+                  {hideBalance ? '₹••••' : `+${formatINR(gallaPulse.todayInflow)}`}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-[var(--ink-muted)]">Cash Outflow</p>
+                <p className="font-display text-sm font-semibold text-[var(--credit-red)] mt-0.5">
+                  {hideBalance ? '₹••••' : `-${formatINR(gallaPulse.todayOutflow)}`}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {capabilities.showMandiCalculator && <MandiAadatHelper />}
         </div>
 
-        {/* RIGHT COLUMN (Mobile Stacked / Desktop 7-col Ledger Feed): Elastic Segment Switcher + iOS 27 Inset Grouped Rows */}
+        {/* RIGHT COLUMN (Mobile Feed / Desktop 7-col): Segmented Tabs + Toolbar + Notice Strip + Party List */}
         <div className="space-y-3 lg:col-span-7">
           {segmentTabs.length > 1 && (
             <div
-              className={`relative grid rounded-full bg-[var(--surface-subtle)] border border-[var(--surface-border)] p-1 ${
+              className={`relative grid rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] p-1 ${
                 segmentTabs.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
               }`}
             >
@@ -818,15 +684,15 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                     key={seg.id}
                     type="button"
                     onClick={() => handleSelectSegment(seg.id)}
-                    className={`relative min-h-[40px] px-2 rounded-full text-xs font-extrabold transition-colors ${
-                      active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
+                    className={`relative min-h-[40px] px-3 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+                      active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
                     }`}
                   >
                     {active && (
                       <motion.span
                         layoutId={prefersReducedMotion ? undefined : 'cashKhataKindPill'}
-                        transition={SPRING_FAST}
-                        className="absolute inset-0 rounded-full bg-[var(--surface)] shadow-sm"
+                        transition={SPRING_SHEET}
+                        className="absolute inset-0 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--glass-border)]"
                       />
                     )}
                     <span className="relative z-10">{seg.label}</span>
@@ -836,161 +702,160 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
             </div>
           )}
 
-          {/* Master Plan 2.0: Recent Activity Section */}
-          {segment !== 'galla' && !searchQuery && recentTransactions.length > 0 && (
-            <div className="ios27-inset-group rounded-[26px] p-4 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-sm font-extrabold text-[var(--ink)]">
-                  Recent Activity
-                </h3>
-                <span className="text-xs font-bold text-[var(--ink-muted)]">
-                  Latest Entries
-                </span>
-              </div>
-              <div className="divide-y divide-[var(--surface-border)]">
-                {recentTransactions.map((tx) => {
-                  const party = accounts.find((a) => a.id === tx.accountId);
-                  const isGiven = tx.direction === 'given';
-                  return (
-                    <button
-                      key={tx.id}
-                      type="button"
-                      onClick={() => {
-                        if (party) {
-                          haptics.tap();
-                          onSelectAccount(party);
-                        }
-                      }}
-                      className="w-full py-2 flex items-center justify-between gap-3 text-left hover:bg-[var(--app-bg)]/45 transition-colors rounded-xl px-2 -mx-2"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span
-                          style={{ backgroundColor: party ? getAvatarColor(party.name) : 'var(--brand)' }}
-                          className="w-7 h-7 rounded-full text-white text-[11px] font-extrabold flex items-center justify-center shrink-0"
-                        >
-                          {party?.name ? party.name.charAt(0).toUpperCase() : 'P'}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-[var(--ink)] truncate">
-                            {party?.name || 'Party'}
-                          </p>
-                          <p className="text-[10px] text-[var(--ink-muted)] truncate">
-                            {tx.note || (isGiven ? 'Credit' : 'Payment')} · {formatDateTime(tx.billDate).split('·')[0]}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0 whitespace-nowrap">
-                        <span
-                          className={`font-display text-xs sm:text-sm font-extrabold font-tabular whitespace-nowrap ${
-                            isGiven ? 'text-[var(--credit-red)]' : 'text-[var(--debit-green)]'
-                          }`}
-                        >
-                          {isGiven ? '+' : '-'}{formatINRCompact(tx.amount)}
-                        </span>
-                        <p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--ink-muted)]">
-                          {isGiven ? 'Credit' : 'Received'}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <div className="flex items-center justify-between gap-2 px-1">
+            <h2 className="font-display text-xs font-medium tracking-normal text-[var(--ink-muted)] inline-flex items-baseline gap-1">
+              {segment === 'galla' ? (
+                'Today in Cashbook'
+              ) : (
+                <>
+                  <span className="font-tabular">{filteredAccounts.length}</span>
+                  <span>{filteredAccounts.length === 1 ? 'Party' : 'Parties'}</span>
+                </>
+              )}
+            </h2>
 
-          {/* Scroll-Velocity Jelly Party List / Inline Galla / Empty State */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <motion.button
+                whileTap={prefersReducedMotion ? undefined : { scale: 0.94 }}
+                transition={SPRING_FAST}
+                type="button"
+                aria-label={hasSecondaryFilter ? `Filter: ${activeFilterLabel}` : 'Filter parties'}
+                onClick={() => {
+                  haptics.tap();
+                  setShowFilterSortSheet(true);
+                }}
+                className={`min-h-[44px] px-3.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-colors ${
+                  hasSecondaryFilter || showAllModes || sortBy !== 'latest-activity'
+                    ? 'bg-[var(--brand)] text-[var(--brand-fg)]'
+                    : 'bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] hover:bg-[var(--brand-tint)]'
+                }`}
+              >
+                <Filter className="w-3.5 h-3.5 stroke-[1.9]" />
+                <span>{hasSecondaryFilter ? activeFilterLabel : 'Filter'}</span>
+              </motion.button>
+
+              <motion.button
+                whileTap={prefersReducedMotion ? undefined : { scale: 0.95 }}
+                transition={SPRING_FAST}
+                type="button"
+                onClick={() =>
+                  handleOpenAddModal(
+                    capabilities.showSuppliers && segment === 'supplier' ? 'supplier' : 'customer'
+                  )
+                }
+                aria-label={addBtnLabel}
+                className="min-h-[44px] px-4 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-semibold inline-flex items-center gap-1 whitespace-nowrap shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.2]" />
+                <span>Add</span>
+              </motion.button>
+            </div>
+          </div>
+
+          {/* Sleek ChatGPT-Style Translucent Light-Blue Notice Strip (Contextually placed right above the Ledger Feed) */}
+          <NoticeBoardBanner
+            partyCount={accounts.length}
+            overdueCount={overdueCount}
+            overdueTotal={overdueTotal}
+            todayInflow={gallaPulse.todayInflow}
+            todayOutflow={gallaPulse.todayOutflow}
+            isPersonalMode={capabilities.focus === 'personal'}
+            dismissedKey={dismissedNoticeKey}
+            onDismiss={handleDismissNotice}
+            onReviewOverdue={onOpenCollection}
+            onListenSummary={onOpenDailySummary}
+            onOpenVoice={onOpenVoiceEntry}
+          />
+
+          {/* Scroll-Velocity Jelly Party List / Inline Galla / Minimal Empty State */}
           <motion.div
             style={prefersReducedMotion ? undefined : { skewY: activeJellySkew }}
             className="space-y-2.5 origin-center"
           >
             {segment === 'galla' && capabilities.showGalla ? (
               <div className="space-y-2.5">
-                <div className="ios27-inset-group rounded-[26px] p-4 flex items-center justify-between gap-3">
+                <div className="ios27-inset-group rounded-[22px] p-4 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-11 h-11 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
-                      <Wallet className="w-5 h-5" />
+                    <span className="w-10 h-10 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
+                      <Wallet className="w-4 h-4 stroke-[1.9]" />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                      <p className="text-[11px] font-medium text-[var(--ink-muted)]">
                         Cash Drawer Today
                       </p>
-                      <p className="font-display text-lg font-extrabold text-[var(--ink)] font-tabular">
+                      <p className="font-display text-lg font-semibold text-[var(--ink)] font-tabular">
                         <OdometerNumber value={gallaPulse.cashDrawerBalance} hidden={hideBalance} />
                       </p>
-                      <p className="text-[11px] font-semibold text-[var(--ink-muted)] font-tabular">
-                        In {formatINR(gallaPulse.todayInflow)} · Out {formatINR(gallaPulse.todayOutflow)}
+                      <p className="text-[11px] font-normal text-[var(--ink-muted)] font-tabular">
+                        In <span className="text-[var(--debit-green)] font-medium">{formatINR(gallaPulse.todayInflow)}</span>
+                        {' · '}
+                        Out <span className="text-[var(--credit-red)] font-medium">{formatINR(gallaPulse.todayOutflow)}</span>
                       </p>
                     </div>
                   </div>
 
                   <motion.button
-                    whileTap={{ scale: 0.94, y: 1 }}
+                    whileTap={{ scale: 0.95 }}
                     transition={SPRING_FAST}
                     type="button"
                     onClick={() => {
                       haptics.tap();
                       onOpenGalla();
                     }}
-                    className="min-h-[42px] px-3.5 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1 shrink-0 tactile-key-primary"
+                    className="min-h-[40px] px-3.5 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-semibold inline-flex items-center gap-1 shrink-0"
                   >
-                    <span>Open Galla</span>
-                    <ChevronRight className="w-4 h-4" />
+                    <span>Open Cashbook</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </motion.button>
                 </div>
 
                 {sortedCashbookEntries.length === 0 ? (
-                  <div className="ios27-inset-group rounded-[26px] p-6 text-center space-y-2.5">
-                    <p className="font-display text-base font-extrabold text-[var(--ink)]">
-                      No Galla entries recorded yet
+                  <div className="ios27-inset-group rounded-[22px] p-6 text-center space-y-1.5">
+                    <p className="font-display text-sm font-semibold text-[var(--ink)]">
+                      No cashbook entries today
                     </p>
                     <p className="text-xs text-[var(--ink-muted)]">
-                      Tap Open Galla above or use + New to log Cash In, Expenses, or UPI sales.
+                      Tap Open Cashbook above to log cash inflows, expenses, or UPI payments.
                     </p>
                   </div>
                 ) : (
-                  <div className="ios27-inset-group rounded-[28px] divide-y divide-[var(--surface-border)] overflow-hidden">
+                  <div className="ios27-inset-group rounded-[22px] divide-y divide-[var(--glass-border)] overflow-hidden">
                     {sortedCashbookEntries.map((entry, idx) => {
                       const isInflow = entry.entryType === 'inflow';
                       return (
                         <motion.button
                           key={entry.id}
                           type="button"
-                          initial={{ opacity: 0, y: 8 }}
+                          initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ ...SPRING_FAST, delay: Math.min(idx, 8) * 0.025 }}
+                          transition={{ ...SPRING_FAST, delay: Math.min(idx, 8) * 0.02 }}
                           whileTap={{ scale: 0.985 }}
                           onClick={() => {
                             haptics.tap();
                             onOpenGalla();
                           }}
-                          className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--app-bg)]/45 transition-colors"
+                          className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/60 transition-colors"
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <span
-                              className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                                isInflow
-                                  ? 'bg-[var(--debit-tint)] text-[var(--debit-green)]'
-                                  : 'bg-[var(--credit-tint)] text-[var(--credit-red)]'
-                              }`}
-                            >
+                            <span className="w-9 h-9 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
                               {isInflow ? (
-                                <ArrowDown className="w-4 h-4 stroke-[2.5]" />
+                                <ArrowDown className="w-4 h-4 stroke-[2]" />
                               ) : (
-                                <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                                <ArrowUp className="w-4 h-4 stroke-[2]" />
                               )}
                             </span>
                             <div className="min-w-0">
-                              <p className="text-sm font-extrabold text-[var(--ink)] truncate">
+                              <p className="text-sm font-semibold text-[var(--ink)] truncate">
                                 {entry.category}
                               </p>
-                              <p className="text-[11px] font-semibold text-[var(--ink-muted)] truncate">
+                              <p className="text-[11px] font-normal text-[var(--ink-muted)] truncate">
                                 {entry.mode.toUpperCase()} · {entry.note || formatDateTime(entry.entryDate)}
                               </p>
                             </div>
                           </div>
 
                           <p
-                            className={`font-display text-base font-extrabold font-tabular shrink-0 ${
+                            className={`font-display text-sm font-semibold font-tabular shrink-0 ${
                               isInflow ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
                             }`}
                           >
@@ -1006,281 +871,174 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
               </div>
             ) : accounts.length === 0 ? (
               <motion.div
-                initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
+                initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
                 transition={SPRING_FAST}
-                className="ios27-inset-group rounded-[28px] p-5 space-y-3.5"
+                className="ios27-inset-group rounded-[22px] p-4 sm:p-7 text-center flex flex-col items-center space-y-3"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-0.5 min-w-0">
-                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
-                      {activeAdaptation.focusBadge} · Instant Entry
-                    </p>
-                    <h1 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                      {capabilities.focus === 'personal'
-                        ? 'Record First Personal Entry'
-                        : 'Record First Ledger Entry'}
-                    </h1>
-                    <p className="text-xs text-[var(--ink-muted)] leading-snug">
-                      {activeAdaptation.emptyStateHint}
-                    </p>
-                  </div>
+                <span className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shadow-xs">
+                  <UserPlus className="w-4 h-4 sm:w-5 sm:h-5 stroke-[1.8]" />
+                </span>
 
-                  <button
+                <div className="space-y-1">
+                  <h1 className="font-display text-base sm:text-lg font-semibold tracking-[-0.01em] text-[var(--ink)]">
+                    {capabilities.focus === 'personal' ? 'Start your personal ledger' : 'Start your business ledger'}
+                  </h1>
+                  <p className="text-[13px] font-normal text-[var(--ink-muted)] max-w-[300px] leading-snug">
+                    {capabilities.focus === 'personal'
+                      ? 'Add a contact manually or speak an entry hands-free.'
+                      : 'Add your first customer or supplier, or speak an entry hands-free.'}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <motion.button
+                    whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+                    transition={SPRING_FAST}
                     type="button"
                     onClick={() =>
                       handleOpenAddModal(
                         capabilities.showSuppliers && segment === 'supplier' ? 'supplier' : 'customer'
                       )
                     }
-                    className="min-h-[34px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-[11px] font-bold text-[var(--ink)] inline-flex items-center gap-1 shrink-0 active:scale-95 transition"
+                    className="min-h-[44px] px-5 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 whitespace-nowrap"
                   >
-                    <UserPlus className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
-                    <span>Full Form</span>
-                  </button>
-                </div>
+                    <UserPlus className="w-4 h-4 shrink-0 stroke-[2]" />
+                    <span>
+                      {capabilities.focus === 'personal' ? 'Add First Contact' : 'Add First Party'}
+                    </span>
+                  </motion.button>
 
-                {/* Instant Inline Quick Add Form (Zero Modal Hopping, Muscle Memory Symmetry) */}
-                <div className="space-y-2.5 pt-1">
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                    <div className="sm:col-span-7">
-                      <label htmlFor="inline-quick-party" className="sr-only">
-                        Party Name
-                      </label>
-                      <input
-                        id="inline-quick-party"
-                        type="text"
-                        value={inlineName}
-                        onChange={(e) => {
-                          setInlineError('');
-                          setInlineName(e.target.value);
-                        }}
-                        placeholder={
-                          capabilities.focus === 'personal'
-                            ? 'Friend or contact name (e.g. Rahul)'
-                            : 'Party or customer name (e.g. Sharma Ji)'
-                        }
-                        className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                      />
-                    </div>
-                    <div className="sm:col-span-5">
-                      <label htmlFor="inline-quick-amount" className="sr-only">
-                        Amount in Rupees
-                      </label>
-                      <input
-                        id="inline-quick-amount"
-                        type="number"
-                        inputMode="decimal"
-                        min="1"
-                        step="any"
-                        value={inlineAmount}
-                        onChange={(e) => {
-                          setInlineError('');
-                          setInlineAmount(e.target.value);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !inlineBusy) {
-                            void handleInlineSubmit('given');
-                          }
-                        }}
-                        placeholder="₹ Amount"
-                        className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-base font-extrabold font-tabular text-right text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Quick Increment Chips */}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {[100, 500, 1000].map((inc) => (
-                      <button
-                        key={inc}
-                        type="button"
-                        onClick={() => {
-                          haptics.tap();
-                          setInlineError('');
-                          const current = Number(inlineAmount) || 0;
-                          setInlineAmount(String(current + inc));
-                        }}
-                        className="min-h-[32px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-[11px] font-extrabold font-tabular text-[var(--ink)] active:scale-95 transition"
-                      >
-                        +₹{inc}
-                      </button>
-                    ))}
-                    {inlineAmount && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          haptics.tap();
-                          setInlineAmount('');
-                        }}
-                        className="min-h-[32px] px-2.5 rounded-xl bg-[var(--app-bg)] text-[11px] font-bold text-[var(--ink-muted)] active:scale-95 transition"
-                      >
-                        Clear
-                      </button>
-                    )}
-                    <input
-                      type="text"
-                      value={inlineNote}
-                      onChange={(e) => setInlineNote(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !inlineBusy) {
-                          void handleInlineSubmit('given');
-                        }
-                      }}
-                      placeholder={activeAdaptation.quickNotePlaceholder}
-                      aria-label="Optional entry note"
-                      className="flex-1 min-w-[140px] min-h-[32px] rounded-xl bg-[var(--app-bg)] px-2.5 text-xs font-medium text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                    />
-                  </div>
-
-                  {inlineError && (
-                    <p role="alert" className="text-xs font-bold text-[var(--credit-red)]">
-                      {inlineError}
-                    </p>
-                  )}
-
-                  {/* Symmetric Fitts's Law Direction Buttons: Left Red Credit · Right Green Received */}
-                  <div className="grid grid-cols-2 gap-2.5 pt-0.5">
-                    <motion.button
-                      whileTap={{ scale: 0.95, y: 1 }}
-                      transition={SPRING_FAST}
-                      type="button"
-                      disabled={inlineBusy}
-                      aria-busy={inlineBusy}
-                      onClick={() => void handleInlineSubmit('given')}
-                      className="min-h-[48px] px-3 rounded-2xl bg-[var(--credit-red)] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-60"
-                    >
-                      <ArrowUp className="w-4 h-4 shrink-0" />
-                      <span>{inlineBusy ? 'Saving...' : 'Credit Given'}</span>
-                    </motion.button>
-                    <motion.button
-                      whileTap={{ scale: 0.95, y: 1 }}
-                      transition={SPRING_FAST}
-                      type="button"
-                      disabled={inlineBusy}
-                      aria-busy={inlineBusy}
-                      onClick={() => void handleInlineSubmit('received')}
-                      className="min-h-[48px] px-3 rounded-2xl bg-[var(--debit-green)] text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-60"
-                    >
-                      <ArrowDown className="w-4 h-4 shrink-0" />
-                      <span>{inlineBusy ? 'Saving...' : 'Payment Received'}</span>
-                    </motion.button>
-                  </div>
-
-                  <div
-                    className={`grid gap-2 pt-1 ${
-                      capabilities.focus === 'personal' ? 'grid-cols-1' : 'grid-cols-2'
-                    }`}
-                  >
-                    <motion.button
-                      whileTap={{ scale: 0.95, y: 1 }}
-                      transition={SPRING_FAST}
-                      type="button"
-                      onClick={() => {
-                        haptics.tap();
-                        onOpenVoiceEntry();
-                      }}
-                      className="min-h-[42px] px-2.5 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-[11px] font-extrabold whitespace-nowrap flex items-center justify-center gap-1.5"
-                    >
-                      <Mic className="w-3.5 h-3.5 shrink-0" />
-                      <span>Speak to Save</span>
-                    </motion.button>
-
-                    {capabilities.focus !== 'personal' && (
-                      <motion.button
-                        whileTap={{ scale: 0.95, y: 1 }}
-                        transition={SPRING_FAST}
-                        type="button"
-                        onClick={() => {
-                          haptics.tap();
-                          onOpenParchiScanner();
-                        }}
-                        className="min-h-[42px] px-2.5 rounded-2xl bg-[var(--app-bg)] text-[11px] font-bold text-[var(--ink)] whitespace-nowrap flex items-center justify-center gap-1.5"
-                      >
-                        <Camera className="w-3.5 h-3.5 text-[var(--brand-accent)] shrink-0" />
-                        <span>Scan Receipt</span>
-                      </motion.button>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            ) : filteredAccounts.length === 0 ? (
-              <div className="ios27-inset-group rounded-[28px] p-8 text-center space-y-3">
-                <p className="font-display text-base font-bold text-[var(--ink)]">
-                  No {filterChip === 'supplier' ? 'suppliers' : 'parties'} matched this view.
-                </p>
-                <p className="text-sm text-[var(--ink-muted)]">
-                  Tap the Matte Indigo Mic Orb below or add a new entry.
-                </p>
-                <div className="flex items-center justify-center gap-2.5 pt-2 flex-wrap">
                   <motion.button
-                    whileTap={{ scale: 0.94, y: 1 }}
+                    whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
                     transition={SPRING_FAST}
                     type="button"
                     onClick={() => {
                       haptics.tap();
                       onOpenVoiceEntry();
                     }}
-                    className="tactile-key-primary min-h-[44px] px-4 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-2"
+                    className="min-h-[44px] px-4 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--ink)] text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
                   >
-                    <Mic className="w-4 h-4" />
-                    <span>{t.voiceEntry}</span>
+                    <Mic className="w-3.5 h-3.5 shrink-0 stroke-[2]" />
+                    <span>Speak Entry</span>
                   </motion.button>
+                </div>
+
+                <div className="pt-2 border-t border-[var(--glass-border)] w-full max-w-[340px] flex items-center justify-center gap-2 text-[11px] font-medium text-[var(--ink-muted)]">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[var(--ink)] shrink-0" />
+                  <span>AES-256 Encrypted</span>
+                  <span aria-hidden="true">·</span>
+                  <span>GST Ready</span>
+                  <span aria-hidden="true">·</span>
+                  <span>WhatsApp Slips</span>
+                </div>
+              </motion.div>
+            ) : filteredAccounts.length === 0 ? (
+              <div className="ios27-inset-group rounded-[22px] p-7 text-center space-y-3">
+                <p className="font-display text-sm font-semibold text-[var(--ink)]">
+                  {searchQuery.trim()
+                    ? `No match for "${searchQuery.trim()}"`
+                    : `No ${filterChip === 'supplier' ? 'suppliers' : 'parties'} matched this view.`}
+                </p>
+                <p className="text-xs text-[var(--ink-muted)]">
+                  {searchQuery.trim()
+                    ? 'Add them cleanly as a new party or record via voice.'
+                    : 'Try clearing your filter or add a new entry.'}
+                </p>
+                <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
                   <motion.button
-                    whileTap={{ scale: 0.94, y: 1 }}
+                    whileTap={{ scale: 0.95 }}
                     transition={SPRING_FAST}
                     type="button"
                     onClick={() =>
                       handleOpenAddModal(
-                        capabilities.showSuppliers && segment === 'supplier' ? 'supplier' : 'customer'
+                        capabilities.showSuppliers && segment === 'supplier' ? 'supplier' : 'customer',
+                        searchQuery.trim()
                       )
                     }
-                    className="min-h-[44px] px-4 rounded-2xl bg-[var(--app-bg)] text-[var(--ink)] text-xs font-bold inline-flex items-center gap-2"
+                    className="min-h-[44px] px-4 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-semibold inline-flex items-center gap-1.5"
                   >
-                    <UserPlus className="w-4 h-4 text-[var(--brand-accent)]" />
+                    <UserPlus className="w-3.5 h-3.5" />
                     <span>
-                      {capabilities.showSuppliers && segment === 'supplier'
-                        ? t.addSupplier
-                        : capabilities.focus === 'personal'
-                          ? 'Add Contact'
-                          : t.addCustomer}
+                      {searchQuery.trim()
+                        ? `Add "${searchQuery.trim()}"`
+                        : capabilities.showSuppliers && segment === 'supplier'
+                          ? t.addSupplier
+                          : capabilities.focus === 'personal'
+                            ? 'Add Contact'
+                            : t.addCustomer}
                     </span>
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    transition={SPRING_FAST}
+                    type="button"
+                    onClick={() => {
+                      haptics.tap();
+                      onOpenVoiceEntry();
+                    }}
+                    className="min-h-[44px] px-4 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center gap-1.5"
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>{t.voiceEntry}</span>
                   </motion.button>
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="ios27-inset-group rounded-[28px] divide-y divide-[var(--surface-border)] overflow-hidden">
-                  {filteredAccounts.slice(0, visibleCount).map((acc, idx) => {
-                    let repulsionOffsetY = 0;
-                    if (activeHoverIdx !== null) {
-                      if (idx === activeHoverIdx - 1) repulsionOffsetY = -3;
-                      else if (idx === activeHoverIdx + 1) repulsionOffsetY = 3;
-                    }
-                    return (
-                      <PartyLedgerCard
-                        key={acc.id}
-                        account={acc}
-                        idx={idx}
-                        trust={trustScoresByAccount[acc.id]}
-                        hideBalance={hideBalance}
-                        groupedRow
-                        isSelected={Boolean(selectedAccountId && selectedAccountId === acc.id)}
-                        isRecentlySaved={Boolean(
-                          recentlyUpdatedAccountId && recentlyUpdatedAccountId === acc.id
-                        )}
-                        repulsionOffsetY={repulsionOffsetY}
-                        dueLabel={t.due}
-                        advanceLabel={t.advance}
-                        settledLabel={t.settled}
-                        onSelect={onSelectAccount}
-                        onQuickAdd={openQuickEntrySheet}
-                        onSwipeRemind={onSwipeRemind}
-                        onInteractionStart={(i) => setActiveHoverIdx(i)}
-                        onInteractionEnd={() => setActiveHoverIdx(null)}
-                      />
-                    );
-                  })}
+                {isFuzzySuggestion && searchQuery.trim() && (
+                  <p className="px-2 text-[11px] font-semibold text-[var(--ink-muted)]">
+                    Showing closest matches for &quot;{searchQuery.trim()}&quot;
+                  </p>
+                )}
+                <div className="ios27-inset-group rounded-[22px] divide-y divide-[var(--glass-border)] overflow-hidden">
+                  {(() => {
+                    const seenDuplicateCounters = new Map<string, number>();
+                    return filteredAccounts.slice(0, visibleCount).map((acc, idx) => {
+                      let repulsionOffsetY = 0;
+                      if (activeHoverIdx !== null) {
+                        if (idx === activeHoverIdx - 1) repulsionOffsetY = -3;
+                        else if (idx === activeHoverIdx + 1) repulsionOffsetY = 3;
+                      }
+                      const nameKey = acc.name.trim().toLowerCase();
+                      const isDup = (duplicateNameCounts.get(nameKey) || 0) > 1;
+                      let disambiguator: string | undefined;
+                      if (isDup) {
+                        const nextOrd = (seenDuplicateCounters.get(nameKey) || 0) + 1;
+                        seenDuplicateCounters.set(nameKey, nextOrd);
+                        if (acc.phone && acc.phone.length >= 4) {
+                          disambiguator = `•••${acc.phone.slice(-4)}`;
+                        } else if (capabilities.showSuppliers) {
+                          disambiguator = acc.kind === 'supplier' ? 'Supplier' : 'Customer';
+                        } else {
+                          disambiguator = `#${nextOrd}`;
+                        }
+                      }
+                      return (
+                        <PartyLedgerCard
+                          key={acc.id}
+                          account={acc}
+                          idx={idx}
+                          hideBalance={hideBalance}
+                          groupedRow
+                          disambiguator={disambiguator}
+                          isSelected={Boolean(selectedAccountId && selectedAccountId === acc.id)}
+                          isRecentlySaved={Boolean(
+                            recentlyUpdatedAccountId && recentlyUpdatedAccountId === acc.id
+                          )}
+                          repulsionOffsetY={repulsionOffsetY}
+                          dueLabel={t.due}
+                          advanceLabel={t.advance}
+                          settledLabel={t.settled}
+                          onSelect={onSelectAccount}
+                          onQuickAdd={openQuickEntrySheet}
+                          onSwipeRemind={onSwipeRemind}
+                          onInteractionStart={(i) => setActiveHoverIdx(i)}
+                          onInteractionEnd={() => setActiveHoverIdx(null)}
+                        />
+                      );
+                    });
+                  })()}
                 </div>
                 {filteredAccounts.length > visibleCount && (
                   <button
@@ -1289,15 +1047,10 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                       haptics.tap();
                       setVisibleCount((v) => v + 60);
                     }}
-                    className="w-full min-h-[42px] rounded-2xl bg-[var(--surface)] border border-[var(--surface-border)] text-xs font-extrabold text-[var(--brand-accent)] active:scale-[0.99] transition"
+                    className="w-full min-h-[44px] rounded-full liquid-glass text-xs font-semibold text-[var(--ink)] active:scale-[0.99] transition"
                   >
                     Show More ({filteredAccounts.length - visibleCount} remaining)
                   </button>
-                )}
-                {accounts.length <= 3 && (
-                  <p className="text-[10px] font-semibold text-center text-[var(--ink-muted)] pt-1">
-                    Swipe row right to Receive ₹ or left for WhatsApp Remind
-                  </p>
                 )}
               </div>
             )}
@@ -1322,7 +1075,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                 capabilities.showSuppliers && segment === 'supplier' ? 'supplier' : 'customer'
               );
             }}
-            className="w-full min-h-[52px] px-4 rounded-2xl bg-[var(--brand)] text-white flex items-center gap-3 text-left font-extrabold text-sm active:scale-[0.98] transition"
+            className="w-full min-h-[52px] px-4 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] flex items-center gap-3 text-left font-extrabold text-sm active:scale-[0.98] transition"
           >
             <UserPlus className="w-4 h-4 shrink-0" />
             <span>Add New Party / {capabilities.primarySegmentLabel}</span>
@@ -1408,15 +1161,9 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
           ) : (
             <div className="space-y-3.5">
               <div className="flex items-center gap-3">
-                <TrustAvatarRing
-                  name={quickEntryAccount.name}
-                  score={trustScoresByAccount[quickEntryAccount.id]?.score ?? 100}
-                  hasTrust={Boolean(
-                    trustScoresByAccount[quickEntryAccount.id] &&
-                      quickEntryAccount.kind === 'customer'
-                  )}
-                  size="sm"
-                />
+                <div className="w-10 h-10 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] font-bold font-display text-sm flex items-center justify-center shrink-0">
+                  {quickEntryAccount.name.charAt(0).toUpperCase()}
+                </div>
                 <div className="min-w-0">
                   <p className="font-display text-sm font-extrabold text-[var(--ink)] truncate">
                     {quickEntryAccount.name}
@@ -1448,7 +1195,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                   transition={SPRING_FAST}
                   type="button"
                   onClick={() => {
-                    haptics.tap();
+                    haptics.select();
                     setQuickDirection('given');
                   }}
                   className={`min-h-[44px] rounded-2xl text-xs font-extrabold flex items-center justify-center gap-1.5 ${
@@ -1465,7 +1212,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                   transition={SPRING_FAST}
                   type="button"
                   onClick={() => {
-                    haptics.tap();
+                    haptics.select();
                     setQuickDirection('received');
                   }}
                   className={`min-h-[44px] rounded-2xl text-xs font-extrabold flex items-center justify-center gap-1.5 ${
@@ -1510,7 +1257,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                       setQuickError('');
                       setQuickAmount((prev) => applyKeypadKey(prev, 'clear'));
                     }}
-                    className="min-h-[32px] px-2.5 rounded-xl bg-[var(--surface)] text-[11px] font-bold text-[var(--ink-muted)] shadow-xs active:scale-95 transition shrink-0"
+                    className="min-h-[44px] px-3.5 rounded-xl liquid-glass text-xs font-bold text-[var(--ink-muted)] active:scale-95 transition shrink-0"
                   >
                     Clear
                   </button>
@@ -1530,7 +1277,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                       setQuickError('');
                       setQuickAmount((prev) => applyKeypadKey(prev, presetKey));
                     }}
-                    className="min-h-[34px] px-2.5 rounded-xl bg-[var(--surface-subtle)] text-[11px] font-extrabold font-tabular text-[var(--ink)] whitespace-nowrap"
+                    className="min-h-[40px] px-3 rounded-xl liquid-glass text-xs font-extrabold font-tabular text-[var(--ink)] whitespace-nowrap"
                   >
                     +₹{presetKey.slice(1)}
                   </motion.button>
@@ -1546,7 +1293,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                       setQuickDirection('received');
                       setQuickAmount(String(Math.round(quickEntryAccount.balance * 100) / 100));
                     }}
-                    className="min-h-[34px] px-2.5 rounded-xl bg-[var(--debit-tint)] text-[11px] font-extrabold font-tabular text-[var(--debit-green)] whitespace-nowrap"
+                    className="min-h-[40px] px-3 rounded-xl bg-[var(--debit-tint)] text-xs font-extrabold font-tabular text-[var(--debit-green)] whitespace-nowrap"
                   >
                     Full ({formatINR(quickEntryAccount.balance)})
                   </motion.button>
@@ -1566,11 +1313,11 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                       transition={SPRING_FAST}
                       aria-label={isBackspace ? 'Backspace' : `Keypad ${key}`}
                       onClick={() => {
-                        haptics.tap();
+                        haptics.keypad();
                         setQuickError('');
                         setQuickAmount((prev) => applyKeypadKey(prev, key));
                       }}
-                      className="min-h-[48px] rounded-2xl bg-[var(--app-bg)] shadow-[0_2px_0_rgba(15,23,42,0.08)] dark:shadow-[0_2px_0_rgba(0,0,0,0.45)] font-display text-lg font-extrabold font-tabular text-[var(--ink)] flex items-center justify-center hover:bg-[var(--brand-tint)] disabled:opacity-50"
+                      className="min-h-[48px] rounded-2xl ios27-ceramic-tile font-display text-lg font-extrabold font-tabular text-[var(--ink)] flex items-center justify-center hover:bg-[var(--brand-tint)] disabled:opacity-50"
                     >
                       {isBackspace ? <Delete className="w-5 h-5" /> : key}
                     </motion.button>
@@ -1589,10 +1336,10 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                         haptics.tap();
                         setQuickNote(preset);
                       }}
-                      className={`min-h-[30px] px-2.5 rounded-xl text-[11px] font-bold whitespace-nowrap shrink-0 active:scale-95 transition ${
+                      className={`min-h-[38px] px-3 rounded-xl text-[11px] font-bold whitespace-nowrap shrink-0 active:scale-95 transition ${
                         quickNote === preset
                           ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
-                          : 'bg-[var(--surface-subtle)] text-[var(--ink-muted)]'
+                          : 'liquid-glass text-[var(--ink-muted)]'
                       }`}
                     >
                       {preset}
@@ -1605,7 +1352,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                   value={quickNote}
                   onChange={(e) => setQuickNote(e.target.value)}
                   placeholder={activeAdaptation.quickNotePlaceholder}
-                  className="w-full min-h-[42px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-xs font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-xs font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 />
 
                 {capabilities.showGalla && (
@@ -1628,7 +1375,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                             haptics.tap();
                             setQuickGallaMode(opt.id);
                           }}
-                          className={`min-h-[32px] px-3 rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
+                          className={`min-h-[38px] px-3 rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
                             quickGallaMode === opt.id
                               ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
                               : 'bg-[var(--surface)] text-[var(--ink-muted)]'
@@ -1706,7 +1453,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                     : 'bg-[var(--surface-border)] justify-start'
                 }`}
               >
-                <span className="w-5 h-5 rounded-full bg-white shadow-xs" />
+                <span className="w-5 h-5 rounded-full bg-[var(--brand-fg)] shadow-xs" />
               </span>
             </button>
           )}
@@ -1823,16 +1570,24 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
 
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-bold text-[var(--brand-accent)] mb-1">
+              <label htmlFor="add-party-name" className="block text-xs font-bold text-[var(--brand-accent)] mb-1">
                 Name
               </label>
               <input
+                id="add-party-name"
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder={activeAdaptation.addPartyPlaceholder}
                 className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-base font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
               />
+              {duplicateNameMatches.length > 0 && (
+                <p className="mt-1.5 text-[11px] font-medium text-[var(--alert-amber)]">
+                  {duplicateNameMatches.length === 1
+                    ? `"${duplicateNameMatches[0].name}" already exists — add a mobile number or surname to tell them apart.`
+                    : `${duplicateNameMatches.length} parties named "${duplicateNameMatches[0].name}" already exist — add a mobile number or surname.`}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">

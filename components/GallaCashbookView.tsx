@@ -29,6 +29,7 @@ import type {
 } from '@/lib/types';
 import { haptics } from '@/utils/haptics';
 import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
+import { SNAPPY_SPRING, calculateStaggerDelay } from './motion/SpatialMotionEngine';
 
 interface GallaCashbookViewProps {
   cashbookEntries: CashbookEntry[];
@@ -50,9 +51,9 @@ interface GallaCashbookViewProps {
   onBack?: () => void;
 }
 
-const INFLOW_CATEGORIES = ['Cash Sale', 'Opening', 'Vasooli', 'Other Income'];
-const OUTFLOW_CATEGORIES = ['Expense', 'Chai / Staff', 'Supplier Pay', 'Rent / Bijli', 'Withdrawal'];
-const SEG_SPRING = { type: 'spring' as const, stiffness: 420, damping: 30 };
+const INFLOW_CATEGORIES = ['Cash Sale', 'Opening Cash', 'Collection', 'Other Income'];
+const OUTFLOW_CATEGORIES = ['Expense', 'Staff & Petty', 'Supplier Payment', 'Rent & Utilities', 'Withdrawal'];
+const SEG_SPRING = SNAPPY_SPRING;
 
 export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
   cashbookEntries,
@@ -138,7 +139,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
       haptics.success();
       setModalType(null);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save Galla entry.');
+      setFormError(err instanceof Error ? err.message : 'Could not save cashbook entry.');
     } finally {
       setSaving(false);
     }
@@ -147,7 +148,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
   const profitPositive = pulse.estimatedDailyProfit >= 0;
 
   return (
-    <div className="space-y-4 pb-32">
+    <div className="space-y-4 pb-16">
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -156,17 +157,17 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
               type="button"
               onClick={onBack}
               aria-label="Back to Ledger"
-              className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card flex items-center justify-center active:scale-95 transition shrink-0"
+              className="min-w-[44px] min-h-[44px] rounded-full liquid-glass flex items-center justify-center active:scale-95 transition shrink-0"
             >
               <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
             </button>
           )}
           <div className="min-w-0">
-            <h2 className="font-display text-xl font-extrabold text-[var(--ink)] truncate">
-              Live Galla &amp; Cashbook
+            <h2 className="font-display text-2xl font-extrabold tracking-tight text-[var(--ink)] truncate">
+              Cashbook
             </h2>
             <p className="text-xs font-medium text-[var(--ink-muted)] truncate">
-              Cash Drawer, UPI/Bank &amp; Profit Pulse · {activeOperatorName}
+              Cash drawer, UPI &amp; daily pulse · {activeOperatorName}
             </p>
           </div>
         </div>
@@ -175,7 +176,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
             type="button"
             onClick={onToggleHideBalance}
             aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
-            className="min-w-[44px] min-h-[44px] rounded-2xl spatial-card flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition shrink-0"
+            className="min-w-[44px] min-h-[44px] rounded-full liquid-glass flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] active:scale-95 transition shrink-0"
           >
             {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
@@ -184,32 +185,36 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
 
       {/* Top 50/50 Split Actions */}
       <div className="grid grid-cols-2 gap-3">
-        <button
+        <motion.button
+          whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+          transition={SEG_SPRING}
           type="button"
           onClick={() => openEntryModal('inflow')}
-          className="min-h-[48px] px-4 rounded-2xl bg-[var(--debit-green)] text-white text-sm font-extrabold inline-flex items-center justify-center gap-2 shadow-sm active:scale-95 transition"
+          className="min-h-[48px] px-4 rounded-full bg-[var(--debit-green)] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-sm transition"
         >
           <PlusCircle className="w-4 h-4 shrink-0" />
-          <span>+ Cash In</span>
-        </button>
-        <button
+          <span>Cash In</span>
+        </motion.button>
+        <motion.button
+          whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+          transition={SEG_SPRING}
           type="button"
           onClick={() => openEntryModal('outflow')}
-          className="min-h-[48px] px-4 rounded-2xl bg-[var(--credit-red)] text-white text-sm font-extrabold inline-flex items-center justify-center gap-2 shadow-sm active:scale-95 transition"
+          className="min-h-[48px] px-4 rounded-full bg-[var(--credit-red)] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-sm transition"
         >
           <MinusCircle className="w-4 h-4 shrink-0" />
-          <span>- Expense / Out</span>
-        </button>
+          <span>Expense</span>
+        </motion.button>
       </div>
 
-      {/* Balances + Daily Profit Pulse (3-column responsive on desktop) */}
+      {/* Balances + Daily Profit Pulse (Unified Monochrome Ceramic Tiles) */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <div className="rounded-[24px] ios27-inset-group p-4 space-y-1.5">
+        <div className="rounded-[22px] ios27-ceramic-tile p-4 space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-extrabold text-[var(--ink-muted)] uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-[var(--ink-muted)] tracking-wide">
               Cash Drawer
             </span>
-            <span className="w-8 h-8 rounded-xl bg-[var(--brand)] text-white flex items-center justify-center shrink-0">
+            <span className="w-8 h-8 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
               <Wallet className="w-4 h-4" />
             </span>
           </div>
@@ -227,12 +232,12 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
           </p>
         </div>
 
-        <div className="rounded-[24px] ios27-inset-group p-4 space-y-1.5">
+        <div className="rounded-[22px] ios27-ceramic-tile p-4 space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-extrabold text-[var(--ink-muted)] uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-[var(--ink-muted)] tracking-wide">
               UPI &amp; Bank
             </span>
-            <span className="w-8 h-8 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+            <span className="w-8 h-8 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
               <Landmark className="w-4 h-4" />
             </span>
           </div>
@@ -245,29 +250,17 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
           </p>
         </div>
 
-        <div
-          className={`col-span-2 lg:col-span-1 rounded-[24px] p-4 flex lg:flex-col items-center lg:items-stretch justify-between gap-3 ${
-            profitPositive ? 'bg-[var(--debit-tint)]' : 'bg-[var(--credit-tint)]'
-          }`}
-        >
+        <div className="col-span-2 lg:col-span-1 rounded-[22px] ios27-ceramic-tile p-4 flex lg:flex-col items-center lg:items-stretch justify-between gap-3">
           <div className="min-w-0 space-y-1">
             <div className="flex items-center gap-2">
-              <span
-                className={`w-8 h-8 rounded-xl text-white flex items-center justify-center shrink-0 ${
-                  profitPositive ? 'bg-[var(--debit-green)]' : 'bg-[var(--credit-red)]'
-                }`}
-              >
+              <span className="w-8 h-8 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
                 {profitPositive ? (
                   <TrendingUp className="w-4 h-4" />
                 ) : (
                   <TrendingDown className="w-4 h-4" />
                 )}
               </span>
-              <span
-                className={`text-xs font-extrabold uppercase tracking-wider ${
-                  profitPositive ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
-                }`}
-              >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
                 Today&apos;s Profit Pulse
               </span>
             </div>
@@ -287,9 +280,9 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
         </div>
       </div>
 
-      {/* Segmented Scope & Mode Controls */}
+      {/* Unified Pill Segmented Scope & Mode Controls */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1 min-w-[165px]">
+        <div className="relative grid grid-cols-2 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] p-1 min-w-[165px]">
           {(
             [
               { id: 'today', label: 'Today' },
@@ -301,8 +294,11 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
               <button
                 key={d.id}
                 type="button"
-                onClick={() => setDateScope(d.id)}
-                className={`relative min-h-[38px] px-3 rounded-xl text-xs font-extrabold z-10 transition-colors ${
+                onClick={() => {
+                  haptics.tap();
+                  setDateScope(d.id);
+                }}
+                className={`relative min-h-[40px] px-3 rounded-full text-xs font-semibold z-10 transition-colors ${
                   active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
                 }`}
               >
@@ -310,7 +306,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                   <motion.span
                     layoutId={prefersReducedMotion ? undefined : 'gallaDateScopeSeg'}
                     transition={SEG_SPRING}
-                    className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
+                    className="absolute inset-0 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--glass-border)]"
                   />
                 )}
                 <span className="relative z-10">{d.label}</span>
@@ -319,7 +315,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
           })}
         </div>
 
-        <div className="relative grid grid-cols-4 rounded-2xl bg-[var(--surface-subtle)] p-1 flex-1 min-w-[230px]">
+        <div className="relative grid grid-cols-4 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] p-1 flex-1 min-w-[230px]">
           {(
             [
               { id: 'all', label: 'All' },
@@ -333,8 +329,11 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
               <button
                 key={m.id}
                 type="button"
-                onClick={() => setModeFilter(m.id)}
-                className={`relative min-h-[38px] px-2 rounded-xl text-xs font-extrabold z-10 transition-colors ${
+                onClick={() => {
+                  haptics.tap();
+                  setModeFilter(m.id);
+                }}
+                className={`relative min-h-[40px] px-2 rounded-full text-xs font-semibold z-10 transition-colors ${
                   active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
                 }`}
               >
@@ -342,7 +341,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                   <motion.span
                     layoutId={prefersReducedMotion ? undefined : 'gallaModeSeg'}
                     transition={SEG_SPRING}
-                    className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
+                    className="absolute inset-0 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--glass-border)]"
                   />
                 )}
                 <span className="relative z-10">{m.label}</span>
@@ -363,28 +362,30 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
 
       {/* Cashbook Entries Inset Group */}
       {visibleEntries.length === 0 ? (
-        <div className="rounded-[28px] ios27-inset-group p-8 text-center space-y-3">
+        <div className="rounded-[22px] ios27-inset-group p-8 text-center space-y-3">
+          <div className="mx-auto w-12 h-12 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center">
+            <Wallet className="w-5 h-5" />
+          </div>
           <p className="font-display text-base font-bold text-[var(--ink)]">
-            No Galla entries for this view yet.
+            No cashbook entries yet
           </p>
-          <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
-            Record morning opening cash, walk-in cash sales, or daily shop expenses like tea,
-            bijli, and tempo fare.
+          <p className="text-xs text-[var(--ink-muted)] leading-relaxed max-w-xs mx-auto">
+            Record morning opening cash, walk-in cash sales, or daily expenses like transport and utilities.
           </p>
           <div className="flex items-center justify-center gap-2.5 pt-1">
             <button
               type="button"
               onClick={() => openEntryModal('inflow')}
-              className="min-h-[44px] px-4 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold tactile-key-primary active:scale-95 transition"
+              className="min-h-[44px] px-5 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-semibold tactile-key-primary active:scale-95 transition"
             >
-              + Add Opening / Cash Sale
+              Add Cash Entry
             </button>
           </div>
         </div>
       ) : (
-        <div className="ios27-inset-group rounded-[26px] divide-y divide-[var(--surface-border)] overflow-hidden">
+        <div className="ios27-inset-group rounded-[22px] divide-y divide-[var(--glass-border)] overflow-hidden">
           <AnimatePresence mode="popLayout">
-            {visibleEntries.map((entry) => {
+            {visibleEntries.map((entry, idx) => {
               const isIn = entry.entryType === 'inflow';
               const armed = armedDeleteId === entry.id;
               return (
@@ -393,24 +394,20 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                   layout={!prefersReducedMotion}
                   initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className="px-4 py-3.5 flex items-center justify-between gap-3"
+                  exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                  transition={{ ...SEG_SPRING, delay: calculateStaggerDelay(idx) }}
+                  className="px-4 py-3.5 min-h-[64px] flex items-center justify-between gap-3 hover:bg-[var(--surface-subtle)]/50 transition-colors will-change-transform"
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <span
-                      className={`w-10 h-10 rounded-xl text-white flex items-center justify-center shrink-0 ${
-                        isIn ? 'bg-[var(--debit-green)]' : 'bg-[var(--credit-red)]'
-                      }`}
-                    >
+                    <span className="w-10 h-10 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
                       {isIn ? (
-                        <ArrowDownLeft className="w-4 h-4" />
+                        <ArrowDownLeft className="w-4 h-4 stroke-[2]" />
                       ) : (
-                        <ArrowUpRight className="w-4 h-4" />
+                        <ArrowUpRight className="w-4 h-4 stroke-[2]" />
                       )}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-extrabold text-[var(--ink)] leading-snug truncate">
+                      <p className="text-sm font-semibold text-[var(--ink)] leading-snug truncate">
                         {entry.note || entry.category}
                       </p>
                       <p className="text-[11px] font-medium text-[var(--ink-muted)] leading-snug mt-0.5 truncate">
@@ -423,7 +420,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span
-                      className={`text-base font-extrabold font-tabular ${
+                      className={`font-display text-sm sm:text-base font-semibold font-tabular ${
                         isIn ? 'text-[var(--debit-green)]' : 'text-[var(--credit-red)]'
                       }`}
                     >
@@ -449,7 +446,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                         }
                       }}
                       aria-label="Delete cashbook entry"
-                      className={`min-w-[40px] min-h-[40px] px-2 rounded-xl text-xs font-bold flex items-center justify-center active:scale-95 transition ${
+                      className={`min-w-[44px] min-h-[44px] px-2.5 rounded-full text-xs font-semibold flex items-center justify-center active:scale-95 transition ${
                         armed
                           ? 'bg-[var(--credit-red)] text-white'
                           : 'text-[var(--ink-muted)] hover:text-[var(--credit-red)] hover:bg-[var(--credit-tint)]'
@@ -471,7 +468,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
         onClose={() => {
           if (!saving) setModalType(null);
         }}
-        title={modalType === 'inflow' ? 'Cash In / Galla Deposit' : 'Shop Expense / Payout'}
+        title={modalType === 'inflow' ? 'Cash In / Deposit' : 'Shop Expense / Payout'}
         subtitle={activeOperatorName}
         initialDetent="peek"
       >
@@ -482,10 +479,10 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
-                className={`min-h-[44px] rounded-2xl text-xs font-extrabold uppercase active:scale-95 transition ${
+                className={`min-h-[44px] rounded-full text-xs font-semibold uppercase active:scale-95 transition border ${
                   mode === m
-                    ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)] ring-2 ring-[var(--brand-accent)]'
-                    : 'bg-[var(--app-bg)] text-[var(--ink)]'
+                    ? 'bg-[var(--brand)] text-[var(--brand-fg)] border-transparent'
+                    : 'bg-[var(--surface-subtle)] border-[var(--glass-border)] text-[var(--ink)]'
                 }`}
               >
                 {m}
@@ -503,10 +500,10 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                   key={cat}
                   type="button"
                   onClick={() => setCategory(cat)}
-                  className={`min-h-[40px] px-3.5 rounded-2xl text-xs font-bold active:scale-95 transition ${
+                  className={`min-h-[40px] px-3.5 rounded-full text-xs font-semibold active:scale-95 transition border ${
                     category === cat
-                      ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
-                      : 'bg-[var(--app-bg)] text-[var(--ink)]'
+                      ? 'bg-[var(--brand)] text-[var(--brand-fg)] border-transparent shadow-xs'
+                      : 'bg-[var(--surface-subtle)] border-[var(--glass-border)] text-[var(--ink)]'
                   }`}
                 >
                   {cat}
@@ -526,7 +523,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="500"
-                className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] ring-2 ring-[var(--brand-accent)] px-3 text-lg font-extrabold font-tabular text-[var(--ink)] outline-none"
+                className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 text-lg font-extrabold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
               />
             </div>
             <div>
@@ -535,7 +532,7 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
                 type="date"
                 value={entryDate}
                 onChange={(e) => setEntryDate(e.target.value)}
-                className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] px-3 text-xs font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                className="w-full min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3 text-xs font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
               />
             </div>
           </div>
@@ -551,9 +548,9 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
               placeholder={
                 modalType === 'inflow'
                   ? 'Morning opening cash / counter sale'
-                  : 'Chai, transport, electricity...'
+                  : 'Tea, transport, utilities...'
               }
-              className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
           </div>
 
@@ -563,9 +560,9 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="w-full min-h-[50px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
+            className="w-full min-h-[50px] rounded-full bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-semibold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
           >
-            {saving ? 'Saving...' : 'Save to Galla'}
+            {saving ? 'Saving...' : 'Save Entry'}
           </button>
         </div>
       </DetentSheetOverlay>

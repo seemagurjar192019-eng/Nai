@@ -2,46 +2,46 @@ import { wcagContrast } from 'culori';
 import { z } from 'zod';
 
 /**
- * Ucred Royal Indigo & Obsidian — Dual-Theme Fintech Color System
- * 60% Primary Canvas · 30% Structural Surfaces & Hairlines · 10% Brand Indigo & Hisaab Semantics
+ * Ucred Apple Minimal Monochrome — Dual-Theme Fintech Color System
+ * Pure White & Jet Black Canvas · Translucent Sky Notice Tint · Amount-Only Semantic Accents
  */
 export const UCRED_COLOR_SYSTEM = {
-  name: 'Ucred Royal Indigo',
+  name: 'Ucred Minimal Monochrome',
   light: {
-    canvas: '#F8FAFC', // Airy Slate Canvas
+    canvas: '#FFFFFF',
     surface: '#FFFFFF',
-    surfaceSubtle: '#F1F5F9',
-    border: '#E2E8F0',
-    ink: '#0F172A', // Deep Charcoal
-    inkMuted: '#475569', // Dark Slate
-    brand: '#1E3A8A', // Deep Royal Indigo
-    brandHover: '#1E40AF',
+    surfaceSubtle: '#F5F5F7',
+    border: '#E5E5EA',
+    ink: '#0A0A0A',
+    inkMuted: '#6E6E73',
+    brand: '#0A0A0A',
+    brandHover: '#262628',
     brandFg: '#FFFFFF',
-    accent: '#1E3A8A',
+    accent: '#0A0A0A',
     accentFg: '#FFFFFF',
-    accentTint: '#EFF6FF',
-    creditRed: '#DC2626',
+    accentTint: '#F2F4F8',
+    creditRed: '#B91C1C',
     debitGreen: '#15803D',
-    alertAmber: '#D97706',
-    munimGradient: 'linear-gradient(135deg, #4F46E5, #06B6D4)',
+    alertAmber: '#B45309',
+    munimGradient: 'linear-gradient(155deg, #27272A 0%, #09090B 100%)',
   },
   dark: {
-    canvas: '#09090B', // Obsidian Canvas
-    surface: '#18181B', // Elevated Dark Card
-    surfaceSubtle: '#27272A',
+    canvas: '#000000',
+    surface: '#121214',
+    surfaceSubtle: '#1C1C1F',
     border: '#27272A',
-    ink: '#FAFAFA', // Crisp White
-    inkMuted: '#94A3B8',
-    brand: '#2563EB', // High-contrast Royal Blue CTA
-    brandHover: '#1D4ED8',
-    brandFg: '#FFFFFF',
-    accent: '#3B82F6', // Indigo Glow highlight
-    accentFg: '#09090B',
-    accentTint: '#172554',
+    ink: '#F5F5F7',
+    inkMuted: '#98989D',
+    brand: '#FFFFFF',
+    brandHover: '#E5E5EA',
+    brandFg: '#0A0A0A',
+    accent: '#FFFFFF',
+    accentFg: '#0A0A0A',
+    accentTint: '#1C1C1F',
     creditRed: '#F87171',
     debitGreen: '#4ADE80',
     alertAmber: '#FBBF24',
-    munimGradient: 'linear-gradient(135deg, #6366F1, #22D3EE)',
+    munimGradient: 'linear-gradient(155deg, #27272A 0%, #141417 100%)',
   },
 } as const;
 

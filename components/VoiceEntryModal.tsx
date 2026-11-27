@@ -109,13 +109,19 @@ interface VoiceEntryModalProps {
   }) => void;
 }
 
+import {
+  SNAPPY_SPRING,
+  SPATIAL_SPRING,
+  APPLE_EASE,
+} from './motion/SpatialMotionEngine';
+
 interface BatchItemState extends ParsedHinglishEntry {
   selected: boolean;
   direction: TxDirection;
 }
 
-const SPRING_FAST = { type: 'spring' as const, stiffness: 420, damping: 28 };
-const SPRING_SHEET = { type: 'spring' as const, stiffness: 360, damping: 32 };
+const SPRING_FAST = SNAPPY_SPRING;
+const SPRING_SHEET = SPATIAL_SPRING;
 
 export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   open,
@@ -723,7 +729,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
           key="voice-modal-backdrop"
           role="dialog"
           aria-modal="true"
-          aria-label="Voice Khata and Counter Entry"
+          aria-label="Voice Ledger and Counter Entry"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.18, ease: 'easeOut' } }}
@@ -731,7 +737,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
           onClick={() => {
             if (!saving) onClose();
           }}
-          className={`fixed inset-0 z-50 bg-black/45 flex justify-center ${
+          className={`fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex justify-center ${
             stage === 'confirm' || stage === 'saved' ? 'items-center p-4' : 'items-end'
           }`}
         >
@@ -753,25 +759,25 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     opacity: 0,
                     scale: 0.35,
                     y: 110,
-                    transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+                    transition: { duration: 0.22, ease: APPLE_EASE },
                   }
                 : {
                     clipPath: 'circle(24px at 50% 92%)',
                     opacity: 0,
                     scale: 0.96,
-                    transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
+                    transition: { duration: 0.22, ease: APPLE_EASE },
                   }
             }
             transition={SPRING_SHEET}
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full bg-[var(--surface)] space-y-4 max-h-[90dvh] overflow-y-auto no-scrollbar overflow-hidden ${
+            className={`relative w-full liquid-glass-elevated space-y-4 max-h-[90dvh] overflow-y-auto no-scrollbar overflow-hidden ${
               stage === 'confirm' || stage === 'saved'
-                ? 'p-5 max-w-[385px] rounded-[28px] shadow-[0_20px_50px_rgba(17,24,39,0.22)]'
-                : 'px-6 pt-4 pb-6 max-w-[430px] rounded-t-[32px] spatial-sheet pb-safe'
+                ? 'p-5 max-w-[385px] rounded-[28px]'
+                : 'px-6 pt-4 pb-6 max-w-[430px] rounded-t-[32px] pb-safe'
             }`}
           >
 
-            <div className="w-10 h-1.5 rounded-full bg-[var(--surface-subtle)] mx-auto" />
+            <div className="w-10 h-1 rounded-full bg-[var(--ink-subtle)]/35 mx-auto" />
 
             {stage === 'listen' && (
               <div className="relative z-10 flex flex-col gap-3.5">
@@ -804,11 +810,11 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 </div>
 
                 {/* Hands-Free Counter Mode Toggle Pill */}
-                <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--app-bg)] px-3.5 py-2">
+                <div className="flex items-center justify-between gap-2 rounded-2xl bg-[var(--app-bg)] px-3.5 py-1.5">
                   <button
                     type="button"
                     onClick={() => setContinuousMode((v) => !v)}
-                    className="flex items-center gap-2 text-xs font-bold text-[var(--ink)] min-h-[38px] active:scale-95 transition"
+                    className="flex items-center gap-2 text-xs font-bold text-[var(--ink)] min-h-[44px] active:scale-95 transition"
                   >
                     <Repeat
                       className={`w-4 h-4 ${
@@ -827,7 +833,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                 {/* Top-Stacking Live Streaming Cards (Superlist Capture Feel) */}
                 <div className="space-y-2 max-h-56 overflow-y-auto no-scrollbar">
                   {aiParsing && (
-                    <div className="rounded-[22px] bg-[var(--surface)] shadow-[var(--spatial-shadow)] p-4 space-y-2.5">
+                    <div className="rounded-[22px] ios27-ceramic-tile p-4 space-y-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <div className="h-3.5 w-28 rounded-full spatial-shimmer" />
                         <div className="h-5 w-20 rounded-full spatial-shimmer" />
@@ -847,7 +853,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       {liveStreamPreview.map((entry, idx) => (
                         <div
                           key={`${entry.name}_${idx}`}
-                          className="rounded-[22px] bg-[var(--surface)] shadow-[var(--spatial-shadow)] ring-2 ring-[var(--brand)] p-3.5 flex items-center justify-between gap-3"
+                          className="rounded-[22px] ios27-ceramic-tile ring-2 ring-[var(--brand)] p-3.5 flex items-center justify-between gap-3"
                         >
                           <div className="min-w-0">
                             <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--brand-accent)]">
@@ -898,7 +904,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       initial={{ opacity: 0, y: -10, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={SPRING_FAST}
-                      className="flex items-center justify-between gap-2 text-xs bg-[var(--surface)] shadow-[var(--spatial-shadow)] rounded-[20px] px-3.5 py-2.5"
+                      className="flex items-center justify-between gap-2 text-xs ios27-ceramic-tile rounded-[20px] px-3.5 py-2.5"
                     >
                       <span className="font-extrabold text-[var(--ink)] truncate">
                         {item.customerName} · {item.direction === 'given' ? 'Credit' : 'Received'}
@@ -1002,7 +1008,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                           haptic.tap();
                           applyTranscriptToConfirm(sample);
                         }}
-                        className="min-h-[36px] px-3 rounded-xl bg-[var(--app-bg)] text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--brand-accent)] whitespace-nowrap shrink-0 active:scale-95 transition"
+                        className="min-h-[40px] px-3 rounded-xl bg-[var(--app-bg)] text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--brand-accent)] whitespace-nowrap shrink-0 active:scale-95 transition"
                       >
                         {sample}
                       </button>
@@ -1010,8 +1016,8 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                   </div>
                 </div>
 
-                {/* Clean 3-Button Solid Bottom Bar: Pause/Resume (||) | 22-Bar Waveform | Save (✓) */}
-                <div className="mt-1 rounded-full bg-[var(--surface-subtle)] shadow-md p-2 flex items-center justify-between gap-2">
+                {/* Clean 3-Button Liquid Glass Capsule Bottom Bar: Pause/Resume (||) | Waveform | Save (✓) */}
+                <div className="mt-1 rounded-full liquid-glass p-2 flex items-center justify-between gap-2">
                   <motion.button
                     whileTap={{ scale: 0.9 }}
                     transition={SPRING_FAST}
@@ -1075,7 +1081,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                         type="button"
                         disabled={aiParsing}
                         onClick={() => applyAiFallback(rawPhrase)}
-                        className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold active:scale-95 transition"
+                        className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold active:scale-95 transition"
                       >
                         <Mic className="w-3.5 h-3.5" />
                         <span>{aiParsing ? 'Parsing...' : 'Cloud Parse'}</span>
@@ -1111,7 +1117,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                         language
                       )
                     }
-                    className="shrink-0 inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl spatial-card text-xs font-extrabold text-[var(--brand-accent)] active:scale-95 transition"
+                    className="shrink-0 inline-flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-xl liquid-glass text-xs font-extrabold text-[var(--brand-accent)] active:scale-95 transition"
                   >
                     <Volume2 className="w-4 h-4" />
                     <span>Listen</span>
@@ -1202,7 +1208,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setDirection('given')}
-                        className={`min-h-[40px] px-3 rounded-xl text-xs font-extrabold active:scale-95 transition ${
+                        className={`min-h-[44px] px-3 rounded-xl text-xs font-extrabold active:scale-95 transition ${
                           direction === 'given'
                             ? 'bg-[var(--credit-red)] text-white shadow-xs'
                             : 'bg-[var(--surface)] text-[var(--ink-muted)]'
@@ -1213,7 +1219,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setDirection('received')}
-                        className={`min-h-[40px] px-3 rounded-xl text-xs font-extrabold active:scale-95 transition ${
+                        className={`min-h-[44px] px-3 rounded-xl text-xs font-extrabold active:scale-95 transition ${
                           direction === 'received'
                             ? 'bg-[var(--debit-green)] text-white shadow-xs'
                             : 'bg-[var(--surface)] text-[var(--ink-muted)]'

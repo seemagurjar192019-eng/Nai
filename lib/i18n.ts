@@ -512,3 +512,48 @@ export function buildBillShareMessage(params: {
       : '';
   return `${params.shopName} — ${heading} #${params.billNumber}\nDate: ${params.billDate}\nCustomer: ${params.customerName}\n\n${lines}\n\nTotal: ${formatINR(params.totalAmount)}${statusLine}${upiLine}\nThank you!`;
 }
+
+/** Mask email addresses and phone numbers before displaying in UI or screenshots. */
+export function maskContactIdentifier(raw: string): string {
+  const clean = String(raw || '').trim();
+  if (!clean) return '';
+  if (clean.includes('@')) {
+    const [local, domain] = clean.split('@');
+    if (!domain) return '••••';
+    const prefix = local.slice(0, Math.min(2, local.length));
+    return `${prefix}••••@${domain}`;
+  }
+  const digits = clean.replace(/\D/g, '');
+  if (digits.length >= 6) {
+    return `••••••${digits.slice(-4)}`;
+  }
+  return clean;
+}
+
+/** Format last backup ISO timestamp cleanly (e.g. "Today 4:10 PM"). */
+export function formatLastBackupLabel(iso: string | null | undefined, nowMs = Date.now()): string {
+  if (!iso) return 'Last backup: Not backed up yet';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return 'Last backup: Not backed up yet';
+    const now = new Date(nowMs);
+    const yest = new Date(nowMs);
+    yest.setDate(now.getDate() - 1);
+    const sameDay = (a: Date, b: Date) =>
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate();
+    const timeStr = d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    if (sameDay(d, now)) return `Last backup: Today ${timeStr}`;
+    if (sameDay(d, yest)) return `Last backup: Yesterday ${timeStr}`;
+    const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    return `Last backup: ${dateStr}, ${timeStr}`;
+  } catch {
+    return 'Last backup: Not backed up yet';
+  }
+}
+

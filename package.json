@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "NODE_ENV=production next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "clean": "next clean",
@@ -15,6 +15,7 @@
     "@capacitor/app": "^8.1.2",
     "@capacitor/cli": "^8.6.2",
     "@capacitor/core": "^8.6.2",
+    "@capacitor/ios": "^8.6.3",
     "@capacitor/status-bar": "^8.0.4",
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@google/genai": "^3.6.0",

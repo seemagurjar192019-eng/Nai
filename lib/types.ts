@@ -13,7 +13,7 @@ export type LanguageCode =
   | 'kn'
   | 'bn';
 
-export type AppearanceMode = 'light' | 'dark';
+export type AppearanceMode = 'system' | 'light' | 'dark';
 
 export type AccountKind = 'customer' | 'supplier';
 export type PersonaContext = 'personal' | 'kirana' | 'mandi' | 'wholesale';

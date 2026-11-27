@@ -264,7 +264,7 @@ export function computeDailyGallaPulse(params: {
 
   const profitBasisNote = hasCostData
     ? 'Based on stock cost margins minus today expenses'
-    : 'Based on today Galla net inflow minus expenses';
+    : 'Based on today cashbook net inflow minus expenses';
 
   return {
     todayStr,
@@ -440,4 +440,139 @@ export function applyKeypadKey(current: string, key: KeypadKey, maxIntegerDigits
 
   return `${current}${key}`;
 }
+
+/**
+ * Computes normalized 7-day transaction volume bars [oldest..today] in 0..100 range.
+ * Returns all 0s when there are zero transactions in the 7-day window.
+ */
+export function computeWeeklyCashVelocity(
+  transactions: LedgerTransaction[],
+  todayStr: string
+): number[] {
+  const parts = todayStr.split('-').map(Number);
+  const baseDate =
+    parts.length === 3 && !parts.some(Number.isNaN)
+      ? new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]))
+      : new Date();
+
+  const keys: string[] = [];
+  for (let offset = 6; offset >= 0; offset--) {
+    const d = new Date(baseDate);
+    d.setUTCDate(baseDate.getUTCDate() - offset);
+    keys.push(d.toISOString().slice(0, 10));
+  }
+
+  const bucketTotals = new Map<string, number>(keys.map((k) => [k, 0]));
+  for (const tx of transactions) {
+    let rawDate = typeof tx.billDate === 'string' ? tx.billDate : '';
+    if (!rawDate && typeof tx.createdAt === 'string') {
+      rawDate = tx.createdAt;
+    } else if (!rawDate && tx.createdAt && typeof tx.createdAt === 'object') {
+      const ts = tx.createdAt as { toDate?: () => Date; seconds?: number };
+      if (typeof ts.toDate === 'function') {
+        rawDate = ts.toDate().toISOString();
+      } else if (typeof ts.seconds === 'number') {
+        rawDate = new Date(ts.seconds * 1000).toISOString();
+      }
+    }
+    const dateKey = rawDate.slice(0, 10);
+    if (bucketTotals.has(dateKey)) {
+      bucketTotals.set(dateKey, (bucketTotals.get(dateKey) || 0) + Math.max(0, Number(tx.amount) || 0));
+    }
+  }
+
+  const raw = keys.map((k) => bucketTotals.get(k) || 0);
+  const maxVal = Math.max(...raw, 0);
+  if (maxVal <= 0) return [0, 0, 0, 0, 0, 0, 0];
+
+  return raw.map((val) => (val <= 0 ? 0 : Math.max(12, Math.round((val / maxVal) * 100))));
+}
+
+function editDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const prev = Array.from({ length: n + 1 }, (_, i) => i);
+  const curr = new Array<number>(n + 1).fill(0);
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    for (let j = 0; j <= n; j++) prev[j] = curr[j];
+  }
+  return prev[n];
+}
+
+function isSubsequence(needle: string, haystack: string): boolean {
+  if (!needle) return true;
+  let i = 0;
+  for (let j = 0; j < haystack.length && i < needle.length; j++) {
+    if (needle[i] === haystack[j]) i++;
+  }
+  return i === needle.length;
+}
+
+/**
+ * Smart search with strict substring match first, falling back to fuzzy typo/subsequence suggestions.
+ */
+export function filterAndSuggestAccounts(
+  accounts: LedgerAccount[],
+  rawQuery: string
+): { matches: LedgerAccount[]; isFuzzySuggestion: boolean } {
+  const q = rawQuery.trim().toLowerCase();
+  if (!q) return { matches: accounts, isFuzzySuggestion: false };
+
+  const digitsQuery = q.replace(/\D/g, '');
+  const strict = accounts.filter(
+    (a) =>
+      a.name.toLowerCase().includes(q) ||
+      a.phone.toLowerCase().includes(q) ||
+      (digitsQuery.length >= 3 && a.phone.replace(/\D/g, '').includes(digitsQuery))
+  );
+  if (strict.length > 0) {
+    return { matches: strict, isFuzzySuggestion: false };
+  }
+
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const scored: Array<{ acc: LedgerAccount; score: number }> = [];
+
+  for (const acc of accounts) {
+    const cleanName = acc.name.toLowerCase();
+    const words = cleanName.split(/\s+/).filter(Boolean);
+    let bestScore = Infinity;
+
+    for (const tok of tokens) {
+      if (tok.length < 2) continue;
+      const maxDist = tok.length <= 3 ? 1 : 2;
+      for (const word of words) {
+        const prefixSlice = word.slice(0, tok.length);
+        const distPrefix = editDistance(tok, prefixSlice);
+        const distFull = editDistance(tok, word);
+        const dist = Math.min(distPrefix, distFull);
+        if (dist <= maxDist) {
+          bestScore = Math.min(bestScore, dist);
+        } else if (tok.length >= 3 && isSubsequence(tok, word)) {
+          bestScore = Math.min(bestScore, 2.5);
+        }
+      }
+      if (cleanName.includes(tok.slice(0, Math.min(3, tok.length)))) {
+        bestScore = Math.min(bestScore, 2.8);
+      }
+    }
+
+    if (bestScore < Infinity) {
+      scored.push({ acc, score: bestScore });
+    }
+  }
+
+  scored.sort((a, b) => a.score - b.score || a.acc.name.localeCompare(b.acc.name));
+  return {
+    matches: scored.map((s) => s.acc),
+    isFuzzySuggestion: scored.length > 0,
+  };
+}
+
 

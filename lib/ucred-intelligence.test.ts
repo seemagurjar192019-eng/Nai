@@ -4,6 +4,8 @@ import {
   applyKeypadKey,
   computeCustomerTrustScore,
   computeNetCashflowSummary,
+  computeWeeklyCashVelocity,
+  filterAndSuggestAccounts,
   getTopDuePartiesToday,
 } from './ucred-intelligence';
 import type { LedgerAccount, LedgerTransaction } from './types';
@@ -91,5 +93,30 @@ describe('Ucred Intelligence Pure Helpers', () => {
 
     amt = applyKeypadKey('', '.');
     assert.equal(amt, '0.');
+  });
+
+  it('computes real 7-day cash velocity bars and falls back cleanly on typos in search', () => {
+    assert.deepEqual(computeWeeklyCashVelocity([], '2026-04-10'), [0, 0, 0, 0, 0, 0, 0]);
+
+    const txs = [
+      { id: 't1', amount: 500, billDate: '2026-04-08', createdAt: '' },
+      { id: 't2', amount: 1000, billDate: '2026-04-10', createdAt: '' },
+    ] as LedgerTransaction[];
+    const bars = computeWeeklyCashVelocity(txs, '2026-04-10');
+    assert.equal(bars.length, 7);
+    assert.equal(bars[4], 50); // April 8
+    assert.equal(bars[6], 100); // April 10
+    assert.equal(bars[0], 0);
+
+    const accounts = [
+      makeAccount({ id: '1', name: 'Rahul Sharma', phone: '9876543210' }),
+      makeAccount({ id: '2', name: 'Ramesh Verma', phone: '9123456789' }),
+    ];
+    assert.equal(filterAndSuggestAccounts(accounts, 'hul').isFuzzySuggestion, false);
+    assert.equal(filterAndSuggestAccounts(accounts, 'hul').matches[0].name, 'Rahul Sharma');
+
+    const fuzzy = filterAndSuggestAccounts(accounts, 'rahl');
+    assert.equal(fuzzy.isFuzzySuggestion, true);
+    assert.equal(fuzzy.matches[0].name, 'Rahul Sharma');
   });
 });

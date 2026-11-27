@@ -63,50 +63,109 @@ export function setHapticsEnabled(enabled: boolean): void {
 }
 
 /**
- * Zero-cost iOS 27 tactile click & confirmation tone synthesizer (Web Audio API).
- * No external MP3 assets required; gracefully silent when muted or unsupported.
+ * Flagship Apple iOS 27 Tactile Acoustic Click & Tone Synthesizer (Web Audio API).
+ * Ultra-fast micro-pulses simulating physical mechanical switches and Taptic feedback.
  */
-function playTactileTone(kind: 'tap' | 'orb' | 'swipe' | 'success'): void {
+function playTactileTone(kind: 'tap' | 'keypad' | 'orb' | 'swipe' | 'select' | 'success'): void {
   if (!getSoundEnabled()) return;
   const ctx = getAudioContext();
   if (!ctx) return;
 
   try {
     const now = ctx.currentTime;
-    const playNote = (
-      freqStart: number,
-      freqEnd: number,
-      durationSec: number,
-      gainPeak: number,
-      offsetSec: number = 0,
-      type: OscillatorType = 'sine'
-    ) => {
+
+    if (kind === 'tap' || kind === 'keypad') {
+      // Crisp 8ms mechanical switch click
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freqStart, now + offsetSec);
-      osc.frequency.exponentialRampToValueAtTime(
-        Math.max(80, freqEnd),
-        now + offsetSec + durationSec
-      );
-      gain.gain.setValueAtTime(0.0001, now + offsetSec);
-      gain.gain.linearRampToValueAtTime(gainPeak, now + offsetSec + 0.003);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + offsetSec + durationSec);
+      const filter = ctx.createBiquadFilter();
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(kind === 'keypad' ? 1400 : 1200, now);
+      filter.Q.setValueAtTime(3.2, now);
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(kind === 'keypad' ? 980 : 840, now);
+      osc.frequency.exponentialRampToValueAtTime(180, now + 0.009);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.032, now + 0.0015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.009);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.01);
+    } else if (kind === 'select') {
+      // Soft iOS picker wheel tick
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1100, now);
+      osc.frequency.exponentialRampToValueAtTime(450, now + 0.008);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.024, now + 0.001);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.008);
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start(now + offsetSec);
-      osc.stop(now + offsetSec + durationSec + 0.01);
-    };
-
-    if (kind === 'tap') {
-      playNote(920, 420, 0.014, 0.028, 0, 'triangle');
+      osc.start(now);
+      osc.stop(now + 0.009);
     } else if (kind === 'orb') {
-      playNote(520, 780, 0.045, 0.036, 0, 'sine');
+      // Siri / Voice Munim warm acoustic pulse
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(540, now);
+      osc.frequency.exponentialRampToValueAtTime(820, now + 0.04);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.038, now + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.05);
     } else if (kind === 'swipe') {
-      playNote(680, 980, 0.025, 0.03, 0, 'sine');
+      // Gesture threshold snap
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(700, now);
+      osc.frequency.exponentialRampToValueAtTime(1050, now + 0.022);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.032, now + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.024);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.025);
     } else if (kind === 'success') {
-      playNote(660, 880, 0.075, 0.038, 0, 'sine');
-      playNote(880, 1180, 0.11, 0.042, 0.055, 'sine');
+      // Apple Pay / Cash two-note bell confirmation
+      const playChime = (freq: number, startOffset: number, dur: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + startOffset);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.06, now + startOffset + dur);
+
+        gain.gain.setValueAtTime(0.001, now + startOffset);
+        gain.gain.linearRampToValueAtTime(0.045, now + startOffset + 0.006);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + startOffset + dur);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + startOffset);
+        osc.stop(now + startOffset + dur + 0.01);
+      };
+      playChime(698.46, 0, 0.08); // F5
+      playChime(1046.5, 0.065, 0.14); // C6
     }
   } catch {
     // Ignore Web Audio autoplay restrictions
@@ -125,27 +184,39 @@ function triggerVibrate(pattern: number | number[]): void {
 }
 
 export const haptics = {
-  /** Subtle 10ms iOS tactile click + vibrate for pills, tabs, keypad keys, and cards */
+  /** Subtle 8ms mechanical tactile click + vibration for buttons, pills, and cards */
   tap: (): void => {
-    triggerVibrate(10);
+    triggerVibrate(8);
     playTactileTone('tap');
   },
 
-  /** Distinct 12ms tactile click + soft upward chime for the raised Voice Orb */
+  /** Ultra-snappy numeric keypad keypress */
+  keypad: (): void => {
+    triggerVibrate(6);
+    playTactileTone('keypad');
+  },
+
+  /** Segmented control and filter tab selection click */
+  select: (): void => {
+    triggerVibrate(6);
+    playTactileTone('select');
+  },
+
+  /** Warm acoustic pulse for the raised Voice Munim orb */
   orbTap: (): void => {
     triggerVibrate(12);
     playTactileTone('orb');
   },
 
-  /** Medium 18ms bump when crossing horizontal swipe-to-action thresholds */
+  /** Medium 18ms bump when crossing horizontal swipe thresholds */
   swipe: (): void => {
     triggerVibrate(18);
     playTactileTone('swipe');
   },
 
-  /** Apple Pay-style two-note confirmation chime + double-pulse haptic on save */
+  /** Apple Pay two-note melodic chime + double-pulse confirmation on save */
   success: (): void => {
-    triggerVibrate([14, 32, 18]);
+    triggerVibrate([12, 28, 16]);
     playTactileTone('success');
   },
 };

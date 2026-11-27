@@ -7,7 +7,11 @@ import {
   applyRestoreBusinessBackup,
   type GuestVaultState,
 } from '@/lib/guest-store';
-import { sanitizeCsvCell, validateSafeBackupJson } from '@/lib/security';
+import {
+  recordLastBackupAt,
+  sanitizeCsvCell,
+  validateSafeBackupJson,
+} from '@/lib/security';
 import type {
   ActivityLog,
   BillDocument,
@@ -84,6 +88,7 @@ export function useLedgerBackup({
     a.download = `${currentBusiness.name.replace(/\s+/g, '_')}_ucred_ledger.csv`;
     a.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    recordLastBackupAt();
   }, [currentBusiness, activeAccounts, activeTransactions]);
 
   const handleExportJson = useCallback(() => {
@@ -108,6 +113,7 @@ export function useLedgerBackup({
     a.download = `${currentBusiness.name.replace(/\s+/g, '_')}_ucred_backup.json`;
     a.click();
     URL.revokeObjectURL(url);
+    recordLastBackupAt();
   }, [
     currentBusiness,
     activeAccounts,

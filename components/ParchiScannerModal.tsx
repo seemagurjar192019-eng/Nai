@@ -7,6 +7,7 @@ import {
   Check,
   FileText,
   Loader2,
+  PackagePlus,
   Plus,
   Receipt,
   RefreshCw,
@@ -48,6 +49,9 @@ interface ParchiScannerModalProps {
     paymentStatus: BillPaymentStatus;
     notes: string;
   }) => void;
+  onRestockItems?: (
+    items: Array<{ name: string; quantity: number; unit: string; price: number }>
+  ) => Promise<void>;
 }
 
 export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
@@ -56,6 +60,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
   accounts,
   onPostToKhata,
   onCreateBillFromScan,
+  onRestockItems,
 }) => {
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
@@ -77,6 +82,8 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
 
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
+  const [restocking, setRestocking] = useState(false);
+  const [restockSuccess, setRestockSuccess] = useState(false);
 
   const matchedAccount = useMemo(() => {
     const clean = partyName.trim().toLowerCase();
@@ -112,6 +119,8 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
     setScanning(false);
     setScanError('');
     setHasScanResult(false);
+    setRestocking(false);
+    setRestockSuccess(false);
     setPartyName('');
     setPhone('');
     setDirection('given');
@@ -250,6 +259,32 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
     onClose();
   };
 
+  const validStockItems = useMemo(
+    () => items.filter((i) => i.name.trim() && (Number(i.qty) || 0) > 0),
+    [items]
+  );
+
+  const handleRestockStock = async () => {
+    if (!onRestockItems || validStockItems.length === 0 || restocking || restockSuccess) return;
+    setPostError('');
+    setRestocking(true);
+    try {
+      await onRestockItems(
+        validStockItems.map((it) => ({
+          name: it.name.trim(),
+          quantity: Number(it.qty) || 1,
+          unit: 'pcs',
+          price: Number(it.rate) || 0,
+        }))
+      );
+      setRestockSuccess(true);
+    } catch (err) {
+      setPostError(err instanceof Error ? err.message : 'Failed to restock scanned items.');
+    } finally {
+      setRestocking(false);
+    }
+  };
+
   return (
     <DetentSheetOverlay
       open={open}
@@ -302,8 +337,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                 Capture Handwritten Receipt or Invoice
               </p>
               <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
-                Supports Hindi, Hinglish, and English kirana slips, supplier invoices, and thermal
-                receipts.
+                Supports handwritten retail slips, supplier invoices, and thermal receipts.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2.5">
@@ -318,7 +352,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
               <button
                 type="button"
                 onClick={() => galleryInputRef.current?.click()}
-                className="min-h-[48px] px-4 rounded-2xl spatial-card font-extrabold text-sm text-[var(--ink)] inline-flex items-center justify-center gap-2 active:scale-95 transition"
+                className="min-h-[48px] px-4 rounded-2xl liquid-glass font-extrabold text-sm text-[var(--ink)] inline-flex items-center justify-center gap-2 active:scale-95 transition"
               >
                 <Upload className="w-4 h-4 text-[var(--brand-accent)]" />
                 <span>Upload</span>
@@ -340,7 +374,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={thumbDataUrl}
-                  alt="Scanned Parchi preview"
+                  alt="Scanned receipt preview"
                   className="w-full max-h-52 object-contain"
                 />
                 {scanning && (
@@ -358,7 +392,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                   type="button"
                   disabled={scanning}
                   onClick={() => cameraInputRef.current?.click()}
-                  className="min-h-[44px] rounded-xl spatial-card text-xs font-bold text-[var(--ink)] active:scale-95 transition"
+                  className="min-h-[44px] rounded-xl liquid-glass text-xs font-bold text-[var(--ink)] active:scale-95 transition"
                 >
                   Retake
                 </button>
@@ -416,7 +450,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => scanDataUrl && runAiScan(scanDataUrl)}
-                    className="min-h-[40px] px-3 rounded-xl bg-[var(--credit-red)] text-white text-xs font-bold inline-flex items-center gap-1.5 active:scale-95 transition"
+                    className="min-h-[44px] px-3.5 rounded-xl bg-[var(--credit-red)] text-white text-xs font-bold inline-flex items-center gap-1.5 active:scale-95 transition"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Retry Scan</span>
@@ -430,7 +464,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                         setItems([{ name: 'Receipt Item', qty: 1, rate: 0, gstRate: 0 }]);
                       }
                     }}
-                    className="min-h-[40px] px-3 rounded-xl spatial-card text-xs font-bold text-[var(--ink)] active:scale-95 transition"
+                    className="min-h-[44px] px-3.5 rounded-xl liquid-glass text-xs font-bold text-[var(--ink)] active:scale-95 transition"
                   >
                     Fill Manually
                   </button>
@@ -532,7 +566,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                       onClick={() =>
                         setItems((prev) => [...prev, { name: '', qty: 1, rate: 0, gstRate: 0 }])
                       }
-                      className="text-xs font-extrabold text-[var(--brand-accent)] inline-flex items-center gap-1 active:scale-95 transition"
+                      className="min-h-[44px] px-2 text-xs font-extrabold text-[var(--brand-accent)] inline-flex items-center gap-1 active:scale-95 transition"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Item</span>
@@ -554,7 +588,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                             setItems(next);
                           }}
                           placeholder="Item"
-                          className="col-span-5 min-h-[40px] rounded-xl spatial-card px-2.5 text-xs font-semibold text-[var(--ink)] outline-none"
+                          className="col-span-5 min-h-[44px] rounded-xl ios27-ceramic-tile px-2.5 text-xs font-semibold text-[var(--ink)] outline-none"
                         />
                         <input
                           type="number"
@@ -568,7 +602,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                             setManualTotal('');
                           }}
                           placeholder="Qty"
-                          className="col-span-2 min-h-[40px] rounded-xl spatial-card px-2 text-xs font-tabular text-[var(--ink)] outline-none"
+                          className="col-span-2 min-h-[44px] rounded-xl ios27-ceramic-tile px-2 text-xs font-tabular text-[var(--ink)] outline-none"
                         />
                         <input
                           type="number"
@@ -581,7 +615,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                             setManualTotal('');
                           }}
                           placeholder="Rate"
-                          className="col-span-3 min-h-[40px] rounded-xl spatial-card px-2 text-xs font-tabular text-[var(--ink)] outline-none"
+                          className="col-span-3 min-h-[44px] rounded-xl ios27-ceramic-tile px-2 text-xs font-tabular text-[var(--ink)] outline-none"
                         />
                         <button
                           type="button"
@@ -590,7 +624,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                             setManualTotal('');
                           }}
                           aria-label="Remove item"
-                          className="col-span-2 min-h-[40px] flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--credit-red)] active:scale-95 transition"
+                          className="col-span-2 min-h-[44px] flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--credit-red)] active:scale-95 transition"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -630,27 +664,58 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                 {postError && <p className="text-xs font-bold text-[var(--credit-red)]">{postError}</p>}
 
                 {/* Dual Action Bar */}
-                <div className="grid grid-cols-2 gap-2.5 pt-1">
-                  <button
-                    type="button"
-                    disabled={posting}
-                    onClick={handlePostKhata}
-                    className="min-h-[48px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-xs inline-flex items-center justify-center gap-1.5 tactile-key-primary disabled:opacity-60 active:scale-95 transition"
-                  >
-                    <Check className="w-4 h-4 shrink-0" />
-                    <span className="font-tabular">
-                      {posting ? 'Posting...' : `Post ${formatINR(effectiveTotal)}`}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={posting}
-                    onClick={handleOpenInBillBuilder}
-                    className="min-h-[48px] rounded-2xl bg-[var(--app-bg)] font-extrabold text-xs text-[var(--ink)] inline-flex items-center justify-center gap-1.5 active:scale-95 transition"
-                  >
-                    <FileText className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
-                    <span>Create GST Bill</span>
-                  </button>
+                <div className="space-y-2 pt-1">
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      disabled={posting || restocking}
+                      onClick={handlePostKhata}
+                      className="min-h-[48px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-xs inline-flex items-center justify-center gap-1.5 tactile-key-primary disabled:opacity-60 active:scale-95 transition"
+                    >
+                      <Check className="w-4 h-4 shrink-0" />
+                      <span className="font-tabular">
+                        {posting ? 'Posting...' : `Post ${formatINR(effectiveTotal)}`}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={posting || restocking}
+                      onClick={handleOpenInBillBuilder}
+                      className="min-h-[48px] rounded-2xl bg-[var(--app-bg)] font-extrabold text-xs text-[var(--ink)] inline-flex items-center justify-center gap-1.5 active:scale-95 transition"
+                    >
+                      <FileText className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
+                      <span>Create GST Bill</span>
+                    </button>
+                  </div>
+
+                  {onRestockItems && validStockItems.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={posting || restocking || restockSuccess}
+                      onClick={handleRestockStock}
+                      className={`w-full min-h-[44px] rounded-2xl border font-extrabold text-xs inline-flex items-center justify-center gap-2 active:scale-95 transition ${
+                        restockSuccess
+                          ? 'bg-[var(--debit-tint)] border-[var(--debit-green)]/30 text-[var(--debit-green)]'
+                          : 'bg-[var(--surface-subtle)] border-[var(--glass-border)] text-[var(--ink)] hover:border-[var(--brand-accent)]/40'
+                      }`}
+                    >
+                      {restockSuccess ? (
+                        <>
+                          <Check className="w-4 h-4 shrink-0" />
+                          <span>Restocked {validStockItems.length} items to Inventory</span>
+                        </>
+                      ) : (
+                        <>
+                          <PackagePlus className="w-4 h-4 shrink-0 text-[var(--ink)]" />
+                          <span>
+                            {restocking
+                              ? 'Updating stock...'
+                              : `Add ${validStockItems.length} Scanned Items to Stock`}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </>
             )}

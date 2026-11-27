@@ -48,7 +48,6 @@ import { getPersonaCapabilities, type PersonaCapabilities } from '@/lib/persona'
 import type {
   Business,
   CashbookMode,
-  CustomerTrustScore,
   LanguageCode,
   LedgerAccount,
   LedgerTransaction,
@@ -57,13 +56,17 @@ import type {
 import { haptics } from '@/utils/haptics';
 import { OdometerNumber } from '../motion/OdometerNumber';
 import { DetentSheetOverlay } from '../motion/DetentSheetOverlay';
+import {
+  SNAPPY_SPRING,
+  SPATIAL_SPRING,
+  TACTILE_TAP_ANIMATION,
+} from '../motion/SpatialMotionEngine';
 
 export interface PartyStatementViewProps {
   account: LedgerAccount;
   business: Business;
   language: LanguageCode;
   transactions: LedgerTransaction[];
-  trustScore?: CustomerTrustScore;
   capabilities?: PersonaCapabilities;
   hideBalance?: boolean;
   onToggleHideBalance?: () => void;
@@ -108,8 +111,8 @@ const KEYPAD_BUTTONS = [
   '.', '0', '=', '+',
 ] as const;
 
-const DETAIL_SPRING = { type: 'spring' as const, stiffness: 360, damping: 32, mass: 0.85 };
-const ACCORDION_SPRING = { type: 'spring' as const, stiffness: 400, damping: 30 };
+const DETAIL_SPRING = SPATIAL_SPRING;
+const ACCORDION_SPRING = SNAPPY_SPRING;
 
 function evaluateCalcExpression(expr: string): number {
   const sanitized = expr.replace(/×/g, '*').replace(/[^0-9+\-*/.]/g, '');
@@ -143,7 +146,6 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
   business,
   language,
   transactions,
-  trustScore,
   capabilities: capabilitiesProp,
   hideBalance = false,
   onToggleHideBalance,
@@ -466,7 +468,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
   // Calculator Modal View
   if (calcDirection) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/50 flex justify-center">
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-center">
         <div className="w-full max-w-[460px] spatial-shell-bg flex-1 flex flex-col justify-between p-4 pb-safe shadow-2xl">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -477,13 +479,12 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                   setCalcDirection(null);
                 }}
                 aria-label="Back to ledger"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+                className="min-w-[44px] min-h-[44px] rounded-full liquid-glass flex items-center justify-center active:scale-95 transition"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div
-                style={{ backgroundColor: getAvatarColor(account.name) }}
-                className="w-10 h-10 rounded-full text-white font-bold flex items-center justify-center shrink-0 shadow-sm"
+                className="w-10 h-10 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] font-bold font-display text-sm flex items-center justify-center shrink-0 shadow-sm"
               >
                 {account.name.charAt(0).toUpperCase()}
               </div>
@@ -513,12 +514,12 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                       haptics.tap();
                       setCalcDirection(d);
                     }}
-                    className={`min-h-[38px] px-2.5 rounded-xl text-xs font-bold active:scale-95 transition ${
+                    className={`min-h-[44px] px-3 rounded-xl text-xs font-bold active:scale-95 transition ${
                       calcDirection === d
                         ? d === 'given'
                           ? 'bg-[var(--credit-red)] text-white shadow-sm'
                           : 'bg-[var(--debit-green)] text-white shadow-sm'
-                        : 'spatial-card text-[var(--ink)]'
+                        : 'liquid-glass text-[var(--ink)]'
                     }`}
                   >
                     {d === 'given' ? 'Given' : 'Received'}
@@ -528,9 +529,15 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
             )}
           </div>
 
-          <div className="py-4 text-center space-y-1.5">
+          <div className="py-4 text-center space-y-1.5 px-3 overflow-hidden">
             <div
-              className={`font-display text-5xl font-extrabold font-tabular tracking-tight ${
+              className={`font-display font-extrabold font-tabular tracking-tight truncate max-w-full mx-auto ${
+                calcExpr.length >= 12
+                  ? 'text-2xl sm:text-3xl'
+                  : calcExpr.length >= 8
+                    ? 'text-3xl sm:text-4xl'
+                    : 'text-4xl sm:text-5xl'
+              } ${
                 calcDirection === 'given'
                   ? 'text-[var(--credit-red)]'
                   : 'text-[var(--debit-green)]'
@@ -555,7 +562,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
           </div>
 
           <div className="space-y-2.5">
-            <div className="flex items-center gap-2 rounded-2xl spatial-card px-3.5 min-h-[48px]">
+            <div className="flex items-center gap-2 rounded-2xl liquid-glass px-3.5 min-h-[48px]">
               <Receipt className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
               <input
                 type="text"
@@ -568,14 +575,14 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                 type="button"
                 onClick={handleDictateNote}
                 aria-label="Speak note"
-                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--brand-accent)] hover:bg-[var(--brand-tint)] active:scale-95 transition"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--brand-accent)] hover:bg-[var(--brand-tint)] active:scale-95 transition"
               >
                 <Mic className="w-4 h-4" />
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
-              <label className="flex items-center justify-between gap-2 rounded-2xl spatial-card px-3.5 min-h-[46px] text-xs font-bold text-[var(--ink)] cursor-pointer">
+              <label className="flex items-center justify-between gap-2 rounded-2xl liquid-glass px-3.5 min-h-[46px] text-xs font-bold text-[var(--ink)] cursor-pointer">
                 <span className="inline-flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-[var(--brand-accent)]" />
                   <span>Date</span>
@@ -591,7 +598,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-between gap-2 rounded-2xl spatial-card px-3.5 min-h-[46px] text-xs font-bold text-[var(--ink)] active:scale-95 transition"
+                className="flex items-center justify-between gap-2 rounded-2xl liquid-glass px-3.5 min-h-[46px] text-xs font-bold text-[var(--ink)] active:scale-95 transition"
               >
                 <span className="inline-flex items-center gap-1.5">
                   <Camera className="w-4 h-4 text-[var(--brand-accent)]" />
@@ -609,9 +616,9 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
             </div>
 
             {!editingTx && capabilities.showGalla && (
-              <div className="flex items-center justify-between gap-2 rounded-2xl spatial-card px-3.5 py-2">
+              <div className="flex items-center justify-between gap-2 rounded-2xl liquid-glass px-3.5 py-2">
                 <span className="text-[11px] font-bold text-[var(--ink-muted)]">
-                  Sync to Today&apos;s Galla
+                  Sync to Cashbook
                 </span>
                 <div className="flex items-center gap-1.5">
                   {(
@@ -628,7 +635,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                         haptics.tap();
                         setSyncGallaMode(opt.id);
                       }}
-                      className={`min-h-[34px] px-3 rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
+                      className={`min-h-[38px] px-3 rounded-xl text-[11px] font-extrabold active:scale-95 transition ${
                         syncGallaMode === opt.id
                           ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-xs'
                           : 'bg-[var(--app-bg)] text-[var(--ink-muted)]'
@@ -654,7 +661,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                     setCalcDirection(null);
                     onOpenCreateBill(account.name, account.phone);
                   }}
-                  className="min-h-[52px] px-4 rounded-2xl spatial-card text-sm font-bold text-[var(--ink)] inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 transition"
+                  className="min-h-[52px] px-4 rounded-2xl liquid-glass text-sm font-bold text-[var(--ink)] inline-flex items-center gap-1.5 whitespace-nowrap active:scale-95 transition"
                 >
                   <FileText className="w-4 h-4 text-[var(--brand-accent)]" />
                   <span>Create Bill</span>
@@ -676,20 +683,21 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
             {KEYPAD_BUTTONS.map((btn) => {
               const isOp = ['+', '-', '×', '=', 'BACK'].includes(btn);
               return (
-                <button
+                <motion.button
                   key={btn}
                   type="button"
+                  whileTap={TACTILE_TAP_ANIMATION}
                   onClick={() => handleKeypadPress(btn)}
-                  className={`min-h-[54px] rounded-2xl font-tabular text-xl font-bold flex items-center justify-center transition active:scale-95 ${
+                  className={`min-h-[56px] rounded-2xl font-tabular text-xl font-bold flex items-center justify-center transition ${
                     btn === '='
                       ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-md'
                       : isOp
                         ? 'bg-[var(--brand-tint)] text-[var(--brand-accent)]'
-                        : 'spatial-card text-[var(--ink)]'
+                        : 'ios27-ceramic-tile text-[var(--ink)]'
                   }`}
                 >
                   {btn === 'BACK' ? <Delete className="w-5 h-5" /> : btn}
-                </button>
+                </motion.button>
               );
             })}
           </div>
@@ -720,15 +728,15 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
         x: prefersReducedMotion ? 0 : swipeBackX,
         touchAction: 'pan-y',
       }}
-      className="flex flex-col h-full rounded-[34px] spatial-card overflow-hidden bg-[var(--surface)] will-change-transform"
+      className="flex flex-col h-full rounded-[34px] liquid-glass-elevated overflow-hidden will-change-transform"
     >
       {/* Drag-Down Pull Bar for Z-Axis Sheet Dismiss */}
       <div
         onPointerDown={(e) => sheetDragControls.start(e)}
         aria-label="Pull down to close statement"
-        className="no-print pt-2 pb-0.5 flex justify-center bg-[var(--surface)] cursor-grab active:cursor-grabbing touch-none"
+        className="no-print pt-2.5 pb-1 flex justify-center cursor-grab active:cursor-grabbing touch-none"
       >
-        <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)]" />
+        <div className="w-10 h-1 rounded-full bg-[var(--ink-subtle)]/35" />
       </div>
 
       {/* Statement Header Bar */}
@@ -737,7 +745,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
           if ((e.target as HTMLElement).closest('button, a, input')) return;
           sheetDragControls.start(e);
         }}
-        className="no-print bg-[var(--surface)] shadow-[0_6px_18px_-10px_rgba(15,23,42,0.08)] px-3 py-2 flex items-center justify-between gap-2"
+        className="no-print border-b border-[var(--surface-border)] px-3 py-2 flex items-center justify-between gap-2"
       >
         <div className="flex items-center gap-2 min-w-0">
           <button
@@ -752,8 +760,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div
-            style={{ backgroundColor: getAvatarColor(account.name) }}
-            className="w-10 h-10 rounded-full text-white font-bold flex items-center justify-center shrink-0 shadow-xs"
+            className="w-10 h-10 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] font-bold font-display text-sm flex items-center justify-center shrink-0 shadow-xs"
           >
             {account.name.charAt(0).toUpperCase()}
           </div>
@@ -776,9 +783,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
               {account.name}
             </h2>
             <p className="text-[11px] font-semibold text-[var(--brand-accent)] truncate">
-              {trustScore && account.kind === 'customer'
-                ? `Trust ${trustScore.score}%`
-                : 'View Profile'}
+              View Profile
               {account.creditLimit ? ` · Limit ₹${account.creditLimit.toLocaleString('en-IN')}` : ''}
               {account.promiseDate ? ` · Promise ${account.promiseDate}` : ''}
             </p>
@@ -794,7 +799,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                 onToggleHideBalance();
               }}
               aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
-              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+              className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
             >
               {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -808,7 +813,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
               }}
               aria-label="Scan Receipt"
               title="Scan Receipt"
-              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+              className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
             >
               <Camera className="w-4 h-4" />
             </button>
@@ -821,7 +826,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
             }}
             aria-label="Print PDF Statement"
             title="Print / Save PDF Statement"
-            className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
           >
             <FileText className="w-4 h-4" />
           </button>
@@ -832,7 +837,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
               setSearchOpen((v) => !v);
             }}
             aria-label="Search entries"
-            className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
           >
             <Search className="w-4 h-4" />
           </button>
@@ -840,21 +845,21 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
       </div>
 
       {searchOpen && (
-        <div className="no-print bg-[var(--surface)] px-4 py-2">
+        <div className="no-print px-4 py-2 border-b border-[var(--surface-border)]">
           <input
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search notes or ₹ amount..."
-            className="w-full min-h-[42px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+            className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
           />
         </div>
       )}
 
       {/* Timeline Filter Strip */}
       {transactions.length > 0 && (
-        <div className="no-print bg-[var(--surface)] px-3 py-2 border-b border-[var(--surface-border)]">
-          <div className="grid grid-cols-4 rounded-xl bg-[var(--surface-subtle)] p-1">
+        <div className="no-print px-3 py-2 border-b border-[var(--surface-border)]">
+          <div className="grid grid-cols-4 rounded-2xl liquid-glass p-1">
             {(
               [
                 { id: 'all', label: 'All' },
@@ -872,7 +877,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                     haptics.tap();
                     setTimelineFilter(f.id);
                   }}
-                  className={`relative min-h-[34px] px-2 rounded-lg text-xs font-extrabold whitespace-nowrap transition-colors ${
+                  className={`relative min-h-[40px] px-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-colors ${
                     active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
                   }`}
                 >
@@ -880,7 +885,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                     <motion.span
                       layoutId={prefersReducedMotion ? undefined : 'partyTimelineFilterSeg'}
                       transition={ACCORDION_SPRING}
-                      className="absolute inset-0 rounded-lg bg-[var(--surface)] shadow-xs"
+                      className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
                     />
                   )}
                   <span className="relative z-10">{f.label}</span>
@@ -906,12 +911,53 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
       )}
 
       {/* Printable Header Summary */}
-      <div className="hidden print:block p-6 border-b border-slate-300">
-        <h1 className="text-2xl font-bold">{business.name} — Party Statement</h1>
-        <p className="text-sm">
-          Party: {account.name} {account.phone ? `(${account.phone})` : ''} | Net Balance:{' '}
-          {formatINR(absBal)} {balLabel}
-        </p>
+      <div className="hidden print:flex items-start justify-between gap-6 p-6 border-b border-slate-300 bg-white text-slate-900">
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+            Party Ledger Statement
+          </p>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {business.name && business.name !== 'My Store' ? business.name : 'Your Shop'}
+          </h1>
+          {(business.gstNumber || business.phone || business.address) && (
+            <p className="text-xs text-slate-600">
+              {[
+                business.gstNumber ? `GSTIN: ${business.gstNumber}` : '',
+                business.phone ? `Ph: ${business.phone}` : '',
+                business.address || '',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          )}
+          <div className="pt-2 text-sm space-y-0.5">
+            <p className="font-semibold">
+              Party: {account.name} {account.phone ? `(${account.phone})` : ''}
+            </p>
+            <p className="font-bold">
+              Net Balance: {formatINR(absBal)} {balLabel}
+            </p>
+            <p className="text-xs text-slate-500">
+              Statement Date: {formatDateHeading(getLocalDateKey())}
+            </p>
+          </div>
+        </div>
+        {business.upiId && account.balance > 0 && (
+          <div className="flex flex-col items-center gap-1 rounded-xl border border-slate-300 p-3 shrink-0">
+            <QRCodeSVG
+              value={buildUpiUri(
+                business.upiId,
+                business.name && business.name !== 'My Store' ? business.name : 'Your Shop',
+                absBal
+              )}
+              size={84}
+            />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700">
+              Scan to Pay Balance
+            </span>
+            <span className="text-[10px] text-slate-500">{business.upiId}</span>
+          </div>
+        )}
       </div>
 
       {/* Chronological Financial Timeline Cards (Zero Chat Bubbles — Tap Row to Expand Accordion) */}
@@ -941,7 +987,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                 const delaySec = Math.min(runningRowIdx++, 10) * 0.025;
                 const metaParts: string[] = [formatTimeOnly(tx.billDate)];
                 if (tx.createdByName) metaParts.push(tx.createdByName);
-                if (tx.gallaSynced) metaParts.push('Galla');
+                if (tx.gallaSynced) metaParts.push('Cashbook');
 
                 const slipUrl = buildWhatsAppUrl(
                   account.phone,
@@ -959,10 +1005,10 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                 return (
                   <motion.div
                     key={tx.id}
-                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 420, damping: 28, delay: delaySec }}
-                    className="rounded-[22px] spatial-card overflow-hidden"
+                    transition={{ ...ACCORDION_SPRING, delay: delaySec }}
+                    className="rounded-[22px] ios27-ceramic-tile overflow-hidden"
                   >
                     <button
                       type="button"
@@ -979,24 +1025,17 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                             isGiven ? 'bg-[var(--credit-red)]' : 'bg-[var(--debit-green)]'
                           }`}
                         >
-                          <svg viewBox="0 0 18 18" className="w-4 h-4" fill="none" aria-hidden="true">
-                            <motion.path
-                              d={isGiven ? 'M9 14V4m0 0-4 4m4-4 4 4' : 'M9 4v10m0 0-4-4m4 4 4-4'}
-                              stroke="currentColor"
-                              strokeWidth="2.3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              initial={{ pathLength: 0 }}
-                              animate={{ pathLength: 1 }}
-                              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: delaySec }}
-                            />
-                          </svg>
+                          {isGiven ? (
+                            <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                          ) : (
+                            <ArrowDown className="w-4 h-4 stroke-[2.5]" />
+                          )}
                         </span>
 
                         <div className="min-w-0 flex-1 space-y-0.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
-                              className={`text-[11px] font-extrabold uppercase tracking-wider ${
+                              className={`text-[11px] font-extrabold tracking-wide ${
                                 isGiven ? 'text-[var(--credit-red)]' : 'text-[var(--debit-green)]'
                               }`}
                             >
@@ -1021,9 +1060,11 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-end gap-1 shrink-0">
+                      <div className="flex flex-col items-end gap-1 shrink-0 max-w-[46%] text-right overflow-hidden">
                         <span
-                          className={`font-display text-lg font-extrabold font-tabular leading-tight ${
+                          className={`font-display ${
+                            tx.amount >= 10000000 ? 'text-sm sm:text-base' : 'text-base sm:text-lg'
+                          } font-extrabold font-tabular leading-tight truncate max-w-full ${
                             isGiven ? 'text-[var(--credit-red)]' : 'text-[var(--debit-green)]'
                           }`}
                         >
@@ -1031,7 +1072,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                           {hideBalance ? '₹••••' : formatINR(tx.amount)}
                         </span>
 
-                        <span className="text-[11px] font-semibold font-tabular text-[var(--ink-muted)]">
+                        <span className="text-[11px] font-semibold font-tabular text-[var(--ink-muted)] truncate max-w-full">
                           Bal:{' '}
                           {hideBalance
                             ? '₹••••'
@@ -1072,26 +1113,30 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                       </div>
                     )}
 
-                    {/* Inline Accordion Drawer beneath tapped timeline entry */}
+                    {/* Inline Accordion Drawer beneath tapped timeline entry (GPU-only) */}
                     <AnimatePresence initial={false}>
                       {isExpanded && (
                         <motion.div
                           key={`accordion-${tx.id}`}
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{
-                            height: 0,
-                            opacity: 0,
-                            transition: { duration: 0.16, ease: 'easeOut' },
-                          }}
+                          initial={
+                            prefersReducedMotion
+                              ? { opacity: 0 }
+                              : { opacity: 0, y: -6, clipPath: 'inset(0% 0% 100% 0%)' }
+                          }
+                          animate={{ opacity: 1, y: 0, clipPath: 'inset(0% 0% 0% 0%)' }}
+                          exit={
+                            prefersReducedMotion
+                              ? { opacity: 0 }
+                              : { opacity: 0, y: -4, clipPath: 'inset(0% 0% 100% 0%)' }
+                          }
                           transition={ACCORDION_SPRING}
-                          className="no-print overflow-hidden"
+                          className="no-print overflow-hidden will-change-transform"
                         >
-                          <div className="px-3 pb-3 pt-1 border-t border-[var(--surface-subtle)] grid grid-cols-3 gap-2">
+                          <div className="px-3 pb-3 pt-1.5 border-t border-[var(--surface-border)] grid grid-cols-3 gap-2">
                             <button
                               type="button"
                               onClick={() => openEditCalculator(tx)}
-                              className="min-h-[38px] px-2.5 rounded-xl bg-[var(--app-bg)] text-[var(--ink)] text-xs font-extrabold flex items-center justify-center gap-1.5 active:scale-95 transition"
+                              className="min-h-[44px] px-2.5 rounded-xl bg-[var(--app-bg)] text-[var(--ink)] text-xs font-extrabold flex items-center justify-center gap-1.5 active:scale-95 transition"
                             >
                               <Edit3 className="w-3.5 h-3.5 text-[var(--brand-accent)] shrink-0" />
                               <span>Edit</span>
@@ -1115,7 +1160,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                                   setDeletingTxId(null);
                                 }
                               }}
-                              className="min-h-[38px] px-2.5 rounded-xl bg-[var(--credit-tint)] text-[var(--credit-red)] text-xs font-extrabold flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition"
+                              className="min-h-[44px] px-2.5 rounded-xl bg-[var(--credit-tint)] text-[var(--credit-red)] text-xs font-extrabold flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition"
                             >
                               <Trash2 className="w-3.5 h-3.5 shrink-0" />
                               <span>{deletingTxId === tx.id ? 'Removing...' : 'Delete'}</span>
@@ -1126,10 +1171,10 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={() => haptics.tap()}
-                              className="min-h-[38px] px-2.5 rounded-xl bg-[var(--debit-tint)] text-[var(--debit-green)] text-xs font-extrabold flex items-center justify-center gap-1.5 active:scale-95 transition"
+                              className="min-h-[44px] px-2.5 rounded-xl bg-[var(--debit-tint)] text-[var(--debit-green)] text-xs font-extrabold flex items-center justify-center gap-1.5 active:scale-95 transition"
                             >
                               <MessageCircle className="w-3.5 h-3.5 shrink-0" />
-                              <span>WhatsApp Slip</span>
+                              <span>WhatsApp</span>
                             </a>
                           </div>
                         </motion.div>
@@ -1144,7 +1189,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
       </div>
 
       {/* Sticky Bottom Quick Strip + 2 Primary Action Buttons (+ Jama Green, + Udhaar Red, Mic) */}
-      <div className="no-print bg-[var(--surface)] shadow-[0_-10px_24px_-12px_rgba(15,23,42,0.1)] px-4 py-3 space-y-3">
+      <div className="no-print border-t border-[var(--surface-border)] px-4 py-3 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
             <a
@@ -1157,7 +1202,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                 }
               }}
               aria-label="Call party"
-              className="w-10 h-10 rounded-2xl bg-[var(--app-bg)] flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+              className="w-11 h-11 rounded-2xl liquid-glass flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
             >
               <Phone className="w-4 h-4" />
             </a>
@@ -1165,7 +1210,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
               href={`sms:${account.phone || ''}?body=${encodeURIComponent(reminderMsg)}`}
               onClick={() => haptics.tap()}
               aria-label="Send SMS reminder"
-              className="w-10 h-10 rounded-2xl bg-[var(--app-bg)] flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+              className="w-11 h-11 rounded-2xl liquid-glass flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
             >
               <MessageSquare className="w-4 h-4" />
             </a>
@@ -1175,7 +1220,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
               rel="noopener noreferrer"
               onClick={() => haptics.tap()}
               aria-label="Send WhatsApp reminder"
-              className="w-10 h-10 rounded-2xl bg-[var(--debit-tint)] flex items-center justify-center text-[var(--debit-green)] active:scale-95 transition"
+              className="w-11 h-11 rounded-2xl bg-[var(--debit-tint)] flex items-center justify-center text-[var(--debit-green)] active:scale-95 transition"
             >
               <MessageCircle className="w-4 h-4" />
             </a>
@@ -1186,7 +1231,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                 setShowQrModal(true);
               }}
               aria-label="Show UPI QR"
-              className="w-10 h-10 rounded-2xl bg-[var(--app-bg)] flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+              className="w-11 h-11 rounded-2xl liquid-glass flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
             >
               <QrCode className="w-4 h-4" />
             </button>
@@ -1200,18 +1245,20 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                 setShowDueModal(true);
               }}
               aria-label="Set due date or promise date"
-              className="w-10 h-10 rounded-2xl bg-[var(--app-bg)] flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+              className="w-11 h-11 rounded-2xl liquid-glass flex items-center justify-center text-[var(--ink)] active:scale-95 transition"
             >
               <Calendar className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+          <div className="text-right shrink-0 max-w-[55%] overflow-hidden">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--ink-muted)] truncate">
               Balance {balLabel}
             </p>
             <p
-              className={`font-display text-lg font-extrabold font-tabular ${
+              className={`font-display ${
+                absBal >= 10000000 ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'
+              } font-extrabold font-tabular truncate ${
                 account.balance > 0
                   ? 'text-[var(--credit-red)]'
                   : account.balance < 0
@@ -1219,7 +1266,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                     : 'text-[var(--ink)]'
               }`}
             >
-              <OdometerNumber value={absBal} hidden={hideBalance} />
+              <OdometerNumber value={absBal} hidden={hideBalance} compact={absBal >= 10000000} />
             </p>
           </div>
         </div>
@@ -1243,8 +1290,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
               onOpenVoiceForCustomer(account.name);
             }}
             aria-label="Voice entry for this party"
-            style={{ backgroundColor: 'var(--brand)' }}
-            className="w-14 min-h-[48px] rounded-2xl text-white flex items-center justify-center shrink-0 tactile-key-primary transition"
+            className="w-14 min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] flex items-center justify-center shrink-0 tactile-key-primary transition"
           >
             <Mic className="w-5 h-5" />
           </motion.button>

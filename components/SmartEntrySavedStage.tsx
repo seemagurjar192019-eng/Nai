@@ -2,8 +2,10 @@
 
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Check } from 'lucide-react';
 import { haptic } from '@/utils/haptics';
 import { OdometerNumber } from './motion/OdometerNumber';
+import { APPLE_EASE, BOUNCY_SPRING } from './motion/SpatialMotionEngine';
 
 interface SmartEntrySavedStageProps {
   partyName: string;
@@ -31,42 +33,33 @@ export const SmartEntrySavedStage: React.FC<SmartEntrySavedStageProps> = ({
       initial={{ opacity: 0.7, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.35, y: 120 }}
-      transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.34, ease: APPLE_EASE }}
       className="py-6 px-3 flex flex-col items-center justify-center text-center space-y-4"
     >
-      {/* Clean iOS Apple Pay-Style SVG PathLength Checkmark Ring (Zero Confetti Clutter) */}
+      {/* Clean iOS Apple Pay-Style Animated Checkmark Ring */}
       <div className="relative flex items-center justify-center w-20 h-20">
         <motion.span
           aria-hidden="true"
           initial={{ scale: 0.85, opacity: 0.5 }}
           animate={{ scale: 1.4, opacity: 0 }}
-          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.65, ease: APPLE_EASE }}
           className="absolute inset-1 rounded-full border-2 border-[var(--debit-green)] pointer-events-none"
         />
 
         <motion.div
           initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 460, damping: 22 }}
-          className="w-16 h-16 rounded-full bg-[var(--debit-tint)] flex items-center justify-center shadow-md"
+          transition={BOUNCY_SPRING}
+          className="w-16 h-16 rounded-full bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center shadow-md"
         >
-          <svg
-            viewBox="0 0 36 36"
-            className="w-9 h-9 text-[var(--debit-green)]"
-            fill="none"
-            aria-hidden="true"
+          <motion.span
+            initial={{ scale: 0.4, rotate: -18, opacity: 0 }}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            transition={{ ...BOUNCY_SPRING, delay: 0.06 }}
+            className="flex items-center justify-center"
           >
-            <motion.path
-              d="M9 18.5L15.2 24.5L27 12"
-              stroke="currentColor"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1], delay: 0.06 }}
-            />
-          </svg>
+            <Check className="w-9 h-9 stroke-[3]" />
+          </motion.span>
         </motion.div>
       </div>
 

@@ -3,7 +3,10 @@ import { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.ucred.app',
   appName: 'Ucred',
-  webDir: '.next',
+  webDir: 'out',
+  server: {
+    androidScheme: 'https',
+  },
 };
 
 export default config;

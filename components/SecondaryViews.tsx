@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
-  Activity,
   AlertTriangle,
   ArrowLeft,
   Bell,
@@ -18,16 +17,18 @@ import {
   Download,
   EyeOff,
   FileSpreadsheet,
+  FileText,
   Fingerprint,
+  HelpCircle,
   Laptop,
   Lock,
   LogOut,
+  MessageCircle,
   Moon,
   QrCode,
-  Server,
   Share2,
   ShieldCheck,
-  SlidersHorizontal,
+  Shuffle,
   Smartphone,
   Star,
   Store,
@@ -43,15 +44,21 @@ import {
   buildUpiUri,
   formatINR,
   formatINRCompact,
+  formatLastBackupLabel,
   isValidGstNumber,
   isValidIndianMobile,
   isValidUpiId,
+  maskContactIdentifier,
   verifyStoredPin,
 } from '@/lib/i18n';
 import {
+  getLastBackupAt,
   getPinCooldownSeconds,
+  getScramblePinPadEnabled,
+  recordLastBackupAt,
   recordPinFailure,
   resetPinGuard,
+  setScramblePinPadEnabled,
   type AutoLockSeconds,
 } from '@/lib/security';
 import type {
@@ -69,6 +76,7 @@ import {
   setSoundEnabled,
 } from '@/utils/haptics';
 import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
+import { APPLE_EASE, SNAPPY_SPRING, SPATIAL_SPRING } from './motion/SpatialMotionEngine';
 import { PWAInstallButton } from './PwaControls';
 
 export type SecondaryRoute =
@@ -89,12 +97,11 @@ export type MoreTarget =
 
 export type ThemeAccentId = 'sapphire' | 'rose' | 'onyx';
 
-const SPRING_TACTILE = { type: 'spring' as const, stiffness: 460, damping: 28 };
-const SEG_SPRING = { type: 'spring' as const, stiffness: 420, damping: 30 };
+const SEG_SPRING = SPATIAL_SPRING;
 
 function InsetSectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-2 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+    <p className="px-2 pb-1.5 text-xs font-bold text-[var(--ink-muted)]">
       {children}
     </p>
   );
@@ -123,6 +130,7 @@ function SpringSwitch({
 
 interface SettingsViewProps {
   appearance: AppearanceMode;
+  resolvedAppearance?: 'light' | 'dark';
   accentTheme?: ThemeAccentId;
   mobileNumber: string;
   verifiedPhone: string;
@@ -132,6 +140,10 @@ interface SettingsViewProps {
   vaultMode?: 'auto' | 'pin';
   isGuestMode?: boolean;
   showBackButton?: boolean;
+  showGalla?: boolean;
+  showStock?: boolean;
+  showGstBills?: boolean;
+  showStaffAudit?: boolean;
   autoLockSeconds?: AutoLockSeconds;
   privacyCurtainEnabled?: boolean;
   webAuthnSupported?: boolean;
@@ -139,6 +151,13 @@ interface SettingsViewProps {
   onOpenCloudSync?: () => void;
   onOpenWorkspaces?: () => void;
   onOpenBusinessProfile?: () => void;
+  onOpenGalla?: () => void;
+  onOpenStock?: () => void;
+  onOpenBills?: () => void;
+  onOpenStaffAudit?: () => void;
+  onOpenAccountSummary?: () => void;
+  onOpenMultiDevice?: () => void;
+  onOpenHelp?: () => void;
   onBack?: () => void;
   onChangeAppearance: (mode: AppearanceMode) => Promise<void>;
   onSelectAccentTheme?: (theme: ThemeAccentId) => Promise<void> | void;
@@ -160,10 +179,9 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   appearance,
-  accentTheme = 'sapphire',
+  resolvedAppearance = 'light',
   mobileNumber,
   verifiedPhone,
-  workspaceBadge = 'Retail Store',
   business,
   appLockPin,
   vaultMode = 'auto',
@@ -174,11 +192,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   webAuthnSupported = false,
   passkeyEnabled = false,
   onOpenCloudSync,
-  onOpenWorkspaces,
   onOpenBusinessProfile,
+  onOpenHelp,
   onBack,
   onChangeAppearance,
-  onSelectAccentTheme,
   onSaveMobile,
   onSaveUpiId,
   onSavePin,
@@ -194,15 +211,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onDeleteAccount,
   onLogout,
 }) => {
-  const prefersReducedMotion = useReducedMotion();
   const [activeSheet, setActiveSheet] = useState<
     | null
     | 'account'
     | 'security'
-    | 'appearance'
-    | 'sounds'
     | 'payments'
     | 'backup'
+    | 'support'
     | 'clear-data'
     | 'delete-account'
   >(null);
@@ -211,6 +226,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [upiInput, setUpiInput] = useState(business.upiId || '');
   const [pinInput, setPinInput] = useState('');
   const [vaultPinInput, setVaultPinInput] = useState('');
+  const [dangerConfirmInput, setDangerConfirmInput] = useState('');
   const [restoreMode, setRestoreMode] = useState<'merge' | 'replace'>('merge');
   const [statusMsg, setStatusMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -218,12 +234,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [busyAction, setBusyAction] = useState('');
   const [soundEnabled, setSoundState] = useState<boolean>(() => getSoundEnabled());
   const [hapticsEnabled, setHapticsState] = useState<boolean>(() => getHapticsEnabled());
+  const [scramblePinPad, setScramblePinPadState] = useState<boolean>(() =>
+    getScramblePinPadEnabled()
+  );
+  const [lastBackupAtIso, setLastBackupAtIso] = useState<string | null>(() => getLastBackupAt());
   const [recoveryKeyValue, setRecoveryKeyValue] = useState('');
   const [recoveryCopied, setRecoveryCopied] = useState(false);
   const restoreRef = useRef<HTMLInputElement | null>(null);
 
-  const activeTheme: ThemeAccentId =
-    appearance === 'dark' ? 'onyx' : accentTheme === 'rose' ? 'rose' : 'sapphire';
+  const isDarkActive =
+    appearance === 'dark' || (appearance === 'system' && resolvedAppearance === 'dark');
+  const feedbackActive = soundEnabled || hapticsEnabled;
+
+  const isDefaultStoreName = !business.name || business.name.trim() === 'My Store';
+  const displayShopName = isDefaultStoreName ? 'Your Shop' : business.name.trim();
+  const shopConfirmTarget = (business.name || 'My Store').trim();
+  const maskedIdentity = maskContactIdentifier(verifiedPhone);
+  const maskedShopMobile = maskContactIdentifier(mobileNumber);
+  const lastBackupLabel = formatLastBackupLabel(lastBackupAtIso);
 
   const autoLockLabel =
     autoLockSeconds === 60
@@ -241,22 +269,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     : passkeyEnabled
       ? 'Passkey'
       : 'Off';
-
-  const appearanceRightValue =
-    appearance === 'dark'
-      ? 'OLED Dark'
-      : activeTheme === 'rose'
-        ? 'Light · Rose'
-        : 'Light · Sapphire';
-
-  const soundsRightValue =
-    soundEnabled && hapticsEnabled
-      ? 'On'
-      : !soundEnabled && !hapticsEnabled
-        ? 'Off'
-        : soundEnabled
-          ? 'Sound'
-          : 'Haptics';
 
   const flash = (msg: string) => {
     setErrorMsg('');
@@ -286,8 +298,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
+  const toggleSoundAndHaptics = () => {
+    const next = !feedbackActive;
+    setSoundEnabled(next);
+    setHapticsEnabled(next);
+    setSoundState(next);
+    setHapticsState(next);
+    if (next) haptics.tap();
+    flash(next ? 'Sound & haptics on' : 'Sound & haptics off');
+  };
+
   return (
-    <div className="max-w-[560px] mx-auto space-y-5 pb-32">
+    <div className="max-w-[560px] mx-auto space-y-5 pb-8">
       {/* Header Row */}
       <div className="flex items-center justify-between gap-2">
         {showBackButton && onBack ? (
@@ -297,7 +319,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               haptics.tap();
               onBack();
             }}
-            className="inline-flex items-center gap-2 min-h-[44px] px-3.5 rounded-2xl spatial-card text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
+            className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-full liquid-glass text-sm font-bold text-[var(--ink)] active:scale-95 transition"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Settings</span>
@@ -327,15 +349,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             type="button"
             onClick={() => setErrorMsg('')}
             aria-label="Dismiss error"
-            className="min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center"
+            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Compact Apple Account Card */}
-      <section className="ios27-inset-group rounded-[26px] p-3.5">
+      {/* Shop Identity Header & Compact Display/Sound Toggles */}
+      <section className="ios27-inset-group rounded-[24px] p-3.5 space-y-3">
         <button
           type="button"
           onClick={() => {
@@ -353,32 +375,94 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           className="w-full flex items-center justify-between gap-3 text-left active:scale-[0.99] transition"
         >
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-11 h-11 rounded-full bg-[var(--brand)] text-white font-display font-extrabold text-base flex items-center justify-center shrink-0">
-              {(business.name || 'U').charAt(0).toUpperCase()}
+            <div className="w-11 h-11 rounded-full bg-[var(--ink)] text-[var(--surface)] font-display font-extrabold text-base flex items-center justify-center shrink-0">
+              {(displayShopName || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
               <p className="font-display text-base font-extrabold text-[var(--ink)] truncate">
-                {business.name}
+                {displayShopName}
               </p>
               <p className="text-xs font-semibold text-[var(--ink-muted)] truncate">
                 {isGuestMode
-                  ? 'Local Device Vault · Tap to Sync Cloud'
-                  : `Cloud Account · ${verifiedPhone || 'Synced'}`}
+                  ? 'Local Vault · Tap to Sync Cloud'
+                  : `Cloud Account${maskedIdentity ? ` · ${maskedIdentity}` : ''}`}
               </p>
             </div>
           </div>
 
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-[var(--brand-accent)] shrink-0">
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-[var(--ink)] shrink-0">
             {isGuestMode ? <span>Sign In</span> : null}
             <ChevronRight className="w-4 h-4 text-[var(--ink-muted)]" />
           </span>
         </button>
+
+        {/* Compact Light/Dark Switch + Single Sound & Haptics Toggle */}
+        <div className="pt-2.5 border-t border-[var(--glass-border)] flex items-center justify-between gap-2">
+          <div
+            role="group"
+            aria-label="Theme"
+            className="grid grid-cols-2 rounded-xl bg-[var(--surface-subtle)] p-0.5 border border-[var(--glass-border)] shrink-0"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                void onChangeAppearance('light');
+                flash('Light theme');
+              }}
+              className={`min-h-[36px] px-2.5 sm:px-3 rounded-[10px] text-[11px] sm:text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition ${
+                !isDarkActive
+                  ? 'bg-[var(--surface)] text-[var(--ink)] shadow-xs'
+                  : 'text-[var(--ink-muted)]'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5 shrink-0" />
+              <span>Light</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                void onChangeAppearance('dark');
+                flash('Dark theme');
+              }}
+              className={`min-h-[36px] px-2.5 sm:px-3 rounded-[10px] text-[11px] sm:text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap transition ${
+                isDarkActive
+                  ? 'bg-[var(--surface)] text-[var(--ink)] shadow-xs'
+                  : 'text-[var(--ink-muted)]'
+              }`}
+            >
+              <Moon className="w-3.5 h-3.5 shrink-0" />
+              <span>Dark</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={feedbackActive}
+            onClick={toggleSoundAndHaptics}
+            className={`min-h-[38px] px-2.5 sm:px-3 rounded-xl border text-[11px] sm:text-xs font-bold inline-flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink-0 transition active:scale-95 ${
+              feedbackActive
+                ? 'bg-[var(--surface)] border-[var(--glass-border)] text-[var(--ink)] shadow-xs'
+                : 'bg-[var(--surface-subtle)] border-transparent text-[var(--ink-muted)]'
+            }`}
+          >
+            <Volume2 className="w-3.5 h-3.5 shrink-0" />
+            <span>Sounds &amp; Haptics</span>
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                feedbackActive ? 'bg-[var(--debit-green)]' : 'bg-[var(--ink-muted)]/40'
+              }`}
+            />
+          </button>
+        </div>
       </section>
 
-      {/* Group 1: Shop Profile */}
+      {/* Group 1: Shop */}
       <div>
-        <InsetSectionLabel>Shop Profile</InsetSectionLabel>
-        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--surface-border)] overflow-hidden">
+        <InsetSectionLabel>Shop</InsetSectionLabel>
+        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--glass-border)] overflow-hidden">
           {onOpenBusinessProfile && (
             <button
               type="button"
@@ -386,18 +470,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 haptics.tap();
                 onOpenBusinessProfile();
               }}
-              className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+              className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
             >
               <span className="flex items-center gap-3 min-w-0">
-                <span className="w-[29px] h-[29px] rounded-[8px] bg-[#007AFF] text-white flex items-center justify-center shrink-0">
+                <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
                   <Store className="w-4 h-4" />
                 </span>
                 <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                  Shop Profile &amp; GSTIN
+                  Shop Profile
                 </span>
               </span>
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0 max-w-[140px]">
-                <span className="truncate">{business.gstNumber || 'Edit'}</span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0 max-w-[155px]">
+                <span className="truncate">
+                  {business.gstNumber || (isDefaultStoreName ? 'Set Name' : displayShopName)}
+                </span>
                 <ChevronRight className="w-4 h-4 shrink-0" />
               </span>
             </button>
@@ -412,52 +498,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               setUpiInput(business.upiId || '');
               setActiveSheet('payments');
             }}
-            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+            className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
           >
             <span className="flex items-center gap-3 min-w-0">
-              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#34C759] text-white flex items-center justify-center shrink-0">
+              <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
                 <QrCode className="w-4 h-4" />
               </span>
               <span className="text-sm font-semibold text-[var(--ink)] truncate">
                 UPI QR &amp; Mobile
               </span>
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0 max-w-[150px]">
-              <span className="truncate">{business.upiId || mobileNumber || 'Off'}</span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0 max-w-[155px]">
+              <span className="truncate">
+                {business.upiId || maskedShopMobile || 'Set Up'}
+              </span>
               <ChevronRight className="w-4 h-4 shrink-0" />
             </span>
           </button>
-
-          {onOpenWorkspaces && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                onOpenWorkspaces();
-              }}
-              className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-            >
-              <span className="flex items-center gap-3 min-w-0">
-                <span className="w-[29px] h-[29px] rounded-[8px] bg-[#5856D6] text-white flex items-center justify-center shrink-0">
-                  <SlidersHorizontal className="w-4 h-4" />
-                </span>
-                <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                  Workspace Modes
-                </span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0">
-                <span>{workspaceBadge}</span>
-                <ChevronRight className="w-4 h-4 shrink-0" />
-              </span>
-            </button>
-          )}
         </section>
       </div>
 
-      {/* Group 2: Security & Privacy */}
+      {/* Group 2: Security */}
       <div>
-        <InsetSectionLabel>Security &amp; Privacy</InsetSectionLabel>
-        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--surface-border)] overflow-hidden">
+        <InsetSectionLabel>Security</InsetSectionLabel>
+        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--glass-border)] overflow-hidden">
           <button
             type="button"
             onClick={() => {
@@ -466,14 +530,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               setPinInput('');
               setActiveSheet('security');
             }}
-            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+            className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
           >
             <span className="flex items-center gap-3 min-w-0">
-              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#1C1C1E] dark:bg-[#5856D6] text-white flex items-center justify-center shrink-0">
+              <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
                 <Lock className="w-4 h-4" />
               </span>
               <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                Passcode &amp; Biometrics
+                App Lock
               </span>
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0">
@@ -495,10 +559,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onTogglePrivacyCurtain(next);
                 flash(next ? 'Privacy Curtain on' : 'Privacy Curtain off');
               }}
-              className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left"
+              className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3 text-left"
             >
               <span className="flex items-center gap-3 min-w-0">
-                <span className="w-[29px] h-[29px] rounded-[8px] bg-[#FF9500] text-white flex items-center justify-center shrink-0">
+                <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
                   <EyeOff className="w-4 h-4" />
                 </span>
                 <span className="text-sm font-semibold text-[var(--ink)] truncate">
@@ -511,84 +575,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </section>
       </div>
 
-      {/* Group 3: Preferences */}
+      {/* Group 3: Data */}
       <div>
-        <InsetSectionLabel>Preferences</InsetSectionLabel>
-        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--surface-border)] overflow-hidden">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              setSheetError('');
-              setActiveSheet('appearance');
-            }}
-            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-          >
-            <span className="flex items-center gap-3 min-w-0">
-              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#5856D6] text-white flex items-center justify-center shrink-0">
-                {appearance === 'dark' ? (
-                  <Moon className="w-4 h-4" />
-                ) : (
-                  <Sun className="w-4 h-4" />
-                )}
-              </span>
-              <span className="text-sm font-semibold text-[var(--ink)] truncate">Appearance</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0">
-              <span>{appearanceRightValue}</span>
-              <ChevronRight className="w-4 h-4 shrink-0" />
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              setSheetError('');
-              setActiveSheet('sounds');
-            }}
-            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-          >
-            <span className="flex items-center gap-3 min-w-0">
-              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#FF2D55] text-white flex items-center justify-center shrink-0">
-                <Volume2 className="w-4 h-4" />
-              </span>
-              <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                Sounds &amp; Haptics
-              </span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] shrink-0">
-              <span>{soundsRightValue}</span>
-              <ChevronRight className="w-4 h-4 shrink-0" />
-            </span>
-          </button>
-        </section>
-      </div>
-
-      {/* Group 4: Backups & Data */}
-      <div>
-        <InsetSectionLabel>Data &amp; Backups</InsetSectionLabel>
-        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--surface-border)] overflow-hidden">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              onExportCsv();
-              flash('CSV exported');
-            }}
-            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
-          >
-            <span className="flex items-center gap-3 min-w-0">
-              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#34C759] text-white flex items-center justify-center shrink-0">
-                <FileSpreadsheet className="w-4 h-4" />
-              </span>
-              <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                Export CSV Statement
-              </span>
-            </span>
-            <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
-          </button>
-
+        <div className="flex items-center justify-between gap-2 px-2 pb-1.5">
+          <p className="text-xs font-bold text-[var(--ink-muted)]">Data</p>
+          <p className="text-[11px] font-bold text-[var(--ink-muted)] font-tabular truncate">
+            {lastBackupLabel}
+          </p>
+        </div>
+        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--glass-border)] overflow-hidden">
           <button
             type="button"
             onClick={() => {
@@ -596,10 +591,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               setSheetError('');
               setActiveSheet('backup');
             }}
-            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+            className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
           >
             <span className="flex items-center gap-3 min-w-0">
-              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#007AFF] text-white flex items-center justify-center shrink-0">
+              <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
                 <Download className="w-4 h-4" />
               </span>
               <span className="text-sm font-semibold text-[var(--ink)] truncate">
@@ -613,13 +608,113 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             type="button"
             onClick={() => {
               haptics.tap();
-              setSheetError('');
-              setActiveSheet('clear-data');
+              onExportCsv();
+              setLastBackupAtIso(recordLastBackupAt());
+              flash('CSV exported');
             }}
-            className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--credit-tint)]/35 transition"
+            className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
           >
             <span className="flex items-center gap-3 min-w-0">
-              <span className="w-[29px] h-[29px] rounded-[8px] bg-[#FF3B30] text-white flex items-center justify-center shrink-0">
+              <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
+                <FileSpreadsheet className="w-4 h-4" />
+              </span>
+              <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                Export CSV
+              </span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
+          </button>
+        </section>
+      </div>
+
+      {/* Group 4: Help */}
+      <div>
+        <InsetSectionLabel>Help</InsetSectionLabel>
+        <section className="ios27-inset-group rounded-[24px] divide-y divide-[var(--glass-border)] overflow-hidden">
+          {onOpenHelp && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                onOpenHelp();
+              }}
+              className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+            >
+              <span className="flex items-center gap-3 min-w-0">
+                <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
+                  <HelpCircle className="w-4 h-4" />
+                </span>
+                <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                  Help &amp; Voice Examples
+                </span>
+              </span>
+              <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              setSheetError('');
+              setActiveSheet('support');
+            }}
+            className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3 text-left hover:bg-[var(--surface-subtle)]/50 transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
+                <MessageCircle className="w-4 h-4" />
+              </span>
+              <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                Support
+              </span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-[var(--ink-muted)] shrink-0" />
+          </button>
+
+          <div className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3">
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4" />
+              </span>
+              <span className="text-sm font-semibold text-[var(--ink)] flex items-center gap-1.5 flex-wrap">
+                <Link href="/privacy" className="hover:underline">
+                  Privacy
+                </Link>
+                <span className="text-[var(--ink-muted)]">·</span>
+                <Link href="/terms" className="hover:underline">
+                  Terms
+                </Link>
+              </span>
+            </span>
+            <span className="text-xs font-bold text-[var(--ink-muted)] font-tabular shrink-0">
+              v1.0.0
+            </span>
+          </div>
+        </section>
+      </div>
+
+      {/* PWA Install Shortcut (if browser supports prompt) */}
+      <div className="px-1 flex justify-end">
+        <PWAInstallButton compact />
+      </div>
+
+      {/* Isolated Danger Zone (Separated far from Backup) */}
+      <div className="pt-4">
+        <p className="px-2 pb-1.5 text-xs font-bold text-[var(--credit-red)]">Danger Zone</p>
+        <section className="rounded-[24px] border border-[var(--credit-red)]/25 bg-[var(--credit-tint)]/20 divide-y divide-[var(--credit-red)]/15 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              setSheetError('');
+              setDangerConfirmInput('');
+              setActiveSheet('clear-data');
+            }}
+            className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3 text-left hover:bg-[var(--credit-tint)]/40 transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--credit-red)]/30 text-[var(--credit-red)] flex items-center justify-center shrink-0">
                 <Trash2 className="w-4 h-4" />
               </span>
               <span className="text-sm font-semibold text-[var(--credit-red)] truncate">
@@ -629,59 +724,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <ChevronRight className="w-4 h-4 text-[var(--credit-red)] shrink-0" />
           </button>
 
-          {!isGuestMode && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                setSheetError('');
-                setActiveSheet('delete-account');
-              }}
-              className="w-full min-h-[50px] px-4 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[var(--credit-tint)]/35 transition"
-            >
-              <span className="flex items-center gap-3 min-w-0">
-                <span className="w-[29px] h-[29px] rounded-[8px] bg-[#FF3B30] text-white flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-4 h-4" />
-                </span>
-                <span className="text-sm font-semibold text-[var(--credit-red)] truncate">
-                  Delete Cloud Account
-                </span>
+          <button
+            type="button"
+            onClick={() => {
+              haptics.tap();
+              setSheetError('');
+              setDangerConfirmInput('');
+              setActiveSheet('delete-account');
+            }}
+            className="w-full min-h-[54px] px-4 flex items-center justify-between gap-3 text-left hover:bg-[var(--credit-tint)]/40 transition"
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="w-8 h-8 rounded-[9px] bg-[var(--surface-subtle)] border border-[var(--credit-red)]/30 text-[var(--credit-red)] flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4" />
               </span>
-              <ChevronRight className="w-4 h-4 text-[var(--credit-red)] shrink-0" />
-            </button>
-          )}
+              <span className="text-sm font-semibold text-[var(--credit-red)] truncate">
+                Delete Account
+              </span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-[var(--credit-red)] shrink-0" />
+          </button>
         </section>
       </div>
-
-      {/* Minimal Footer */}
-      <footer className="px-2 pt-1 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-[var(--ink-muted)]">
-          <span className="font-bold text-[var(--ink)]">Ucred</span>
-          <Link href="/privacy" className="hover:text-[var(--ink)] transition">
-            Privacy
-          </Link>
-          <Link href="/terms" className="hover:text-[var(--ink)] transition">
-            Terms
-          </Link>
-          <Link href="/delete-account" className="hover:text-[var(--ink)] transition">
-            Account Deletion
-          </Link>
-          <a
-            href="mailto:naitik.webstudio45@gmail.com"
-            className="hover:text-[var(--ink)] transition"
-          >
-            Support
-          </a>
-        </div>
-        <PWAInstallButton compact />
-      </footer>
 
       {/* Sheet 1: Cloud Account & Recovery (Quietly holds Recovery Key + Sign Out) */}
       <DetentSheetOverlay
         open={activeSheet === 'account'}
         onClose={() => setActiveSheet(null)}
         title="Cloud Account"
-        subtitle={verifiedPhone || business.name}
+        subtitle={maskedIdentity || displayShopName}
         initialDetent="peek"
         allowDetentToggle={false}
       >
@@ -707,7 +778,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       setTimeout(() => setRecoveryCopied(false), 2500);
                     }
                   }}
-                  className="min-h-[36px] px-3 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 active:scale-95 transition"
+                  className="min-h-[44px] px-3.5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center gap-1.5 shrink-0 active:scale-95 transition"
                 >
                   {recoveryCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{recoveryCopied ? 'Copied' : recoveryKeyValue ? 'Copy' : 'Reveal'}</span>
@@ -722,7 +793,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
 
           {!isGuestMode && onConfigureVaultMode && (
-            <div className="ios27-inset-group rounded-2xl divide-y divide-[var(--surface-border)] overflow-hidden">
+            <div className="ios27-inset-group rounded-2xl divide-y divide-[var(--glass-border)] overflow-hidden">
               <button
                 type="button"
                 disabled={busyAction === 'e2ee'}
@@ -730,14 +801,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   void runSafely(
                     'e2ee',
                     () => onConfigureVaultMode('auto'),
-                    'Auto sync across devices active',
+                    'Auto unlock active',
                     true
                   )
                 }
                 className="w-full p-3.5 flex items-center justify-between gap-3 text-left"
               >
                 <div>
-                  <p className="text-sm font-bold text-[var(--ink)]">Auto-Sync Across Devices</p>
+                  <p className="text-sm font-bold text-[var(--ink)]">Auto-Unlock Vault</p>
                   <p className="text-[11px] text-[var(--ink-muted)]">
                     Instant unlock on signed-in devices
                   </p>
@@ -745,7 +816,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <span
                   className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
                     vaultMode === 'auto'
-                      ? 'bg-[var(--brand)] text-white'
+                      ? 'bg-[var(--brand)] text-[var(--brand-fg)]'
                       : 'border-2 border-[var(--surface-border)]'
                   }`}
                 >
@@ -756,13 +827,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-bold text-[var(--ink)]">Multi-Device Secret PIN</p>
+                    <p className="text-sm font-bold text-[var(--ink)]">Secret Recovery PIN</p>
                     <p className="text-[11px] text-[var(--ink-muted)]">
-                      Require secret PIN when logging in on new devices
+                      Require secret PIN when signing in on a new phone
                     </p>
                   </div>
                   {vaultMode === 'pin' && (
-                    <span className="w-5 h-5 rounded-full bg-[var(--brand)] text-white flex items-center justify-center shrink-0">
+                    <span className="w-5 h-5 rounded-full bg-[var(--brand)] text-[var(--brand-fg)] flex items-center justify-center shrink-0">
                       <Check className="w-3 h-3 stroke-[3]" />
                     </span>
                   )}
@@ -774,7 +845,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     value={vaultPinInput}
                     onChange={(e) => setVaultPinInput(e.target.value)}
                     placeholder="Enter 4+ char PIN"
-                    className="flex-1 min-h-[42px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                    className="flex-1 min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
                   />
                   <button
                     type="button"
@@ -794,7 +865,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         true
                       );
                     }}
-                    className="min-h-[42px] px-4 rounded-xl bg-[var(--brand)] text-white text-xs font-extrabold disabled:opacity-60"
+                    className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold disabled:opacity-60"
                   >
                     {busyAction === 'e2ee' ? '...' : 'Save'}
                   </button>
@@ -820,11 +891,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </DetentSheetOverlay>
 
-      {/* Sheet 2: Unified Passcode, Auto-Lock & Biometrics */}
+      {/* Sheet 2: App Lock (Passcode, Auto-Lock, Scrambled Pad, Biometrics) */}
       <DetentSheetOverlay
         open={activeSheet === 'security'}
         onClose={() => setActiveSheet(null)}
-        title="Passcode & Biometrics"
+        title="App Lock"
         subtitle={appLockPin ? 'Passcode Active' : 'Passcode Off'}
         initialDetent="peek"
         allowDetentToggle={false}
@@ -893,14 +964,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-2 text-xs font-bold text-[var(--ink)]">
-                  <Timer className="w-3.5 h-3.5 text-[var(--brand-accent)]" />
+                  <Timer className="w-3.5 h-3.5 text-[var(--ink)]" />
                   <span>Idle Auto-Lock</span>
                 </span>
                 <span className="text-[11px] font-semibold text-[var(--ink-muted)]">
                   {appLockPin ? autoLockLabel : 'Requires PIN'}
                 </span>
               </div>
-              <div className="grid grid-cols-4 gap-1.5 rounded-2xl bg-[var(--surface-subtle)] p-1">
+              <div className="grid grid-cols-4 gap-1.5 rounded-2xl liquid-glass p-1">
                 {(
                   [
                     { sec: 0, label: 'Off' },
@@ -919,9 +990,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         onChangeAutoLockSeconds(opt.sec);
                         flash(opt.sec === 0 ? 'Auto-lock off' : `Auto-lock ${opt.label}`);
                       }}
-                      className={`min-h-[36px] rounded-xl text-xs font-extrabold transition ${
+                      className={`min-h-[44px] rounded-xl text-xs font-extrabold transition ${
                         selected
-                          ? 'bg-[var(--surface)] text-[var(--brand-accent)] shadow-xs'
+                          ? 'bg-[var(--surface)] text-[var(--ink)] shadow-xs border border-[var(--glass-border)]'
                           : 'text-[var(--ink-muted)]'
                       }`}
                     >
@@ -932,6 +1003,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
           )}
+
+          {/* Anti-Peep Scrambled PIN Pad */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={scramblePinPad}
+            onClick={() => {
+              const next = setScramblePinPadEnabled(!scramblePinPad);
+              setScramblePinPadState(next);
+              haptics.tap();
+              flash(next ? 'Anti-peep keypad on' : 'Standard keypad');
+            }}
+            className="w-full pt-3 border-t border-[var(--surface-border)] flex items-center justify-between gap-3 text-left"
+          >
+            <span className="flex items-center gap-2.5 min-w-0">
+              <Shuffle className="w-4 h-4 text-[var(--ink)] shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-[var(--ink)]">
+                  Scrambled Keypad
+                </span>
+                <span className="block text-[11px] text-[var(--ink-muted)]">
+                  Shuffle digits on lock screen to prevent shoulder surfing
+                </span>
+              </span>
+            </span>
+            <SpringSwitch checked={scramblePinPad} />
+          </button>
 
           {webAuthnSupported && onTogglePasskey && (
             <button
@@ -951,9 +1049,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               className="w-full pt-3 border-t border-[var(--surface-border)] flex items-center justify-between gap-3 text-left disabled:opacity-60"
             >
               <span className="flex items-center gap-2.5 min-w-0">
-                <Fingerprint className="w-4 h-4 text-[var(--debit-green)] shrink-0" />
+                <Fingerprint className="w-4 h-4 text-[var(--ink)] shrink-0" />
                 <span className="text-sm font-bold text-[var(--ink)]">
-                  Face ID / Touch ID Passkey
+                  Fingerprint / Face Unlock
                 </span>
               </span>
               <SpringSwitch checked={passkeyEnabled} />
@@ -964,152 +1062,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </DetentSheetOverlay>
 
-      {/* Sheet 3: Appearance */}
-      <DetentSheetOverlay
-        open={activeSheet === 'appearance'}
-        onClose={() => setActiveSheet(null)}
-        title="Appearance"
-        initialDetent="peek"
-        allowDetentToggle={false}
-      >
-        <div className="space-y-4">
-          <div className="relative grid grid-cols-2 rounded-2xl bg-[var(--surface-subtle)] p-1">
-            {(
-              [
-                { id: 'light', label: 'Light Canvas', icon: Sun },
-                { id: 'dark', label: 'OLED Dark', icon: Moon },
-              ] as const
-            ).map((m) => {
-              const Icon = m.icon;
-              const active = appearance === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={async () => {
-                    haptics.tap();
-                    await onChangeAppearance(m.id);
-                    flash(`${m.label} active`);
-                  }}
-                  className={`relative min-h-[44px] rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 z-10 transition-colors ${
-                    active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
-                  }`}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId={prefersReducedMotion ? undefined : 'settingsAppearanceSeg'}
-                      transition={SEG_SPRING}
-                      className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
-                    />
-                  )}
-                  <Icon className="w-3.5 h-3.5 relative z-10" />
-                  <span className="relative z-10">{m.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {onSelectAccentTheme && (
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  { id: 'sapphire', label: 'Sapphire', dot: 'bg-[#4F46E5]' },
-                  { id: 'rose', label: 'Rose', dot: 'bg-[#E11D48]' },
-                  { id: 'onyx', label: 'Onyx', dot: 'bg-[#09090B] ring-1 ring-white/40' },
-                ] as const
-              ).map((opt) => {
-                const selected = activeTheme === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => {
-                      haptics.tap();
-                      void onSelectAccentTheme(opt.id);
-                    }}
-                    className={`min-h-[44px] px-3 rounded-xl flex items-center justify-between text-xs font-bold active:scale-95 transition ${
-                      selected
-                        ? 'bg-[var(--brand-tint)] ring-1 ring-[var(--brand)] text-[var(--brand-accent)]'
-                        : 'bg-[var(--surface-subtle)] text-[var(--ink)]'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className={`w-3.5 h-3.5 rounded-full ${opt.dot}`} />
-                      <span>{opt.label}</span>
-                    </span>
-                    {selected && <Check className="w-3.5 h-3.5" />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </DetentSheetOverlay>
-
-      {/* Sheet 4: Sounds & Haptics */}
-      <DetentSheetOverlay
-        open={activeSheet === 'sounds'}
-        onClose={() => setActiveSheet(null)}
-        title="Sounds & Haptics"
-        initialDetent="peek"
-        allowDetentToggle={false}
-      >
-        <div className="ios27-inset-group rounded-2xl divide-y divide-[var(--surface-border)] overflow-hidden">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={soundEnabled}
-            onClick={() => {
-              const next = !soundEnabled;
-              setSoundEnabled(next);
-              setSoundState(next);
-              if (next) haptics.tap();
-            }}
-            className="w-full min-h-[54px] px-4 py-3 flex items-center justify-between gap-3 text-left"
-          >
-            <span className="flex items-center gap-3 min-w-0">
-              <Volume2 className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
-              <span className="text-sm font-bold text-[var(--ink)]">Tactile Click Sounds</span>
-            </span>
-            <SpringSwitch checked={soundEnabled} />
-          </button>
-
-          <button
-            type="button"
-            role="switch"
-            aria-checked={hapticsEnabled}
-            onClick={() => {
-              const next = !hapticsEnabled;
-              setHapticsEnabled(next);
-              setHapticsState(next);
-              if (next) haptics.tap();
-            }}
-            className="w-full min-h-[54px] px-4 py-3 flex items-center justify-between gap-3 text-left"
-          >
-            <span className="flex items-center gap-3 min-w-0">
-              <Smartphone className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
-              <span className="text-sm font-bold text-[var(--ink)]">Haptic Feedback</span>
-            </span>
-            <SpringSwitch checked={hapticsEnabled} />
-          </button>
-        </div>
-      </DetentSheetOverlay>
-
-      {/* Sheet 5: Backup & Restore */}
+      {/* Sheet 3: Backup & Restore */}
       <DetentSheetOverlay
         open={activeSheet === 'backup'}
         onClose={() => setActiveSheet(null)}
         title="Backup & Restore"
-        subtitle={business.name}
+        subtitle={lastBackupLabel}
         initialDetent="peek"
         allowDetentToggle={false}
       >
         <div className="space-y-4">
+          <div className="rounded-xl bg-[var(--surface-subtle)] px-3.5 py-2.5 flex items-center justify-between text-xs">
+            <span className="font-semibold text-[var(--ink-muted)]">Status</span>
+            <span className="font-bold text-[var(--ink)] font-tabular">{lastBackupLabel}</span>
+          </div>
+
           <button
             type="button"
             onClick={() => {
               haptics.tap();
               onExportJson();
+              setLastBackupAtIso(recordLastBackupAt());
               flash('JSON backup downloaded');
               setActiveSheet(null);
             }}
@@ -1119,9 +1092,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <span>Download JSON Backup</span>
           </button>
 
-          <div className="pt-3 border-t border-[var(--surface-border)] space-y-2.5">
+          <div className="pt-3 border-t border-[var(--glass-border)] space-y-2.5">
             <p className="text-xs font-bold text-[var(--ink-muted)]">Restore Mode</p>
-            <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-[var(--surface-subtle)] p-1">
+            <div className="grid grid-cols-2 gap-1.5 rounded-2xl liquid-glass p-1">
               {(
                 [
                   { id: 'merge', label: 'Merge with Current' },
@@ -1135,9 +1108,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     haptics.tap();
                     setRestoreMode(m.id);
                   }}
-                  className={`min-h-[38px] rounded-xl text-xs font-extrabold transition ${
+                  className={`min-h-[44px] rounded-xl text-xs font-extrabold transition ${
                     restoreMode === m.id
-                      ? 'bg-[var(--surface)] text-[var(--ink)] shadow-xs'
+                      ? 'bg-[var(--surface)] text-[var(--ink)] shadow-xs border border-[var(--glass-border)]'
                       : 'text-[var(--ink-muted)]'
                   }`}
                 >
@@ -1179,11 +1152,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </DetentSheetOverlay>
 
-      {/* Sheet 6: Shop Mobile & UPI QR */}
+      {/* Sheet 4: Shop Mobile & UPI QR */}
       <DetentSheetOverlay
         open={activeSheet === 'payments'}
         onClose={() => setActiveSheet(null)}
-        title="Shop Mobile & UPI QR"
+        title="UPI QR & Mobile"
         subtitle="Used on reminder slips and GST bills"
         initialDetent="peek"
         allowDetentToggle={false}
@@ -1199,7 +1172,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 maxLength={10}
                 value={phoneInput}
                 onChange={(e) => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="9876543210"
+                placeholder="Enter 10-digit mobile"
                 className="flex-1 min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
               />
               <button
@@ -1232,7 +1205,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="text"
                 value={upiInput}
                 onChange={(e) => setUpiInput(e.target.value)}
-                placeholder="sharma@okicici"
+                placeholder="shopname@okicici"
                 className="flex-1 min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
               />
               <button
@@ -1257,7 +1230,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {business.upiId && (
             <div className="rounded-2xl bg-[var(--app-bg)] p-4 flex items-center gap-4">
               <div className="p-2 bg-white rounded-xl shrink-0">
-                <QRCodeSVG value={buildUpiUri(business.upiId, business.name)} size={72} />
+                <QRCodeSVG value={buildUpiUri(business.upiId, displayShopName)} size={72} />
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-extrabold text-[var(--ink)] truncate">
@@ -1274,35 +1247,118 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </DetentSheetOverlay>
 
-      {/* Sheet 7: Confirm Reset Shop Data */}
+      {/* Sheet 5: Support (Privacy-safe: zero personal email/mobile shown on screen) */}
+      <DetentSheetOverlay
+        open={activeSheet === 'support'}
+        onClose={() => setActiveSheet(null)}
+        title="Support"
+        subtitle="Ucred Help Desk"
+        initialDetent="peek"
+        allowDetentToggle={false}
+      >
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-[var(--surface-subtle)] p-4 space-y-1.5 text-xs">
+            <p className="font-bold text-[var(--ink)]">App Version: v1.0.0</p>
+            <p className="text-[var(--ink-muted)] leading-relaxed">
+              Your ledger is protected with AES-256 encryption. Always download a JSON backup before resetting device data.
+            </p>
+          </div>
+
+          {onOpenHelp && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                setActiveSheet(null);
+                onOpenHelp();
+              }}
+              className="w-full min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] text-[var(--ink)] text-xs font-bold inline-flex items-center justify-center gap-2"
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span>Voice Commands &amp; User Guide</span>
+            </button>
+          )}
+
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(
+              `Ucred Support Request (${displayShopName} · v1.0.0): `
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center justify-center gap-2 tactile-key-primary"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>Message on WhatsApp</span>
+          </a>
+
+          <Link
+            href="/delete-account"
+            className="block text-center text-xs font-semibold text-[var(--ink-muted)] hover:underline pt-1"
+          >
+            Data Deletion Policy
+          </Link>
+        </div>
+      </DetentSheetOverlay>
+
+      {/* Sheet 6: Confirm Reset Shop Data (Requires typing Shop Name) */}
       <DetentSheetOverlay
         open={activeSheet === 'clear-data'}
-        onClose={() => setActiveSheet(null)}
+        onClose={() => {
+          setDangerConfirmInput('');
+          setActiveSheet(null);
+        }}
         title="Reset Shop Data"
-        subtitle={business.name}
+        subtitle={displayShopName}
         initialDetent="peek"
         allowDetentToggle={false}
       >
         <div className="space-y-4">
           <div className="rounded-2xl bg-[var(--credit-tint)] p-4 text-xs font-bold text-[var(--credit-red)] leading-relaxed">
-            This will permanently erase all parties, transactions, bills, cashbook, staff logs, and
-            inventory items for {business.name}. Download a JSON backup first.
+            This will permanently erase all parties, entries, bills, cashbook, staff logs, and stock items for{' '}
+            <span className="underline">{shopConfirmTarget}</span>. Export a JSON backup first.
           </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-[var(--ink-muted)]">
+              Type <span className="text-[var(--ink)]">&quot;{shopConfirmTarget}&quot;</span> to confirm
+            </label>
+            <input
+              type="text"
+              value={dangerConfirmInput}
+              onChange={(e) => setDangerConfirmInput(e.target.value)}
+              placeholder={shopConfirmTarget}
+              autoComplete="off"
+              className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--credit-red)]"
+            />
+          </div>
+
           {sheetError && <p className="text-xs font-bold text-[var(--credit-red)]">{sheetError}</p>}
+
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
-              disabled={busyAction === 'clear'}
+              disabled={busyAction === 'clear' || dangerConfirmInput.trim() !== shopConfirmTarget}
               onClick={() =>
-                void runSafely('clear', onClearAll, 'All shop data cleared', true)
+                void runSafely(
+                  'clear',
+                  async () => {
+                    await onClearAll();
+                    setDangerConfirmInput('');
+                  },
+                  'All shop data cleared',
+                  true
+                )
               }
-              className="min-h-[48px] rounded-2xl bg-[var(--credit-red)] text-white text-xs font-extrabold disabled:opacity-60"
+              className="min-h-[48px] rounded-2xl bg-[var(--credit-red)] text-white text-xs font-extrabold disabled:opacity-40 transition"
             >
-              {busyAction === 'clear' ? 'Clearing...' : 'Yes, Reset'}
+              {busyAction === 'clear' ? 'Resetting...' : 'Reset Shop Data'}
             </button>
             <button
               type="button"
-              onClick={() => setActiveSheet(null)}
+              onClick={() => {
+                setDangerConfirmInput('');
+                setActiveSheet(null);
+              }}
               className="min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)]"
             >
               Cancel
@@ -1311,33 +1367,69 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </DetentSheetOverlay>
 
-      {/* Sheet 8: Confirm Delete Cloud Account */}
+      {/* Sheet 7: Confirm Delete Account (Requires typing Shop Name) */}
       <DetentSheetOverlay
         open={activeSheet === 'delete-account'}
-        onClose={() => setActiveSheet(null)}
-        title="Delete Cloud Account"
+        onClose={() => {
+          setDangerConfirmInput('');
+          setActiveSheet(null);
+        }}
+        title="Delete Account"
         subtitle="Permanent Action"
         initialDetent="peek"
         allowDetentToggle={false}
       >
         <div className="space-y-4">
           <div className="rounded-2xl bg-[var(--credit-tint)] p-4 text-xs font-bold text-[var(--credit-red)] leading-relaxed">
-            Permanently deletes ALL shops, vaults, ledger entries, and cloud account data. Export a
-            JSON backup before proceeding.
+            {isGuestMode
+              ? 'Permanently deletes your local vault, settings, and all ledger entries on this device.'
+              : 'Permanently deletes all shops, vaults, ledger entries, and your cloud account.'}
           </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-[var(--ink-muted)]">
+              Type <span className="text-[var(--ink)]">&quot;{shopConfirmTarget}&quot;</span> to confirm
+            </label>
+            <input
+              type="text"
+              value={dangerConfirmInput}
+              onChange={(e) => setDangerConfirmInput(e.target.value)}
+              placeholder={shopConfirmTarget}
+              autoComplete="off"
+              className="w-full min-h-[46px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--credit-red)]"
+            />
+          </div>
+
           {sheetError && <p className="text-xs font-bold text-[var(--credit-red)]">{sheetError}</p>}
+
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
-              disabled={busyAction === 'delete-account'}
-              onClick={() => void runSafely('delete-account', onDeleteAccount, undefined, true)}
-              className="min-h-[48px] rounded-2xl bg-[var(--credit-red)] text-white text-xs font-extrabold disabled:opacity-60"
+              disabled={
+                busyAction === 'delete-account' ||
+                dangerConfirmInput.trim() !== shopConfirmTarget
+              }
+              onClick={() =>
+                void runSafely(
+                  'delete-account',
+                  async () => {
+                    await onDeleteAccount();
+                    setDangerConfirmInput('');
+                  },
+                  isGuestMode ? 'Local vault deleted' : undefined,
+                  true
+                )
+              }
+              className="min-h-[48px] rounded-2xl bg-[var(--credit-red)] text-white text-xs font-extrabold disabled:opacity-40 transition"
             >
               {busyAction === 'delete-account' ? 'Deleting...' : 'Delete Forever'}
             </button>
             <button
               type="button"
-              onClick={() => setActiveSheet(null)}
+              onClick={() => {
+                setDangerConfirmInput('');
+                setActiveSheet(null);
+              }}
               className="min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)]"
             >
               Cancel
@@ -1417,21 +1509,31 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5 pb-32">
+    <div className="max-w-2xl mx-auto space-y-5 pb-8">
       <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 min-h-[44px] px-3.5 rounded-2xl spatial-card text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Business Profile</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to Settings"
+            className="w-11 h-11 rounded-full liquid-glass flex items-center justify-center text-[var(--ink)] active:scale-95 transition shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="font-display text-2xl font-extrabold tracking-tight text-[var(--ink)]">
+              Shop Profile
+            </h1>
+            <p className="text-xs font-medium text-[var(--ink-muted)]">
+              Store details, GSTIN, and visiting card
+            </p>
+          </div>
+        </div>
 
         <button
           type="button"
           onClick={() => setShowCardModal(true)}
-          className="min-h-[44px] px-3.5 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center gap-1.5 active:scale-95 transition"
+          className="min-h-[44px] px-4 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center gap-1.5 active:scale-95 transition shrink-0"
         >
           <CreditCard className="w-4 h-4" />
           <span>Share Card</span>
@@ -1439,10 +1541,10 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
       </div>
 
       {/* Business Card Preview */}
-      <div className="ios27-pass-indigo rounded-[28px] p-6 space-y-3">
+      <div className="ios27-pass-indigo rounded-[22px] p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center font-extrabold text-xl">
+            <div className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center font-extrabold text-xl">
               {(name || 'U').charAt(0).toUpperCase()}
             </div>
             <div>
@@ -1452,7 +1554,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               </p>
             </div>
           </div>
-          <Building2 className="w-7 h-7 opacity-80" />
+          <Building2 className="w-6 h-6 opacity-80" />
         </div>
         <div className="text-xs space-y-1 opacity-95 pt-2">
           {phone && <p className="font-tabular">Mobile: +91 {phone}</p>}
@@ -1462,7 +1564,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
       </div>
 
       {/* Profile Form */}
-      <div className="ios27-inset-group rounded-[26px] p-5 space-y-3.5">
+      <div className="ios27-inset-group rounded-[22px] p-5 space-y-3.5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
             <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
@@ -1472,7 +1574,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
           </div>
           <div>
@@ -1484,7 +1586,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               maxLength={10}
               value={phone}
               onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm font-tabular font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
           </div>
           <div>
@@ -1496,7 +1598,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               value={gstNumber}
               onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
               placeholder="22AAAAA0000A1Z5"
-              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-tabular uppercase text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm font-tabular uppercase text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
           </div>
           <div>
@@ -1506,7 +1608,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               value={upiId}
               onChange={(e) => setUpiId(e.target.value)}
               placeholder="shopname@okicici"
-              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
           </div>
           <div>
@@ -1518,7 +1620,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               value={businessType}
               onChange={(e) => setBusinessType(e.target.value)}
               placeholder="Retailer / Wholesaler"
-              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
           </div>
           <div>
@@ -1527,8 +1629,8 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              placeholder="Kirana / Medical / Hardware"
-              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              placeholder="Grocery / Medical / Hardware"
+              className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
           </div>
         </div>
@@ -1539,8 +1641,8 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
             type="text"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="Main Market Road, Near Bus Stand"
-            className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+            placeholder="Main Market Road"
+            className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
           />
         </div>
 
@@ -1551,7 +1653,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
           </div>
           <div>
@@ -1561,7 +1663,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               value={about}
               onChange={(e) => setAbout(e.target.value)}
               placeholder="Fresh groceries & daily essentials"
-              className="w-full min-h-[44px] rounded-xl bg-[var(--surface-subtle)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+              className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
           </div>
         </div>
@@ -1572,9 +1674,9 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
           type="button"
           disabled={saving}
           onClick={handleSave}
-          className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
+          className="w-full min-h-[48px] rounded-full bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-semibold text-sm tactile-key-primary disabled:opacity-60 active:scale-95 transition"
         >
-          {saving ? 'Saving Profile...' : savedToast ? 'Saved ✓' : 'Save Business Profile'}
+          {saving ? 'Saving Profile...' : savedToast ? 'Saved ✓' : 'Save Shop Profile'}
         </button>
 
         {canDeleteBusiness && onDeleteBusiness && (
@@ -1666,6 +1768,7 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
 interface AccountSummaryViewProps {
   accounts: LedgerAccount[];
   transactions: LedgerTransaction[];
+  showBackButton?: boolean;
   onBack: () => void;
   onExportJson: () => void;
   onExportCsv: () => void;
@@ -1674,6 +1777,7 @@ interface AccountSummaryViewProps {
 export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
   accounts,
   transactions,
+  showBackButton = true,
   onBack,
   onExportJson,
   onExportCsv,
@@ -1687,47 +1791,59 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
   const suppDue = suppliers.reduce((s, a) => s + Math.abs(a.balance), 0);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4 pb-32">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex items-center gap-2 min-h-[44px] px-3.5 rounded-2xl spatial-card text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>Account Summary &amp; Backup</span>
-      </button>
+    <div className="space-y-4 pb-8">
+      <div className="flex items-center gap-2.5">
+        {showBackButton && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to Ledger"
+            className="w-11 h-11 rounded-full liquid-glass flex items-center justify-center text-[var(--ink)] active:scale-95 transition shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        )}
+        <div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-[var(--ink)]">
+            Account Summary
+          </h1>
+          <p className="text-xs font-medium text-[var(--ink-muted)]">
+            Receivables, payables, and quick backup export
+          </p>
+        </div>
+      </div>
 
-      <div className="ios27-inset-group rounded-[26px] p-5 space-y-3">
+      <div className="ios27-inset-group rounded-[22px] p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-base font-extrabold text-[var(--ink)]">
-            Customer Khata
+            Customer Accounts
           </h2>
-          <span className="text-xs font-bold text-[var(--ink-muted)] font-tabular">
+          <span className="text-xs font-semibold text-[var(--ink-muted)] font-tabular">
             {customers.length} customers
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 font-tabular">
           <div className="rounded-2xl bg-[var(--debit-tint)] p-4 truncate">
-            <p className="text-xs font-bold text-[var(--debit-green)]">You Get</p>
+            <p className="text-xs font-bold text-[var(--debit-green)]">Receivable</p>
             <p className="text-base sm:text-xl font-extrabold text-[var(--debit-green)] mt-0.5 truncate whitespace-nowrap">
               {custDue >= 10000000 ? formatINRCompact(custDue) : formatINR(custDue)}
             </p>
           </div>
-          <div className="rounded-2xl bg-[var(--brand-tint)] p-4 truncate">
-            <p className="text-xs font-bold text-[var(--brand-accent)]">Advance</p>
-            <p className="text-base sm:text-xl font-extrabold text-[var(--brand-accent)] mt-0.5 truncate whitespace-nowrap">
+          <div className="rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] p-4 truncate">
+            <p className="text-xs font-bold text-[var(--ink-muted)]">Advance</p>
+            <p className="text-base sm:text-xl font-extrabold text-[var(--ink)] mt-0.5 truncate whitespace-nowrap">
               {custAdv >= 10000000 ? formatINRCompact(custAdv) : formatINR(custAdv)}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="ios27-inset-group rounded-[26px] p-5 space-y-3">
+      <div className="ios27-inset-group rounded-[22px] p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-base font-extrabold text-[var(--ink)]">
-            Supplier Khata
+            Supplier Accounts
           </h2>
-          <span className="text-xs font-bold text-[var(--ink-muted)] font-tabular">
+          <span className="text-xs font-semibold text-[var(--ink-muted)] font-tabular">
             {suppliers.length} suppliers
           </span>
         </div>
@@ -1743,7 +1859,7 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
         <button
           type="button"
           onClick={onExportJson}
-          className="min-h-[50px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
+          className="min-h-[48px] rounded-full bg-[var(--brand)] text-[var(--brand-fg)] font-semibold text-sm flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
         >
           <Download className="w-4 h-4" />
           <span>Download JSON Backup</span>
@@ -1751,9 +1867,9 @@ export const AccountSummaryView: React.FC<AccountSummaryViewProps> = ({
         <button
           type="button"
           onClick={onExportCsv}
-          className="min-h-[50px] rounded-2xl spatial-card font-extrabold text-sm text-[var(--ink)] flex items-center justify-center gap-2 active:scale-95 transition"
+          className="min-h-[48px] rounded-full liquid-glass font-semibold text-sm text-[var(--ink)] flex items-center justify-center gap-2 active:scale-95 transition"
         >
-          <FileSpreadsheet className="w-4 h-4 text-[var(--brand-accent)]" />
+          <FileSpreadsheet className="w-4 h-4 text-[var(--ink)]" />
           <span>Export CSV Statement</span>
         </button>
       </div>
@@ -1767,79 +1883,89 @@ export const MultiDeviceView: React.FC<{
   isGuestMode?: boolean;
   onOpenCloudSync?: () => void;
   onBack: () => void;
-}> = ({ verifiedPhone, mobileNumber, isGuestMode = false, onOpenCloudSync, onBack }) => (
-  <div className="max-w-xl mx-auto space-y-5 pb-32">
-    <button
-      type="button"
-      onClick={onBack}
-      className="inline-flex items-center gap-2 min-h-[44px] px-3.5 rounded-2xl spatial-card text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
-    >
-      <ArrowLeft className="w-4 h-4" />
-      <span>Multi-Device Cloud Sync</span>
-    </button>
-
-    <div className="ios27-inset-group rounded-[28px] p-6 space-y-4">
-      <div className="w-12 h-12 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
-        <Laptop className="w-6 h-6" />
-      </div>
-      <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
-        {isGuestMode
-          ? 'Encrypted Local Guest Storage Active'
-          : 'Your Khata is Synced with Zero-Knowledge E2EE'}
-      </h2>
-      <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-        {isGuestMode
-          ? 'All ledger entries, Galla cashbook, bills, and stock are encrypted with AES-256 on this device. Connect free Cloud Backup anytime to sync across devices.'
-          : 'Every customer entry, voice transaction, parchi scan, Galla cash entry, GST bill, and stock change is AES-256 encrypted before syncing to Cloud Firestore.'}
-      </p>
-
-      <div className="rounded-2xl bg-[var(--surface-subtle)] p-4 space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span className="text-[var(--ink-muted)]">Mode</span>
-          <span className="font-bold text-[var(--ink)]">
-            {isGuestMode ? 'Guest Mode (Local E2EE)' : verifiedPhone || 'Signed In'}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-[var(--ink-muted)]">Shop Mobile</span>
-          <span className="font-bold font-tabular text-[var(--ink)]">
-            {mobileNumber
-              ? `+91 ${mobileNumber}`
-              : isGuestMode
-                ? 'Not connected'
-                : verifiedPhone || 'Not set'}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-[var(--ink-muted)]">Encryption</span>
-          <span
-            className={`font-bold ${
-              isGuestMode ? 'text-[var(--brand-accent)]' : 'text-[var(--debit-green)]'
-            }`}
-          >
-            {isGuestMode ? 'AES-256 On-Device' : 'AES-256 Real-Time Sync'}
-          </span>
-        </div>
-      </div>
-
-      {isGuestMode && onOpenCloudSync ? (
+}> = ({ verifiedPhone, mobileNumber, isGuestMode = false, onOpenCloudSync, onBack }) => {
+  const maskedPhone = maskContactIdentifier(mobileNumber);
+  const maskedIdentity = maskContactIdentifier(verifiedPhone);
+  return (
+    <div className="max-w-xl mx-auto space-y-5 pb-8">
+      <div className="flex items-center gap-2.5">
         <button
           type="button"
-          onClick={onOpenCloudSync}
-          className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
+          onClick={onBack}
+          aria-label="Back to Settings"
+          className="w-11 h-11 rounded-full liquid-glass flex items-center justify-center text-[var(--ink)] active:scale-95 transition shrink-0"
         >
-          <CloudUpload className="w-4 h-4" />
-          <span>Connect Free Cloud Backup</span>
+          <ArrowLeft className="w-5 h-5" />
         </button>
-      ) : (
-        <p className="text-xs text-[var(--ink-muted)]">
-          Sign in with this same Google, Email Link, or +91 mobile account on another phone or shop
-          desktop to access your encrypted ledger live.
+        <div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-[var(--ink)]">
+            Cloud Backup &amp; Sync
+          </h1>
+          <p className="text-xs font-medium text-[var(--ink-muted)]">
+            Encrypted device storage and sync status
+          </p>
+        </div>
+      </div>
+
+      <div className="ios27-inset-group rounded-[22px] p-6 space-y-4">
+        <div className="w-12 h-12 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center">
+          <Laptop className="w-6 h-6" />
+        </div>
+        <h2 className="font-display text-xl font-extrabold text-[var(--ink)]">
+          {isGuestMode
+            ? 'Encrypted Local Storage Active'
+            : 'Encrypted Cloud Sync Active'}
+        </h2>
+        <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
+          {isGuestMode
+            ? 'All ledger entries, cashbook, bills, and stock are encrypted with AES-256 on this device. Connect free Cloud Backup anytime to sync across devices.'
+            : 'Every customer entry, voice transaction, receipt scan, cashbook entry, GST bill, and stock change is encrypted before syncing.'}
         </p>
-      )}
+
+        <div className="rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] p-4 space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-[var(--ink-muted)]">Mode</span>
+            <span className="font-bold text-[var(--ink)]">
+              {isGuestMode ? 'Offline Device Vault' : maskedIdentity || 'Signed In'}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-[var(--ink-muted)]">Shop Mobile</span>
+            <span className="font-bold font-tabular text-[var(--ink)]">
+              {maskedPhone || (isGuestMode ? 'Not connected' : maskedIdentity || 'Not set')}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-[var(--ink-muted)]">Encryption</span>
+            <span
+              className={`font-bold ${
+                isGuestMode ? 'text-[var(--ink)]' : 'text-[var(--debit-green)]'
+              }`}
+            >
+              {isGuestMode ? 'AES-256 On-Device' : 'AES-256 Real-Time Sync'}
+            </span>
+          </div>
+        </div>
+
+        {isGuestMode && onOpenCloudSync ? (
+          <button
+            type="button"
+            onClick={onOpenCloudSync}
+            className="w-full min-h-[48px] rounded-full bg-[var(--brand)] text-[var(--brand-fg)] font-semibold text-sm flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
+          >
+            <CloudUpload className="w-4 h-4" />
+            <span>Connect Free Cloud Backup</span>
+          </button>
+        ) : (
+          <p className="text-xs text-[var(--ink-muted)]">
+            Sign in with this same account on another phone or desktop to access your encrypted
+            ledger.
+          </p>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface NotificationsDrawerProps {
   open: boolean;
@@ -1876,7 +2002,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
       initialDetent="full"
     >
       <div className="space-y-4">
-        <div className="relative grid grid-cols-3 rounded-2xl bg-[var(--surface-subtle)] p-1">
+        <div className="relative grid grid-cols-3 rounded-2xl liquid-glass p-1">
           {(
             [
               { id: 'all', label: 'All' },
@@ -1890,7 +2016,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
-                className={`relative min-h-[40px] rounded-xl text-xs font-extrabold z-10 transition-colors ${
+                className={`relative min-h-[44px] rounded-xl text-xs font-extrabold z-10 transition-colors ${
                   active ? 'text-[var(--ink)]' : 'text-[var(--ink-muted)]'
                 }`}
               >
@@ -1898,7 +2024,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                   <motion.span
                     layoutId={prefersReducedMotion ? undefined : 'notifTabSeg'}
                     transition={SEG_SPRING}
-                    className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs"
+                    className="absolute inset-0 rounded-xl bg-[var(--surface)] shadow-xs border border-[var(--glass-border)]"
                   />
                 )}
                 <span className="relative z-10">{t.label}</span>
@@ -1923,11 +2049,11 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                   initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
-                  transition={{ duration: 0.18 }}
+                  transition={SNAPPY_SPRING}
                   key={item.id}
                   className={`rounded-[22px] p-4 space-y-2.5 ${
                     item.read
-                      ? 'bg-[var(--surface-subtle)]'
+                      ? 'ios27-ceramic-tile'
                       : 'ios27-inset-group ring-1 ring-[var(--brand-accent)]'
                   }`}
                 >
@@ -1940,7 +2066,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                       type="button"
                       onClick={() => onToggleFav(item.id)}
                       aria-label="Star notification"
-                      className="min-w-[40px] min-h-[40px] rounded-xl flex items-center justify-center text-amber-500 active:scale-95 transition"
+                      className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-amber-500 active:scale-95 transition"
                     >
                       <Star className={`w-4 h-4 ${item.fav ? 'fill-amber-400' : ''}`} />
                     </button>
@@ -1958,7 +2084,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                         onTriggerAction(item.targetAction);
                         onClose();
                       }}
-                      className="min-h-[40px] px-3.5 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold tactile-key-primary active:scale-95 transition"
+                      className="min-h-[44px] px-4 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold tactile-key-primary active:scale-95 transition"
                     >
                       {item.actionLabel}
                     </button>
@@ -1966,7 +2092,7 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
                       <button
                         type="button"
                         onClick={() => onToggleRead(item.id)}
-                        className="min-h-[40px] px-2 text-xs font-semibold text-[var(--ink-muted)] hover:underline"
+                        className="min-h-[44px] px-3 text-xs font-semibold text-[var(--ink-muted)] hover:underline"
                       >
                         Mark Read
                       </button>
@@ -1983,45 +2109,54 @@ export const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({
 };
 
 export const HelpSupportView: React.FC<{ onBack: () => void }> = ({ onBack }) => (
-  <div className="max-w-2xl mx-auto space-y-4 pb-32">
-    <button
-      type="button"
-      onClick={onBack}
-      className="inline-flex items-center gap-2 min-h-[44px] px-3.5 rounded-2xl spatial-card text-sm font-extrabold text-[var(--ink)] active:scale-95 transition"
-    >
-      <ArrowLeft className="w-4 h-4" />
-      <span>Help &amp; Support</span>
-    </button>
+  <div className="max-w-2xl mx-auto space-y-4 pb-8">
+    <div className="flex items-center gap-2.5">
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="Back to Settings"
+        className="w-11 h-11 rounded-full liquid-glass flex items-center justify-center text-[var(--ink)] active:scale-95 transition shrink-0"
+      >
+        <ArrowLeft className="w-5 h-5" />
+      </button>
+      <div>
+        <h1 className="font-display text-2xl font-extrabold tracking-tight text-[var(--ink)]">
+          Help &amp; Voice Examples
+        </h1>
+        <p className="text-xs font-medium text-[var(--ink-muted)]">
+          Quick guide for voice entries and billing
+        </p>
+      </div>
+    </div>
 
     <div className="space-y-3">
-      <div className="ios27-inset-group rounded-[26px] p-5 space-y-2.5">
-        <div className="flex items-center gap-2.5 text-[var(--brand-accent)] font-extrabold text-sm">
-          <span className="w-9 h-9 rounded-2xl bg-[var(--brand-tint)] flex items-center justify-center">
+      <div className="ios27-inset-group rounded-[22px] p-5 space-y-3">
+        <div className="flex items-center gap-2.5 text-[var(--ink)] font-extrabold text-sm">
+          <span className="w-9 h-9 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
             <BookOpen className="w-4 h-4" />
           </span>
-          <span>Hybrid Voice Entry &amp; Counter Queue Examples</span>
+          <span>Voice Entry Examples</span>
         </div>
-        <ul className="text-sm text-[var(--ink-muted)] space-y-1.5 list-disc list-inside">
-          <li>&quot;Ramesh do hazaar udhaar&quot; → Instant offline ₹2,000 Given (Udhaar)</li>
-          <li>&quot;Mohan se paanch sau mila&quot; → Instant ₹500 Received (Jama)</li>
+        <ul className="text-sm text-[var(--ink-muted)] space-y-2 list-disc list-inside leading-relaxed">
+          <li>&quot;Sharma 2000 credit&quot; → Records ₹2,000 Credit Given to Sharma</li>
+          <li>&quot;Received 500 from Mohan&quot; → Records ₹500 Payment Received from Mohan</li>
           <li>
-            &quot;Ramesh ka bill 2kg chini 90 aur 1kg atta 45&quot; → Voice Bill Draft
+            &quot;Verma bill 2kg sugar 90 and 1kg flour 45&quot; → Opens itemized Voice Bill draft
           </li>
           <li>Hands-Free Counter Mode → Auto-saves and stays listening during shop rush</li>
         </ul>
       </div>
 
-      <div className="ios27-inset-group rounded-[26px] p-5 space-y-2.5">
-        <div className="flex items-center gap-2.5 text-[var(--brand-accent)] font-extrabold text-sm">
-          <span className="w-9 h-9 rounded-2xl bg-[var(--debit-tint)] text-[var(--debit-green)] flex items-center justify-center">
+      <div className="ios27-inset-group rounded-[22px] p-5 space-y-3">
+        <div className="flex items-center gap-2.5 text-[var(--ink)] font-extrabold text-sm">
+          <span className="w-9 h-9 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
             <ShieldCheck className="w-4 h-4" />
           </span>
-          <span>Ucred Suite — Free &amp; Zero-Knowledge Private</span>
+          <span>Private &amp; Encrypted Suite</span>
         </div>
         <p className="text-sm text-[var(--ink-muted)] leading-relaxed">
-          Ucred combines Receipt Scanning, Live Cashbook &amp; Daily Profit Pulse, Customer Trust
-          Scores, Staff Counter Logs, Multi-Business Ledgers, GST Bills, and 1-Click WhatsApp UPI
-          Collection inside your AES-256 encrypted local or cloud vault.
+          Ucred combines Receipt Scanning, Daily Cashbook, Staff Activity Logs, Multi-Workspace
+          Ledgers, GST Bills, and 1-Tap WhatsApp UPI reminders inside your encrypted vault.
         </p>
       </div>
     </div>
@@ -2043,6 +2178,17 @@ export const PinLockOverlay: React.FC<{
   const [shaking, setShaking] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [scrambleEnabled] = useState(() => getScramblePinPadEnabled());
+  const [keypadOrder] = useState<string[]>(() => {
+    const base = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+    if (!getScramblePinPadEnabled()) return ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
+    const digits = [...base];
+    for (let i = digits.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [digits[i], digits[j]] = [digits[j], digits[i]];
+    }
+    return [...digits.slice(0, 9), '', digits[9], '⌫'];
+  });
 
   useEffect(() => {
     if (cooldownSec <= 0) return;
@@ -2101,17 +2247,19 @@ export const PinLockOverlay: React.FC<{
                 x: shaking ? [0, -10, 10, -6, 6, 0] : 0,
               }
         }
-        transition={{ duration: 0.3 }}
-        className="w-full max-w-xs rounded-[28px] spatial-hero p-6 text-center space-y-5"
+        transition={{ duration: 0.3, ease: APPLE_EASE }}
+        className="w-full max-w-xs rounded-[28px] liquid-glass-elevated p-6 text-center space-y-5"
       >
-        <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
+        <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center">
           <Lock className="w-7 h-7" />
         </div>
         <div>
           <h1 className="font-display text-xl font-extrabold text-[var(--ink)]">
             Enter 4-Digit App PIN
           </h1>
-          <p className="text-xs text-[var(--ink-muted)] mt-1">Ucred Security Lock</p>
+          <p className="text-xs text-[var(--ink-muted)] mt-1">
+            {scrambleEnabled ? 'Ucred Security Lock · Anti-Peep Keypad' : 'Ucred Security Lock'}
+          </p>
         </div>
 
         <div className="flex justify-center gap-3">
@@ -2134,7 +2282,7 @@ export const PinLockOverlay: React.FC<{
         )}
 
         <div className="grid grid-cols-3 gap-2.5">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((key, i) =>
+          {keypadOrder.map((key, i) =>
             key === '' ? (
               <div key={`pin-spacer-${i}`} />
             ) : (
@@ -2147,7 +2295,7 @@ export const PinLockOverlay: React.FC<{
                   if (key === '⌫') setEntered((p) => p.slice(0, -1));
                   else void handleDigit(key);
                 }}
-                className="min-h-[52px] rounded-2xl bg-[var(--surface-subtle)] text-lg font-extrabold font-tabular text-[var(--ink)] hover:bg-[var(--brand-tint)] disabled:opacity-40 active:scale-95 transition"
+                className="min-h-[52px] rounded-2xl bg-[var(--surface-subtle)] text-lg font-extrabold font-tabular text-[var(--ink)] hover:bg-[var(--surface)] disabled:opacity-40 active:scale-95 transition"
               >
                 {key}
               </button>

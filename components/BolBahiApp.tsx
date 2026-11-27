@@ -136,7 +136,6 @@ import {
   stopSpeaking,
 } from '@/lib/i18n';
 import {
-  computeCustomerTrustScore,
   computeDailyGallaPulse,
   computeNetCashflowSummary,
 } from '@/lib/ucred-intelligence';
@@ -154,7 +153,6 @@ import type {
   Business,
   CashbookEntry,
   CashbookMode,
-  CustomerTrustScore,
   LanguageCode,
   LedgerAccount,
   LedgerTransaction,
@@ -201,9 +199,16 @@ import {
 import { StaffAuditView } from './StaffAuditView';
 import { StockView } from './StockView';
 import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
+import { APPLE_EASE, SPATIAL_SPRING } from './motion/SpatialMotionEngine';
 import { VoiceMunimSheet } from './voice/VoiceMunimSheet';
 
 type NotifPrefsMap = Record<string, { read?: boolean; fav?: boolean }>;
+const APPEARANCE_PREF_KEY = 'ucred_appearance_pref_v1';
+
+function normalizeAppearancePref(val: unknown): AppearanceMode {
+  if (val === 'light' || val === 'dark' || val === 'system') return val;
+  return 'system';
+}
 
 function readPreloginPrefs(): {
   language?: LanguageCode;
@@ -364,6 +369,26 @@ function BolBahiAppInner() {
 
   // Voice, Counter Mode, Receipt Scanner & Bill Drafts
   const [hideBalance, setHideBalance] = useState(false);
+  const [appearancePref, setAppearancePref] = useState<AppearanceMode>(() => {
+    if (typeof window === 'undefined') return 'system';
+    try {
+      const explicit = localStorage.getItem(APPEARANCE_PREF_KEY);
+      if (explicit === 'system' || explicit === 'light' || explicit === 'dark') {
+        return explicit;
+      }
+      const pre = readPreloginPrefs();
+      if (pre.appearance === 'light' || pre.appearance === 'dark' || pre.appearance === 'system') {
+        return pre.appearance;
+      }
+    } catch {
+      // Ignore storage read errors
+    }
+    return 'system';
+  });
+  const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [accentTheme, setAccentTheme] = useState<ThemeAccentId>(() => {
     if (typeof window === 'undefined') return 'sapphire';
     try {
@@ -411,11 +436,13 @@ function BolBahiAppInner() {
   const language: LanguageCode = isGuestMode
     ? guestVault.profile.language
     : profile?.language || guestVault.profile.language;
-  const appearance: AppearanceMode = isGuestMode
-    ? guestVault.profile.appearance
-    : profile?.appearance === 'dark'
-      ? 'dark'
-      : 'light';
+  const appearance: AppearanceMode = appearancePref;
+  const resolvedAppearance: 'light' | 'dark' =
+    appearancePref === 'system'
+      ? systemPrefersDark
+        ? 'dark'
+        : 'light'
+      : appearancePref;
   const mobileNumber: string = isGuestMode
     ? guestVault.profile.mobileNumber
     : profile?.mobileNumber || guestVault.profile.mobileNumber;
@@ -758,7 +785,7 @@ function BolBahiAppInner() {
     const saved = await upsertUserProfile(uid, {
       mobileNumber: phoneDigits || existingProfile?.mobileNumber || localSnapshot.profile.mobileNumber || '',
       language: localSnapshot.profile.language || existingProfile?.language || 'en',
-      appearance: localSnapshot.profile.appearance || existingProfile?.appearance || 'light',
+      appearance: resolvedAppearance,
       ...(mergedActiveBizId ? { activeBusinessId: mergedActiveBizId } : {}),
       onboardingDone: true,
     });
@@ -766,7 +793,7 @@ function BolBahiAppInner() {
     clearGuestVault();
     const freshGuest = createInitialGuestVault({
       language: saved.language,
-      appearance: saved.appearance,
+      appearance: appearancePref,
       mobileNumber: saved.mobileNumber,
     });
     commitGuestVault(freshGuest);
@@ -934,17 +961,31 @@ function BolBahiAppInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply Light / Dark mode + Accent Theme on documentElement
+  // Listen for OS prefers-color-scheme changes for Auto Appearance mode
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Apply resolved Light / Dark mode + Accent Theme + browser theme-color on documentElement
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
-    if (accentTheme === 'rose') {
-      root.setAttribute('data-accent', 'rose');
+    if (accentTheme === 'rose' || accentTheme === 'onyx') {
+      root.setAttribute('data-accent', accentTheme);
     } else {
       root.removeAttribute('data-accent');
     }
-    root.classList.toggle('dark', appearance === 'dark');
-  }, [appearance, accentTheme]);
+    const isDark = resolvedAppearance === 'dark';
+    root.classList.toggle('dark', isDark);
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', isDark ? '#000000' : '#FFFFFF');
+    }
+  }, [resolvedAppearance, accentTheme]);
 
   // Background Firebase Auth listener (never blocks Guest Mode entry)
   useEffect(() => {
@@ -1073,21 +1114,6 @@ function BolBahiAppInner() {
   }, [user, cloudActiveBusiness?.id, dekResolvedForUid, cloudDek]);
 
   // Deterministic Intelligence Computations
-  const trustScoresByAccount = useMemo<Record<string, CustomerTrustScore>>(() => {
-    const todayStr = getLocalDateKey();
-    const txByAcc = new Map<string, LedgerTransaction[]>();
-    for (const tx of activeTransactions) {
-      const arr = txByAcc.get(tx.accountId);
-      if (arr) arr.push(tx);
-      else txByAcc.set(tx.accountId, [tx]);
-    }
-    const map: Record<string, CustomerTrustScore> = {};
-    for (const acc of activeAccounts) {
-      map[acc.id] = computeCustomerTrustScore(acc, txByAcc.get(acc.id) || [], todayStr);
-    }
-    return map;
-  }, [activeAccounts, activeTransactions]);
-
   const gallaPulse = useMemo(
     () =>
       computeDailyGallaPulse({
@@ -1198,35 +1224,31 @@ function BolBahiAppInner() {
   };
 
   const handleSetAppearance = async (nextMode: AppearanceMode) => {
-    persistPrelogin({ appearance: nextMode });
+    const cleanMode = normalizeAppearancePref(nextMode);
+    setAppearancePref(cleanMode);
+    try {
+      localStorage.setItem(APPEARANCE_PREF_KEY, cleanMode);
+    } catch {
+      // Ignore storage write errors
+    }
+    persistPrelogin({ appearance: cleanMode });
     if (isGuestMode) {
       updateGuestVault((prev) => ({
         ...prev,
-        profile: { ...prev.profile, appearance: nextMode },
+        profile: { ...prev.profile, appearance: cleanMode },
       }));
       return;
     }
     if (user) {
       try {
-        const updated = await upsertUserProfile(user.uid, { appearance: nextMode });
+        const firestoreSafeMode: 'light' | 'dark' =
+          cleanMode === 'system' ? (systemPrefersDark ? 'dark' : 'light') : cleanMode;
+        const updated = await upsertUserProfile(user.uid, { appearance: firestoreSafeMode });
         setProfile(updated);
       } catch (err) {
         setAuthError(err instanceof Error ? err.message : 'Unable to save theme preference.');
       }
     }
-  };
-
-  const handleToggleAppearance = async () => {
-    const nextMode: AppearanceMode = appearance === 'dark' ? 'light' : 'dark';
-    const nextAccent: ThemeAccentId =
-      nextMode === 'dark' ? 'onyx' : accentTheme === 'onyx' ? 'sapphire' : accentTheme;
-    setAccentTheme(nextAccent);
-    try {
-      localStorage.setItem('ucred_accent_theme_v1', nextAccent);
-    } catch {
-      // Ignore storage write errors
-    }
-    await handleSetAppearance(nextMode);
   };
 
   const handleSelectAccentTheme = async (next: ThemeAccentId) => {
@@ -1236,7 +1258,6 @@ function BolBahiAppInner() {
     } catch {
       // Ignore storage write errors
     }
-    await handleSetAppearance(next === 'onyx' ? 'dark' : 'light');
   };
 
   const triggerAccountHighlight = (accountId: string) => {
@@ -1776,30 +1797,6 @@ function BolBahiAppInner() {
       });
     }
 
-    const highRiskAccs = scopedAccounts.filter(
-      (a) =>
-        a.kind === 'customer' &&
-        a.balance > 0 &&
-        (trustScoresByAccount[a.id]?.score ?? 100) < 50
-    );
-    if (highRiskAccs.length > 0) {
-      items.push({
-        id: 'live-trust-risk',
-        title: `${highRiskAccs.length} High Trust-Risk Party`,
-        bullets: highRiskAccs
-          .slice(0, 2)
-          .map(
-            (a) =>
-              `${a.name}: Trust ${trustScoresByAccount[a.id]?.score}/100 (${trustScoresByAccount[a.id]?.recoveryTimingHint})`
-          ),
-        actionLabel: 'Collect First',
-        targetAction: 'collection',
-        read: Boolean(notifPrefs['live-trust-risk']?.read),
-        fav: Boolean(notifPrefs['live-trust-risk']?.fav),
-        timeLabel: 'Recovery Radar',
-      });
-    }
-
     if (!currentBusiness?.upiId) {
       items.push({
         id: 'live-upi-setup',
@@ -1854,7 +1851,6 @@ function BolBahiAppInner() {
     currentBusiness?.upiId,
     dailyStats.todayKey,
     notifPrefs,
-    trustScoresByAccount,
     capabilities.focus,
   ]);
 
@@ -2305,7 +2301,26 @@ function BolBahiAppInner() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!user) return;
+    if (!user) {
+      await clearDeviceDekBytes(GUEST_OWNER_ID);
+      clearGuestVault();
+      resetDeviceSecurityState();
+      try {
+        localStorage.removeItem('ucred_prelogin_prefs');
+        localStorage.removeItem('ucred_notif_prefs');
+      } catch {
+        // Ignore storage removal errors
+      }
+      const freshVault = createInitialGuestVault({
+        language,
+        appearance,
+      });
+      commitGuestVault(freshVault);
+      setSecondaryRoute(null);
+      setSelectedAccountId(null);
+      setMainTab('ledger');
+      return;
+    }
     const hasGoogle = user.providerData.some((p) => p.providerId === 'google.com');
     if (needsRecentSignIn(user.metadata.lastSignInTime)) {
       if (hasGoogle) {
@@ -2492,13 +2507,13 @@ function BolBahiAppInner() {
   const activeDockDestination: DockDestination =
     effectiveMainTab === 'more' || effectiveSecondaryRoute === 'settings'
       ? 'settings'
-      : effectiveSecondaryRoute === 'account-summary' && !capabilities.showGstBills
+      : effectiveMainTab === 'bills' ||
+          effectiveMainTab === 'stock' ||
+          effectiveMainTab === 'account-summary'
         ? 'bills'
-        : effectiveMainTab === 'bills' || effectiveMainTab === 'stock'
-          ? 'bills'
-          : effectiveMainTab === 'collection'
-            ? 'overdue'
-            : 'home';
+        : effectiveMainTab === 'collection'
+          ? 'overdue'
+          : 'home';
 
   const showSubNavStrip =
     !selectedAccount &&
@@ -2508,10 +2523,10 @@ function BolBahiAppInner() {
   const hasForegroundOverlay = Boolean(selectedAccount || effectiveSecondaryRoute);
 
   return (
-    <div className="w-full max-w-[460px] lg:max-w-[1200px] mx-auto h-dvh overflow-hidden relative shadow-2xl flex flex-col select-none spatial-shell-bg native-app-shell text-[var(--ink)]">
+    <div className="w-full max-w-[480px] lg:max-w-none mx-auto h-dvh overflow-hidden relative shadow-2xl lg:shadow-none flex flex-col select-none spatial-shell-bg native-app-shell text-[var(--ink)]">
       <OfflineIndicator />
 
-      {/* Scroll-Linked Living Matte Dynamic Island Header */}
+      {/* Scroll-Linked Floating Liquid Glass Top Chrome */}
       {!hasForegroundOverlay && !personaOnboardingOpen && (
         <DynamicIslandHeader
           business={currentBusiness}
@@ -2533,6 +2548,7 @@ function BolBahiAppInner() {
           voiceModalOpen={voiceModalOpen}
           islandToast={islandToast}
           undoBusy={undoBusy}
+          isHeaderVisible={spatialMotion.isHeaderVisible}
           onOpenBusinessSwitcher={() => setBizSwitcherOpen(true)}
           onToggleSearch={() => setSearchOpen((v) => !v)}
           onChangeSearch={setSearchQuery}
@@ -2551,36 +2567,47 @@ function BolBahiAppInner() {
         />
       )}
 
-      {/* Cockpit Main Canvas (Recesses Smoothly along Z-Axis when Statement or Secondary Overlay Opens) */}
-      <main
+      {/* Cockpit Full-Bleed Scroll Canvas (Glides Behind Frosted Top Chrome & Bottom Dock) */}
+      <motion.main
         ref={mainScrollRef}
-        className={`flex-1 min-h-0 w-full overflow-y-auto no-scrollbar px-4 lg:px-6 py-3 pb-32 origin-top transition-[transform,opacity,border-radius,filter] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        animate={
           hasForegroundOverlay
-            ? 'scale-[0.92] -translate-y-2.5 rounded-[34px] opacity-45 brightness-90 pointer-events-none will-change-transform'
-            : ''
+            ? { scale: 0.92, y: -10, opacity: 0.45 }
+            : { scale: 1, y: 0, opacity: 1 }
+        }
+        transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.8 }}
+        className={`h-full w-full overflow-y-auto overscroll-y-contain no-scrollbar px-4 lg:px-6 pb-44 origin-top will-change-transform ${
+          !hasForegroundOverlay && !personaOnboardingOpen
+            ? personaPrefs.categories.length > 1
+              ? 'pt-[102px]'
+              : 'pt-[68px]'
+            : 'pt-4'
+        } ${
+          hasForegroundOverlay ? 'rounded-[34px] pointer-events-none' : ''
         }`}
       >
-        {/* Single Unified Home Return + Sub-Tool Switcher Bar (Zero Double Back Buttons) */}
+        <div className="w-full max-w-[1120px] mx-auto">
+        {/* Single Unified Home Return + Sub-Tool Switcher Bar */}
         {showSubNavStrip && (
-          <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="mb-4 flex items-center justify-between gap-2">
             <motion.button
-              whileTap={{ scale: 0.94, y: 1 }}
-              transition={{ type: 'spring', stiffness: 460, damping: 24 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 480, damping: 28, mass: 0.7 }}
               type="button"
               onClick={() => {
                 haptics.tap();
                 setSecondaryRoute(null);
                 setMainTab('ledger');
               }}
-              className="min-h-[38px] px-3 rounded-full bg-[var(--surface)] shadow-[var(--spatial-shadow)] text-xs font-extrabold text-[var(--ink)] inline-flex items-center gap-1.5 shrink-0"
+              className="min-h-[44px] px-3.5 rounded-full liquid-glass text-xs font-semibold text-[var(--ink)] inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
+              <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
               <span>{capabilities.feedTitle}</span>
             </motion.button>
 
             {(effectiveMainTab === 'bills' ||
               effectiveMainTab === 'stock') && (
-              <div className="flex items-center gap-1 rounded-full bg-[var(--surface-subtle)] p-1">
+              <div className="relative flex items-center gap-1 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] p-1">
                 {subNavigationTabs.map((sub) => {
                   const subActive =
                     sub.id === 'activity' || sub.id === 'staff-audit'
@@ -2593,7 +2620,8 @@ function BolBahiAppInner() {
                       onClick={() => {
                         haptics.tap();
                         if (sub.id === 'activity') {
-                          setSecondaryRoute('account-summary');
+                          setSecondaryRoute(null);
+                          setMainTab('account-summary');
                         } else if (sub.id === 'staff-audit') {
                           setSecondaryRoute('staff-audit');
                         } else {
@@ -2601,13 +2629,20 @@ function BolBahiAppInner() {
                           setMainTab(sub.id);
                         }
                       }}
-                      className={`min-h-[30px] px-2.5 rounded-full text-[11px] font-extrabold transition ${
+                      className={`relative min-h-[36px] px-3 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors ${
                         subActive
-                          ? 'bg-[var(--surface)] text-[var(--brand-accent)] shadow-xs'
-                          : 'text-[var(--ink-muted)]'
+                          ? 'text-[var(--ink)]'
+                          : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
                       }`}
                     >
-                      {sub.label}
+                      {subActive && (
+                        <motion.span
+                          layoutId="subNavigationActivePill"
+                          transition={{ type: 'spring', stiffness: 480, damping: 28, mass: 0.7 }}
+                          className="absolute inset-0 rounded-full bg-[var(--surface)] shadow-xs border border-[var(--glass-border)]"
+                        />
+                      )}
+                      <span className="relative z-10">{sub.label}</span>
                     </button>
                   );
                 })}
@@ -2626,7 +2661,6 @@ function BolBahiAppInner() {
             language={language}
             searchQuery={searchQuery}
             gallaPulse={gallaPulse}
-            trustScoresByAccount={trustScoresByAccount}
             selectedAccountId={selectedAccountId}
             recentlyUpdatedAccountId={recentlyUpdatedAccountId}
             hideBalance={hideBalance}
@@ -2709,21 +2743,18 @@ function BolBahiAppInner() {
           />
         )}
 
-        <AnimatePresence mode="wait" initial={false}>
           {!effectiveSecondaryRoute && effectiveMainTab === 'collection' && (
             <motion.div
               key="tab-collection"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
             >
               <CollectionView
             key={`${currentBusiness.id}_${currentBusiness.upiId || ''}`}
             accounts={scopedAccounts}
             business={currentBusiness}
             language={language}
-            trustScoresByAccount={trustScoresByAccount}
             capabilities={capabilities}
             onUpdateAccountDue={async (accountId, dueDate) => {
               if (isGuestMode) {
@@ -2758,8 +2789,7 @@ function BolBahiAppInner() {
               key="tab-bills"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
             >
               <BillsView
             key={`${currentBusiness.id}_${billDraft?.customerName || billPrefill?.name || 'none'}_${
@@ -2959,8 +2989,7 @@ function BolBahiAppInner() {
               key="tab-stock"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
             >
               <StockView
             items={activeStockItems}
@@ -3000,17 +3029,35 @@ function BolBahiAppInner() {
             </motion.div>
           )}
 
+          {!effectiveSecondaryRoute && effectiveMainTab === 'account-summary' && (
+            <motion.div
+              key="tab-account-summary"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <AccountSummaryView
+                accounts={scopedAccounts}
+                transactions={scopedTransactions}
+                showBackButton={false}
+                onBack={() => setMainTab('ledger')}
+                onExportJson={handleExportJson}
+                onExportCsv={handleExportCsv}
+              />
+            </motion.div>
+          )}
+
           {!effectiveSecondaryRoute && effectiveMainTab === 'more' && (
             <motion.div
               key="tab-settings"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
             >
               <SettingsView
             key={currentBusiness.id}
             appearance={appearance}
+            resolvedAppearance={resolvedAppearance}
             accentTheme={accentTheme}
             mobileNumber={mobileNumber}
             verifiedPhone={verifiedPhoneDisplay}
@@ -3020,6 +3067,10 @@ function BolBahiAppInner() {
             vaultMode={vaultMode}
             isGuestMode={isGuestMode}
             showBackButton={false}
+            showGalla={capabilities.showGalla}
+            showStock={capabilities.showStock}
+            showGstBills={capabilities.showGstBills}
+            showStaffAudit={capabilities.focus !== 'personal'}
             autoLockSeconds={autoLockSeconds}
             privacyCurtainEnabled={privacyCurtainEnabled}
             webAuthnSupported={webAuthnSupported}
@@ -3030,6 +3081,28 @@ function BolBahiAppInner() {
               setPersonaOnboardingOpen(true);
             }}
             onOpenBusinessProfile={() => setSecondaryRoute('business-profile')}
+            onOpenGalla={() => {
+              if (!capabilities.showGalla) return;
+              setSecondaryRoute('galla');
+            }}
+            onOpenStock={() => {
+              if (!capabilities.showStock) return;
+              setSecondaryRoute(null);
+              setMainTab('stock');
+            }}
+            onOpenBills={() => {
+              if (!capabilities.showGstBills) return;
+              setSecondaryRoute(null);
+              setMainTab('bills');
+            }}
+            onOpenStaffAudit={() => setSecondaryRoute('staff-audit')}
+            onOpenAccountSummary={() => {
+              setSecondaryRoute(null);
+              setMainTab('account-summary');
+              mainScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+            }}
+            onOpenMultiDevice={() => setSecondaryRoute('multi-device')}
+            onOpenHelp={() => setSecondaryRoute('help-support')}
             onChangeAppearance={handleSetAppearance}
             onSelectAccentTheme={(theme) => void handleSelectAccentTheme(theme)}
             onChangeAutoLockSeconds={changeAutoLockSeconds}
@@ -3113,8 +3186,8 @@ function BolBahiAppInner() {
           />
             </motion.div>
           )}
-        </AnimatePresence>
-      </main>
+        </div>
+      </motion.main>
 
       {/* Z-Axis Foreground Party Statement Sheet (Shared layoutId Morph from PartyLedgerCard) */}
       <AnimatePresence>
@@ -3130,7 +3203,6 @@ function BolBahiAppInner() {
               hideBalance={hideBalance}
               onToggleHideBalance={() => setHideBalance((v) => !v)}
               transactions={activeTransactions.filter((tx) => tx.accountId === selectedAccount.id)}
-              trustScore={trustScoresByAccount[selectedAccount.id]}
               onBack={() => setSelectedAccountId(null)}
               onOpenParchiScanner={
                 capabilities.focus === 'personal' ? undefined : () => setParchiScannerOpen(true)
@@ -3309,8 +3381,8 @@ function BolBahiAppInner() {
             transition={{ type: 'spring', stiffness: 360, damping: 32 }}
             className="absolute inset-0 z-30 p-3 pt-4 pb-3 flex flex-col items-center"
           >
-            <div className="w-full max-w-[680px] flex-1 min-h-0 rounded-[34px] spatial-card bg-[var(--app-bg)] overflow-y-auto no-scrollbar px-4 pt-3 pb-8">
-              <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto mb-3" />
+            <div className="w-full max-w-[680px] flex-1 min-h-0 rounded-[32px] liquid-glass-elevated overflow-y-auto no-scrollbar px-4 pt-3 pb-8">
+              <div className="w-10 h-1 rounded-full bg-[var(--ink-muted)]/30 mx-auto mb-3" />
 
               {effectiveSecondaryRoute === 'galla' && capabilities.showGalla && (
                 <GallaCashbookView
@@ -3352,7 +3424,7 @@ function BolBahiAppInner() {
                     }
                     logActivity(
                       'galla',
-                      `Galla ${payload.entryType} ₹${payload.amount} (${payload.category})`,
+                      `Cashbook ${payload.entryType} ₹${payload.amount} (${payload.category})`,
                       payload.category,
                       payload.amount
                     );
@@ -3363,7 +3435,7 @@ function BolBahiAppInner() {
                     } else {
                       await deleteCashbookEntry(entryId);
                     }
-                    logActivity('galla', 'Deleted Galla cashbook entry');
+                    logActivity('galla', 'Deleted cashbook entry');
                   }}
                   onBack={() => setSecondaryRoute(null)}
                 />
@@ -3422,6 +3494,7 @@ function BolBahiAppInner() {
                 <SettingsView
                   key={currentBusiness.id}
                   appearance={appearance}
+                  resolvedAppearance={resolvedAppearance}
                   accentTheme={accentTheme}
                   mobileNumber={mobileNumber}
                   verifiedPhone={verifiedPhoneDisplay}
@@ -3431,6 +3504,10 @@ function BolBahiAppInner() {
                   vaultMode={vaultMode}
                   isGuestMode={isGuestMode}
                   showBackButton
+                  showGalla={capabilities.showGalla}
+                  showStock={capabilities.showStock}
+                  showGstBills={capabilities.showGstBills}
+                  showStaffAudit={capabilities.focus !== 'personal'}
                   autoLockSeconds={autoLockSeconds}
                   privacyCurtainEnabled={privacyCurtainEnabled}
                   webAuthnSupported={webAuthnSupported}
@@ -3442,6 +3519,28 @@ function BolBahiAppInner() {
                     setPersonaOnboardingOpen(true);
                   }}
                   onOpenBusinessProfile={() => setSecondaryRoute('business-profile')}
+                  onOpenGalla={() => {
+                    if (!capabilities.showGalla) return;
+                    setSecondaryRoute('galla');
+                  }}
+                  onOpenStock={() => {
+                    if (!capabilities.showStock) return;
+                    setSecondaryRoute(null);
+                    setMainTab('stock');
+                  }}
+                  onOpenBills={() => {
+                    if (!capabilities.showGstBills) return;
+                    setSecondaryRoute(null);
+                    setMainTab('bills');
+                  }}
+                  onOpenStaffAudit={() => setSecondaryRoute('staff-audit')}
+                  onOpenAccountSummary={() => {
+                    setSecondaryRoute(null);
+                    setMainTab('account-summary');
+                    mainScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+                  }}
+                  onOpenMultiDevice={() => setSecondaryRoute('multi-device')}
+                  onOpenHelp={() => setSecondaryRoute('help-support')}
                   onBack={() => setSecondaryRoute(null)}
                   onChangeAppearance={handleSetAppearance}
                   onSelectAccentTheme={(theme) => void handleSelectAccentTheme(theme)}
@@ -3567,16 +3666,6 @@ function BolBahiAppInner() {
                 />
               )}
 
-              {effectiveSecondaryRoute === 'account-summary' && (
-                <AccountSummaryView
-                  accounts={scopedAccounts}
-                  transactions={scopedTransactions}
-                  onBack={() => setSecondaryRoute(null)}
-                  onExportJson={handleExportJson}
-                  onExportCsv={handleExportCsv}
-                />
-              )}
-
               {effectiveSecondaryRoute === 'multi-device' && (
                 <MultiDeviceView
                   verifiedPhone={verifiedPhoneDisplay}
@@ -3595,24 +3684,27 @@ function BolBahiAppInner() {
         )}
       </AnimatePresence>
 
-      {/* Solid Matte iOS 27 Floating Capsule Dock */}
+      {/* Liquid Glass iOS 27 Floating Capsule Dock */}
       {!hasForegroundOverlay && !personaOnboardingOpen && (
         <BottomSpatialDock
           activeDestination={activeDockDestination}
           voiceModalOpen={voiceModalOpen}
+          isDockVisible={spatialMotion.isHeaderVisible}
           capabilities={capabilities}
           onSelectHome={() => {
             setSecondaryRoute(null);
             setSelectedAccountId(null);
             setMainTab('ledger');
+            mainScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' });
           }}
           onSelectBills={() => {
             setSelectedAccountId(null);
+            setSecondaryRoute(null);
+            mainScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' });
             if (!capabilities.showGstBills) {
-              setSecondaryRoute('account-summary');
+              setMainTab('account-summary');
               return;
             }
-            setSecondaryRoute(null);
             setMainTab('bills');
           }}
           onOpenVoice={() => {
@@ -3624,11 +3716,13 @@ function BolBahiAppInner() {
             setSecondaryRoute(null);
             setSelectedAccountId(null);
             setMainTab('collection');
+            mainScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' });
           }}
           onSelectSettings={() => {
             setSecondaryRoute(null);
             setSelectedAccountId(null);
             setMainTab('more');
+            mainScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' });
           }}
         />
       )}
@@ -3642,17 +3736,17 @@ function BolBahiAppInner() {
             aria-label="Cloud Backup and Sync"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.18, ease: 'easeOut' } }}
+            exit={{ opacity: 0, transition: { duration: 0.18, ease: APPLE_EASE } }}
             onClick={() => {
               if (!authBusy) setSyncSheetOpen(false);
             }}
-            className="fixed inset-0 z-50 bg-black/55 flex items-end justify-center"
+            className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-end justify-center"
           >
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+              transition={SPATIAL_SPRING}
               drag="y"
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={{ top: 0, bottom: 0.4 }}
@@ -3660,7 +3754,7 @@ function BolBahiAppInner() {
                 if (info.offset.y > 90 && !authBusy) setSyncSheetOpen(false);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[460px] rounded-t-[34px] spatial-sheet p-6 space-y-4 pb-safe max-h-[92dvh] overflow-y-auto no-scrollbar"
+              className="w-full max-w-[460px] rounded-t-[34px] liquid-glass-elevated p-6 space-y-4 pb-safe max-h-[92dvh] overflow-y-auto no-scrollbar"
             >
               <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
               <div className="flex items-center justify-between gap-2">
@@ -3813,7 +3907,7 @@ function BolBahiAppInner() {
                             }
                           }}
                           placeholder="you@gmail.com"
-                          className="flex-1 min-h-[42px] rounded-xl bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                          className="flex-1 min-h-[44px] rounded-xl bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
                         />
                         <button
                           type="button"
@@ -3822,7 +3916,7 @@ function BolBahiAppInner() {
                             haptics.tap();
                             void handleSendEmailLink(syncEmailInput);
                           }}
-                          className="min-h-[42px] px-4 rounded-xl bg-[var(--surface)] ring-1 ring-[var(--surface-border)] text-xs font-extrabold text-[var(--ink)] hover:bg-[var(--brand-tint)] disabled:opacity-60"
+                          className="min-h-[44px] px-4 rounded-xl liquid-glass text-xs font-extrabold text-[var(--ink)] hover:bg-[var(--brand-tint)] disabled:opacity-60"
                         >
                           Send Link
                         </button>
@@ -3838,7 +3932,7 @@ function BolBahiAppInner() {
                         haptics.tap();
                         setShowPhoneOtpInSync(true);
                       }}
-                      className="w-full min-h-[42px] rounded-xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] inline-flex items-center justify-center gap-1.5"
+                      className="w-full min-h-[44px] rounded-xl liquid-glass text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] inline-flex items-center justify-center gap-1.5"
                     >
                       <Smartphone className="w-3.5 h-3.5" />
                       <span>Use +91 Mobile SMS OTP instead</span>
@@ -3904,9 +3998,9 @@ function BolBahiAppInner() {
           role="dialog"
           aria-modal="true"
           aria-label="Confirm Email Address"
-          className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4"
         >
-          <div className="w-full max-w-sm rounded-[28px] spatial-sheet p-6 space-y-4">
+          <div className="w-full max-w-sm rounded-[28px] liquid-glass-elevated p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
                 Confirm Your Email
@@ -3915,7 +4009,7 @@ function BolBahiAppInner() {
                 type="button"
                 onClick={() => setEmailConfirmPrompt(false)}
                 aria-label="Cancel email confirmation"
-                className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--ink-muted)]"
+                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3937,7 +4031,7 @@ function BolBahiAppInner() {
               type="button"
               disabled={authBusy}
               onClick={() => void handleConfirmCrossBrowserEmailLink()}
-              className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-white text-sm font-extrabold disabled:opacity-60"
+              className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold disabled:opacity-60"
             >
               {authBusy ? 'Verifying...' : 'Complete Sign-In'}
             </button>
@@ -3953,13 +4047,13 @@ function BolBahiAppInner() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setBizSwitcherOpen(false)}
-            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
+            className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-end justify-center"
           >
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+              transition={SPATIAL_SPRING}
               drag="y"
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={{ top: 0, bottom: 0.4 }}
@@ -3967,7 +4061,7 @@ function BolBahiAppInner() {
                 if (info.offset.y > 90) setBizSwitcherOpen(false);
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[460px] rounded-t-[34px] spatial-sheet p-6 space-y-4 pb-safe"
+              className="w-full max-w-[460px] rounded-t-[34px] liquid-glass-elevated p-6 space-y-4 pb-safe"
             >
               <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
               <div className="flex items-center justify-between">
@@ -4091,13 +4185,13 @@ function BolBahiAppInner() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeDailyMunimSummary}
-            className="no-print fixed inset-0 z-50 bg-black/55 flex items-end justify-center"
+            className="no-print fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-end justify-center"
           >
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+              transition={SPATIAL_SPRING}
               drag="y"
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={{ top: 0, bottom: 0.4 }}
@@ -4105,7 +4199,7 @@ function BolBahiAppInner() {
                 if (info.offset.y > 90) closeDailyMunimSummary();
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[460px] rounded-t-[34px] spatial-sheet p-6 space-y-4 pb-safe"
+              className="w-full max-w-[460px] rounded-t-[34px] liquid-glass-elevated p-6 space-y-4 pb-safe"
             >
               <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
               <div className="flex items-center justify-between gap-2">
@@ -4433,6 +4527,67 @@ function BolBahiAppInner() {
           setSelectedAccountId(null);
           setMainTab('bills');
         }}
+        onRestockItems={
+          capabilities.showStock
+            ? async (scannedItems) => {
+                if (scannedItems.length === 0) return;
+                if (isGuestMode) {
+                  updateGuestVault((prev) => {
+                    let nextVault = prev;
+                    for (const item of scannedItems) {
+                      const existing = nextVault.stockItems.find(
+                        (s) =>
+                          s.businessId === currentBusiness.id &&
+                          s.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+                      );
+                      nextVault = applySaveStockItem(nextVault, {
+                        businessId: currentBusiness.id,
+                        existingId: existing?.id,
+                        name: existing?.name || item.name,
+                        unit: existing?.unit || item.unit || 'pcs',
+                        salePrice: existing?.salePrice || item.price,
+                        purchasePrice: item.price > 0 ? item.price : existing?.purchasePrice || 0,
+                        quantity: (existing?.quantity || 0) + item.quantity,
+                        lowStockThreshold: existing?.lowStockThreshold ?? 5,
+                      }).vault;
+                    }
+                    return applyRecordActivityLog(nextVault, {
+                      businessId: currentBusiness.id,
+                      actorName: activeOperator.name,
+                      actorRole: activeOperator.role,
+                      actionType: 'stock',
+                      summary: `Restocked ${scannedItems.length} item${scannedItems.length === 1 ? '' : 's'} from scanned receipt`,
+                      targetName: scannedItems[0]?.name || 'Stock',
+                    });
+                  });
+                  return;
+                }
+                if (!user) return;
+                for (const item of scannedItems) {
+                  const existing = activeStockItems.find(
+                    (s) => s.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+                  );
+                  await saveStockItem({
+                    ownerId: user.uid,
+                    businessId: currentBusiness.id,
+                    existingId: existing?.id,
+                    name: existing?.name || item.name,
+                    unit: existing?.unit || item.unit || 'pcs',
+                    salePrice: existing?.salePrice || item.price,
+                    purchasePrice: item.price > 0 ? item.price : existing?.purchasePrice || 0,
+                    quantity: (existing?.quantity || 0) + item.quantity,
+                    lowStockThreshold: existing?.lowStockThreshold ?? 5,
+                    dek: cloudDek,
+                  });
+                }
+                logActivity(
+                  'stock',
+                  `Restocked ${scannedItems.length} item${scannedItems.length === 1 ? '' : 's'} from scanned receipt`,
+                  scannedItems[0]?.name
+                );
+              }
+            : undefined
+        }
       />
 
       {/* Single Persistent reCAPTCHA Anchor */}
@@ -4448,12 +4603,12 @@ function BolBahiAppInner() {
           role="dialog"
           aria-modal="true"
           aria-label="Mobile OTP Verification"
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4"
         >
-          <div className="w-full max-w-sm rounded-[28px] spatial-sheet p-6 space-y-4">
+          <div className="w-full max-w-sm rounded-[28px] liquid-glass-elevated p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500/15 to-indigo-500/20 shadow-inner text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                <span className="w-10 h-10 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
                   <KeyRound className="w-5 h-5" />
                 </span>
                 <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
@@ -4577,15 +4732,15 @@ function BolBahiAppInner() {
         </div>
       </DetentSheetOverlay>
 
-      {/* Solid Matte Tab Privacy Curtain Veil */}
+      {/* Privacy Curtain Veil */}
       {privacyCurtainVisible && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Screen Protected"
-          className="fixed inset-0 z-[70] bg-[var(--app-bg)] flex flex-col items-center justify-center p-6"
+          className="fixed inset-0 z-[70] spatial-shell-bg backdrop-blur-xl flex flex-col items-center justify-center p-6"
         >
-          <div className="w-full max-w-xs rounded-[28px] spatial-hero p-6 text-center space-y-4">
+          <div className="w-full max-w-xs rounded-[28px] liquid-glass-elevated p-6 text-center space-y-4">
             <div className="mx-auto w-14 h-14 rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center">
               <Lock className="w-7 h-7" />
             </div>

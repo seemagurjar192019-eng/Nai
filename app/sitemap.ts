@@ -1,5 +1,7 @@
 import type { MetadataRoute } from 'next';
 
+export const dynamic = 'force-static';
+
 const APP_ORIGIN = (
   process.env.NEXT_PUBLIC_APP_URL ||
   process.env.APP_URL ||

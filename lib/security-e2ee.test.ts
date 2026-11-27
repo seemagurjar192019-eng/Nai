@@ -23,20 +23,24 @@ import {
   loadEncryptedGuestVault,
   saveEncryptedGuestVault,
 } from './guest-store';
-import { hashPinForUid, verifyStoredPin } from './i18n';
+import { formatLastBackupLabel, hashPinForUid, maskContactIdentifier, verifyStoredPin } from './i18n';
 import {
   clearDeviceSecurityPrefs,
   getAutoLockSeconds,
+  getLastBackupAt,
   getPinCooldownSeconds,
   getPrivacyCurtainEnabled,
+  getScramblePinPadEnabled,
   getStoredPasskeyId,
   hasValidImageMagicBytes,
   normalizeAutoLockSeconds,
+  recordLastBackupAt,
   recordPinFailure,
   resetPinGuard,
   sanitizeCsvCell,
   setAutoLockSeconds,
   setPrivacyCurtainEnabled,
+  setScramblePinPadEnabled,
   setStoredPasskeyId,
   stripDangerousKeys,
   validateSafeBackupJson,
@@ -289,6 +293,33 @@ describe('Security Hardening Helpers (CSV, JSON Backup, Image Magic Bytes, API B
     assert.equal(getPrivacyCurtainEnabled(), false);
     assert.equal(getStoredPasskeyId(), '');
     assert.equal(store.size, 0);
+  });
+
+  it('masks personal email/mobile identifiers cleanly, formats backup timestamps, and persists scramble keypad', () => {
+    installMockWindowStorage();
+
+    assert.equal(maskContactIdentifier('owner.shop@gmail.com'), 'ow••••@gmail.com');
+    assert.equal(maskContactIdentifier('+91 9876543210'), '••••••3210');
+    assert.equal(maskContactIdentifier(''), '');
+
+    const nowMs = new Date(2026, 4, 15, 17, 0, 0).getTime();
+    const todayIso = new Date(2026, 4, 15, 16, 10, 0).toISOString();
+    const yestIso = new Date(2026, 4, 14, 11, 30, 0).toISOString();
+    assert.equal(formatLastBackupLabel(null, nowMs), 'Last backup: Not backed up yet');
+    assert.match(formatLastBackupLabel(todayIso, nowMs), /^Last backup: Today 4:10\s*PM$/);
+    assert.match(formatLastBackupLabel(yestIso, nowMs), /^Last backup: Yesterday 11:30\s*AM$/);
+
+    assert.equal(getLastBackupAt(), null);
+    recordLastBackupAt(todayIso);
+    assert.equal(getLastBackupAt(), todayIso);
+
+    assert.equal(getScramblePinPadEnabled(), false);
+    setScramblePinPadEnabled(true);
+    assert.equal(getScramblePinPadEnabled(), true);
+
+    clearDeviceSecurityPrefs();
+    assert.equal(getLastBackupAt(), null);
+    assert.equal(getScramblePinPadEnabled(), false);
   });
 
   it('creates party and entry atomically from empty guest vault via inline quick-add path', () => {
