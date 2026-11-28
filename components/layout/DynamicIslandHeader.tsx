@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { AnimatePresence, motion, useReducedMotion, type MotionValue } from 'framer-motion';
 import {
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
   Check,
   ChevronDown,
@@ -556,12 +557,23 @@ export const DynamicIslandHeader: React.FC<DynamicIslandHeaderProps> = ({
                   onChange={(e) => onChangeSearch(e.target.value)}
                   placeholder={
                     capabilities.showSuppliers
-                      ? 'Search party name or phone... (Esc to close)'
-                      : 'Search contact name or phone... (Esc to close)'
+                      ? 'Search party name or phone...'
+                      : 'Search contact name or phone...'
                   }
-                  className="w-full min-h-[46px] rounded-[20px] liquid-glass-elevated pl-10 pr-12 text-sm font-medium text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  className="w-full min-h-[46px] rounded-[20px] liquid-glass-elevated pl-12 pr-12 text-sm font-medium text-[var(--ink)] placeholder:text-[var(--ink-muted)] outline-none focus:ring-2 focus:ring-[var(--brand)] [&::-webkit-search-cancel-button]:hidden"
                 />
-                <Search className="w-4 h-4 text-[var(--ink-muted)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none stroke-[2]" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.tap();
+                    onChangeSearch('');
+                    onToggleSearch();
+                  }}
+                  aria-label="Close search mode"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full text-[var(--ink)] hover:bg-[var(--surface-subtle)] flex items-center justify-center active:scale-95 transition"
+                >
+                  <ArrowLeft className="w-4 h-4 stroke-[2.2]" />
+                </button>
                 {searchQuery ? (
                   <button
                     type="button"

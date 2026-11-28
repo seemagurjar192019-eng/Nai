@@ -560,134 +560,136 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
     <div className="pb-44 pt-1">
       <div className="space-y-3.5 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start lg:space-y-0">
         {/* LEFT COLUMN (Mobile Top / Desktop 5-col Sticky): Apple Monochrome Balance Slab + Quick Counter Bar */}
-        <div className="space-y-3 lg:col-span-5 lg:sticky lg:top-2">
-          <HeroBalanceCard
-            cashflow={cashflow}
-            partyCount={accounts.length}
-            cashDrawerBalance={gallaPulse.cashDrawerBalance + gallaPulse.upiBankBalance}
-            todayInflow={gallaPulse.todayInflow}
-            todayOutflow={gallaPulse.todayOutflow}
-            weeklyVelocity={weeklyVelocity}
-            hideBalance={hideBalance}
-            capabilities={capabilities}
-            personaAdaptation={activeAdaptation}
-            heroOpacity={heroOpacity}
-            heroScale={heroScale}
-            heroY={heroY}
-            onToggleHideBalance={onToggleHideBalance}
-            onOpenDailySummary={onOpenDailySummary}
-            onSelectReceivable={() => handleSelectSegment('customer')}
-            onSelectPayable={() => {
-              if (capabilities.showSuppliers) handleSelectSegment('supplier');
-            }}
-            onSelectGalla={() => {
-              if (capabilities.showGalla) onOpenGalla();
-            }}
-          />
-
-          {/* Compact 3-Action Monochrome Counter Strip */}
-          <div className="grid grid-cols-3 gap-2">
-            <motion.button
-              whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
-              transition={SPRING_FAST}
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                setShowQuickMenuSheet(true);
+        {!searchQuery.trim() && (
+          <div className="space-y-3 lg:col-span-5 lg:sticky lg:top-2">
+            <HeroBalanceCard
+              cashflow={cashflow}
+              partyCount={accounts.length}
+              cashDrawerBalance={gallaPulse.cashDrawerBalance + gallaPulse.upiBankBalance}
+              todayInflow={gallaPulse.todayInflow}
+              todayOutflow={gallaPulse.todayOutflow}
+              weeklyVelocity={weeklyVelocity}
+              hideBalance={hideBalance}
+              capabilities={capabilities}
+              personaAdaptation={activeAdaptation}
+              heroOpacity={heroOpacity}
+              heroScale={heroScale}
+              heroY={heroY}
+              onToggleHideBalance={onToggleHideBalance}
+              onOpenDailySummary={onOpenDailySummary}
+              onSelectReceivable={() => handleSelectSegment('customer')}
+              onSelectPayable={() => {
+                if (capabilities.showSuppliers) handleSelectSegment('supplier');
               }}
-              className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.2] shrink-0" />
-              <span className="truncate">Quick Entry</span>
-            </motion.button>
+              onSelectGalla={() => {
+                if (capabilities.showGalla) onOpenGalla();
+              }}
+            />
 
-            {capabilities.focus !== 'personal' ? (
+            {/* Compact 3-Action Monochrome Counter Strip */}
+            <div className="grid grid-cols-3 gap-2">
               <motion.button
                 whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
                 transition={SPRING_FAST}
                 type="button"
                 onClick={() => {
                   haptics.tap();
-                  onOpenParchiScanner();
+                  setShowQuickMenuSheet(true);
                 }}
                 className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
               >
-                <Camera className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
-                <span className="truncate">Scan Bill</span>
+                <Plus className="w-3.5 h-3.5 stroke-[2.2] shrink-0" />
+                <span className="truncate">Quick Entry</span>
               </motion.button>
-            ) : (
-              <motion.button
-                whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
-                transition={SPRING_FAST}
-                type="button"
-                onClick={() => {
-                  haptics.tap();
-                  onOpenVoiceEntry();
-                }}
-                className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
-              >
-                <Mic className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
-                <span className="truncate">Voice Log</span>
-              </motion.button>
-            )}
 
-            {capabilities.showGalla ? (
-              <motion.button
-                whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
-                transition={SPRING_FAST}
-                type="button"
-                onClick={() => {
-                  haptics.tap();
-                  onOpenGalla();
-                }}
-                className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
-              >
-                <Wallet className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
-                <span className="truncate">Cashbook</span>
-              </motion.button>
-            ) : (
-              <motion.button
-                whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
-                transition={SPRING_FAST}
-                type="button"
-                onClick={() => {
-                  haptics.tap();
-                  onOpenCollection();
-                }}
-                className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
-              >
-                <Repeat className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
-                <span className="truncate">Dues</span>
-              </motion.button>
-            )}
-          </div>
+              {capabilities.focus !== 'personal' ? (
+                <motion.button
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+                  transition={SPRING_FAST}
+                  type="button"
+                  onClick={() => {
+                    haptics.tap();
+                    onOpenParchiScanner();
+                  }}
+                  className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
+                >
+                  <Camera className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
+                  <span className="truncate">Scan Bill</span>
+                </motion.button>
+              ) : (
+                <motion.button
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+                  transition={SPRING_FAST}
+                  type="button"
+                  onClick={() => {
+                    haptics.tap();
+                    onOpenVoiceEntry();
+                  }}
+                  className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
+                >
+                  <Mic className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
+                  <span className="truncate">Voice Log</span>
+                </motion.button>
+              )}
 
-          {/* Desktop Counter Pulse Snapshot (Balances 2-column weight cleanly) */}
-          <div className="hidden lg:block ios27-inset-group rounded-[22px] p-4 space-y-2.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-[var(--ink)]">Today&apos;s Counter</span>
-              <span className="text-[11px] text-[var(--ink-muted)] font-tabular">
-                {overdueCount > 0 ? `${overdueCount} Overdue` : 'All Clear'}
-              </span>
+              {capabilities.showGalla ? (
+                <motion.button
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+                  transition={SPRING_FAST}
+                  type="button"
+                  onClick={() => {
+                    haptics.tap();
+                    onOpenGalla();
+                  }}
+                  className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
+                >
+                  <Wallet className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
+                  <span className="truncate">Cashbook</span>
+                </motion.button>
+              ) : (
+                <motion.button
+                  whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+                  transition={SPRING_FAST}
+                  type="button"
+                  onClick={() => {
+                    haptics.tap();
+                    onOpenCollection();
+                  }}
+                  className="min-h-[44px] px-2.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap hover:bg-[var(--brand-tint)] transition-colors"
+                >
+                  <Repeat className="w-3.5 h-3.5 stroke-[1.9] shrink-0" />
+                  <span className="truncate">Dues</span>
+                </motion.button>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-3 pt-1 border-t border-[var(--glass-border)] font-tabular">
-              <div>
-                <p className="text-[11px] text-[var(--ink-muted)]">Cash Inflow</p>
-                <p className="font-display text-sm font-semibold text-[var(--debit-green)] mt-0.5">
-                  {hideBalance ? '₹••••' : `+${formatINR(gallaPulse.todayInflow)}`}
-                </p>
+
+            {/* Desktop Counter Pulse Snapshot (Balances 2-column weight cleanly) */}
+            <div className="hidden lg:block ios27-inset-group rounded-[22px] p-4 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-[var(--ink)]">Today&apos;s Counter</span>
+                <span className="text-[11px] text-[var(--ink-muted)] font-tabular">
+                  {overdueCount > 0 ? `${overdueCount} Overdue` : 'All Clear'}
+                </span>
               </div>
-              <div>
-                <p className="text-[11px] text-[var(--ink-muted)]">Cash Outflow</p>
-                <p className="font-display text-sm font-semibold text-[var(--credit-red)] mt-0.5">
-                  {hideBalance ? '₹••••' : `-${formatINR(gallaPulse.todayOutflow)}`}
-                </p>
+              <div className="grid grid-cols-2 gap-3 pt-1 border-t border-[var(--glass-border)] font-tabular">
+                <div>
+                  <p className="text-[11px] text-[var(--ink-muted)]">Cash Inflow</p>
+                  <p className="font-display text-sm font-semibold text-[var(--debit-green)] mt-0.5">
+                    {hideBalance ? '₹••••' : `+${formatINR(gallaPulse.todayInflow)}`}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-[var(--ink-muted)]">Cash Outflow</p>
+                  <p className="font-display text-sm font-semibold text-[var(--credit-red)] mt-0.5">
+                    {hideBalance ? '₹••••' : `-${formatINR(gallaPulse.todayOutflow)}`}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          {capabilities.showMandiCalculator && <MandiAadatHelper />}
-        </div>
+            {capabilities.showMandiCalculator && <MandiAadatHelper />}
+          </div>
+        )}
 
         {/* RIGHT COLUMN (Mobile Feed / Desktop 7-col): Segmented Tabs + Toolbar + Notice Strip + Party List */}
         <div className="space-y-3 lg:col-span-7">

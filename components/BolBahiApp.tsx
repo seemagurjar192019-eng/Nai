@@ -2404,7 +2404,34 @@ function BolBahiAppInner() {
     return tabs;
   }, [capabilities.showGstBills, capabilities.showStock, capabilities.focus]);
 
-  // Optional 4-Digit PIN Lock Gate (when configured)
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const initialHeight = window.innerHeight;
+    const handleResize = () => {
+      if (window.innerHeight < initialHeight - 140) {
+        setIsKeyboardOpen(true);
+      } else {
+        setIsKeyboardOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        if (window.visualViewport && window.visualViewport.height < initialHeight - 140) {
+          setIsKeyboardOpen(true);
+        } else {
+          setIsKeyboardOpen(false);
+        }
+      });
+    }
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  // Optional 4-ID PIN Lock Gate (when configured)
   if (appLockPin && !pinUnlocked) {
     return (
       <>
@@ -3750,7 +3777,7 @@ function BolBahiAppInner() {
         <BottomSpatialDock
           activeDestination={activeDockDestination}
           voiceModalOpen={voiceModalOpen}
-          isDockVisible={spatialMotion.isHeaderVisible}
+          isDockVisible={spatialMotion.isHeaderVisible && !searchOpen && !isKeyboardOpen}
           capabilities={capabilities}
           onSelectHome={() => {
             setSecondaryRoute(null);
