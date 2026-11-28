@@ -28,7 +28,9 @@ import {
   formatINR,
   getLocalDateKey,
   isValidIndianMobile,
+  splitCgstSgst,
 } from '@/lib/i18n';
+import { useBackStack } from '@/hooks/useBackStack';
 import type {
   BillDocType,
   BillDocument,
@@ -142,17 +144,11 @@ export const BillsView: React.FC<BillsViewProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    if (!creating) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !saving) {
-        setCreating(false);
-        if (onClearPrefill) onClearPrefill();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [creating, saving, onClearPrefill]);
+  useBackStack(creating && !saving, () => {
+    setCreating(false);
+    if (onClearPrefill) onClearPrefill();
+  });
+  useBackStack(Boolean(previewBill), () => setPreviewBill(null));
 
   const handlePrintBill = () => {
     document.body.classList.add('printing-bill');
@@ -297,6 +293,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
     );
     const isColored = previewBill.templateId === 'gst-color';
     const isThermal = previewBill.templateId === 'thermal-58';
+    const taxSplit = splitCgstSgst(previewBill.totalGst);
     const shareText = buildBillShareMessage({
       docType: previewBill.docType,
       billNumber: previewBill.billNumber,
@@ -354,7 +351,7 @@ export const BillsView: React.FC<BillsViewProps> = ({
             </div>
           </div>
 
-          <div className="print-area mx-auto w-full max-w-[300px] bg-white text-slate-900 border border-dashed border-slate-400 p-4 font-mono text-xs space-y-3 shadow-sm">
+          <div className="print-area print-thermal-58 mx-auto w-full max-w-[300px] bg-white text-slate-900 border border-dashed border-slate-400 p-4 font-mono text-xs space-y-3 shadow-sm">
             <div className="text-center border-b border-dashed border-slate-400 pb-2 space-y-0.5">
               <p className="text-sm font-bold uppercase">{business.name}</p>
               {business.address && <p className="text-[11px]">{business.address}</p>}
@@ -402,10 +399,23 @@ export const BillsView: React.FC<BillsViewProps> = ({
                 <span>SUBTOTAL</span>
                 <span>{formatINR(previewBill.subtotal)}</span>
               </div>
-              <div className="flex justify-between">
-                <span>GST</span>
-                <span>{formatINR(previewBill.totalGst)}</span>
-              </div>
+              {previewBill.totalGst > 0 ? (
+                <>
+                  <div className="flex justify-between">
+                    <span>CGST (50%)</span>
+                    <span>{formatINR(taxSplit.cgst)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>SGST (50%)</span>
+                    <span>{formatINR(taxSplit.sgst)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between">
+                  <span>GST</span>
+                  <span>{formatINR(previewBill.totalGst)}</span>
+                </div>
+              )}
               {Number(previewBill.discountAmount) > 0 && (
                 <div className="flex justify-between">
                   <span>DISCOUNT</span>
@@ -561,10 +571,23 @@ export const BillsView: React.FC<BillsViewProps> = ({
                   <span className="text-slate-500">Subtotal</span>
                   <span>{formatINR(previewBill.subtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Total GST</span>
-                  <span>{formatINR(previewBill.totalGst)}</span>
-                </div>
+                {previewBill.totalGst > 0 ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">CGST (50%)</span>
+                      <span>{formatINR(taxSplit.cgst)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">SGST (50%)</span>
+                      <span>{formatINR(taxSplit.sgst)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Total GST</span>
+                    <span>{formatINR(previewBill.totalGst)}</span>
+                  </div>
+                )}
                 {Number(previewBill.discountAmount) > 0 && (
                   <div className="flex justify-between text-emerald-700">
                     <span>Discount</span>

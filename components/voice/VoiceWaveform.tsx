@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 export interface VoiceWaveformProps {
   active: boolean;
   aiParsing?: boolean;
+  shareMicWithSpeechRec?: boolean;
 }
 
 const BASE_WEIGHTS = [0.42, 0.68, 0.86, 1, 0.86, 0.68, 0.42] as const;
@@ -14,11 +15,12 @@ const IDLE_LEVELS = [6, 8, 11, 14, 11, 8, 6];
 /**
  * 7-Bar Real-Time Audio-Reactive SVG Equalizer (`AnalyserNode` backed).
  * Smoothly modulates heights to real mic RMS amplitude when `active` and mic permission is granted,
- * with zero-cost fallback pulse during typing/cloud parsing or unsupported headless browsers.
+ * with zero-cost rAF organic wave when SpeechRecognition owns the hardware mic (prevents Android WebView contention).
  */
 export const VoiceWaveform: React.FC<VoiceWaveformProps> = ({
   active,
   aiParsing = false,
+  shareMicWithSpeechRec = false,
 }) => {
   const [levels, setLevels] = useState<number[]>(IDLE_LEVELS);
   const rafRef = useRef<number | null>(null);
@@ -50,6 +52,7 @@ export const VoiceWaveform: React.FC<VoiceWaveformProps> = ({
 
     const connectMic = async () => {
       if (
+        shareMicWithSpeechRec ||
         typeof navigator === 'undefined' ||
         !navigator.mediaDevices ||
         typeof navigator.mediaDevices.getUserMedia !== 'function'
@@ -107,7 +110,7 @@ export const VoiceWaveform: React.FC<VoiceWaveformProps> = ({
       if (stream) stream.getTracks().forEach((tr) => tr.stop());
       if (ctx) ctx.close().catch(() => {});
     };
-  }, [active]);
+  }, [active, shareMicWithSpeechRec]);
 
   const displayLevels = active ? levels : IDLE_LEVELS;
 

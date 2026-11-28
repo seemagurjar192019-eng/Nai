@@ -48,7 +48,9 @@ const DEVANAGARI_WORD_MAP: Record<string, string> = {
   'हिसाब': 'hisaab', 'बताओ': 'batao', 'कितना': 'kitna', 'कितने': 'kitna',
   'दिखाओ': 'dikhao', 'आज': 'aaj', 'कमाई': 'kamai', 'टोटल': 'total',
   'खाता': 'khata', 'चेक': 'check', 'बैलेंस': 'balance', 'मुनीम': 'munim',
-  'सुनाओ': 'sunao',
+  'सुनाओ': 'sunao', 'रोकड़': 'rokad', 'रोकड': 'rokad', 'नकद': 'nagad', 'नगद': 'nagad',
+  'वसूली': 'vasooli', 'वसूल': 'vasool', 'उगाही': 'ugrahi', 'खर्च': 'kharch',
+  'लिखो': 'likho', 'लिख': 'likh', 'भेजा': 'bheja', 'लेना': 'lena',
 };
 
 const CONS_MAP: Record<string, string> = {
@@ -183,6 +185,7 @@ const CREDIT_WORDS: Record<string, boolean> = {
   diya: true, di: true, dia: true,
   dena: true, dene: true,
   bakaya: true, baaki: true, baki: true,
+  bheja: true, lena: true, kharch: true, kharcha: true,
 };
 
 const DEBIT_WORDS: Record<string, boolean> = {
@@ -192,6 +195,8 @@ const DEBIT_WORDS: Record<string, boolean> = {
   wapas: true, wapis: true, wapaas: true, vaapas: true, vapis: true,
   liya: true, li: true,
   aaya: true, aaye: true, aayi: true,
+  vasool: true, vasooli: true, wasool: true, wasooli: true, ugrahi: true,
+  rokad: true, nagad: true, nakad: true,
 };
 
 const STOP_WORDS: Record<string, boolean> = {
@@ -203,6 +208,8 @@ const STOP_WORDS: Record<string, boolean> = {
   ji: true, bhai: true, bhaiya: true, sahab: true, saheb: true,
   sir: true, shri: true, seth: true, madam: true,
   mein: true, me: true, par: true, pe: true,
+  likh: true, likho: true, likhna: true, kardo: true, karo: true,
+  de: true, entry: true, hisab: true, hisaab: true,
 };
 
 function capitalize(str: string): string {

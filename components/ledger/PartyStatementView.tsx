@@ -8,6 +8,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  Calculator,
   Calendar,
   Camera,
   Check,
@@ -18,6 +19,7 @@ import {
   EyeOff,
   FileText,
   Lock,
+  Merge,
   MessageCircle,
   MessageSquare,
   Mic,
@@ -45,12 +47,19 @@ import {
   isValidIndianMobile,
 } from '@/lib/i18n';
 import { getPersonaCapabilities, type PersonaCapabilities } from '@/lib/persona';
+import { findRecentDuplicateTransaction } from '@/lib/duplicate-guard';
+import {
+  calculateMonthlySimpleInterest,
+  estimateInterestDaysForParty,
+} from '@/lib/vyaaj-interest';
+import { useBackStack } from '@/hooks/useBackStack';
 import type {
   Business,
   CashbookMode,
   LanguageCode,
   LedgerAccount,
   LedgerTransaction,
+  PartyTag,
   TxDirection,
 } from '@/types';
 import { haptics } from '@/utils/haptics';
@@ -64,6 +73,7 @@ import {
 
 export interface PartyStatementViewProps {
   account: LedgerAccount;
+  allAccounts?: LedgerAccount[];
   business: Business;
   language: LanguageCode;
   transactions: LedgerTransaction[];
@@ -97,7 +107,9 @@ export interface PartyStatementViewProps {
     creditLimit?: number;
     promiseDate?: string;
     promiseNote?: string;
+    tag?: PartyTag;
   }) => Promise<void>;
+  onMergeAccount?: (targetAccountId: string) => Promise<void>;
   onDeleteAccount: () => Promise<void>;
   onOpenVoiceForCustomer: (name: string) => void;
   onOpenCreateBill: (customerName: string, customerPhone: string) => void;
@@ -143,6 +155,7 @@ function evaluateCalcExpression(expr: string): number {
  */
 export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
   account,
+  allAccounts = [],
   business,
   language,
   transactions,
@@ -154,6 +167,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
   onUpdateTransaction,
   onDeleteTransaction,
   onUpdateAccount,
+  onMergeAccount,
   onDeleteAccount,
   onOpenVoiceForCustomer,
   onOpenCreateBill,
@@ -191,11 +205,20 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
   const [editCreditLimit, setEditCreditLimit] = useState(
     account.creditLimit ? String(account.creditLimit) : ''
   );
+  const [editTag, setEditTag] = useState<PartyTag>(account.tag || 'regular');
+  const [mergeTargetId, setMergeTargetId] = useState('');
+  const [mergeBusy, setMergeBusy] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [dueSaving, setDueSaving] = useState(false);
   const [dueError, setDueError] = useState('');
   const [confirmDeleteCustomer, setConfirmDeleteCustomer] = useState(false);
+
+  // Vyaaj (Simple Monthly Interest) calculator modal
+  const [showVyaajModal, setShowVyaajModal] = useState(false);
+  const [vyaajRatePct, setVyaajRatePct] = useState('2');
+  const [vyaajDays, setVyaajDays] = useState('30');
+  const [vyaajPosting, setVyaajPosting] = useState(false);
 
   // Calculator transaction modal (Add or Edit mode)
   const [calcDirection, setCalcDirection] = useState<TxDirection | null>(null);
@@ -207,6 +230,10 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
   const [syncGallaMode, setSyncGallaMode] = useState<CashbookMode | null>(null);
   const [calcSaving, setCalcSaving] = useState(false);
   const [calcError, setCalcError] = useState('');
+  const [calcDuplicateWarn, setCalcDuplicateWarn] = useState<{
+    amount: number;
+    minutesAgo: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Swipe-right scrub back to cockpit without interfering with vertical timeline scroll
@@ -232,29 +259,16 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
     }
   );
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (previewImage) setPreviewImage(null);
-      else if (showDueModal && !dueSaving) setShowDueModal(false);
-      else if (showQrModal) setShowQrModal(false);
-      else if (showProfileDrawer && !profileSaving) setShowProfileDrawer(false);
-      else if (calcDirection && !calcSaving) setCalcDirection(null);
-      else onBack();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [
-    previewImage,
-    showDueModal,
-    dueSaving,
-    showQrModal,
-    showProfileDrawer,
-    profileSaving,
-    calcDirection,
-    calcSaving,
-    onBack,
-  ]);
+  // LIFO Hardware Back & Escape registration
+  useBackStack(true, onBack);
+  useBackStack(Boolean(calcDirection && !calcSaving), () => setCalcDirection(null));
+  useBackStack(showProfileDrawer && !profileSaving && !mergeBusy, () =>
+    setShowProfileDrawer(false)
+  );
+  useBackStack(showQrModal, () => setShowQrModal(false));
+  useBackStack(showDueModal && !dueSaving, () => setShowDueModal(false));
+  useBackStack(showVyaajModal && !vyaajPosting, () => setShowVyaajModal(false));
+  useBackStack(Boolean(previewImage), () => setPreviewImage(null));
 
   // Chronological entries + running balance per transaction
   const timeline = useMemo(() => {
@@ -305,6 +319,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
     setCalcBillImage('');
     setSyncGallaMode(null);
     setCalcError('');
+    setCalcDuplicateWarn(null);
   };
 
   const openEditCalculator = (tx: LedgerTransaction) => {
@@ -317,11 +332,13 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
     setCalcBillImage(tx.billImage || '');
     setSyncGallaMode(null);
     setCalcError('');
+    setCalcDuplicateWarn(null);
   };
 
   const handleKeypadPress = (key: string) => {
     haptics.tap();
     setCalcError('');
+    setCalcDuplicateWarn(null);
     if (key === 'BACK') {
       setCalcExpr((prev) => (prev.length <= 1 ? '0' : prev.slice(0, -1)));
       return;
@@ -365,13 +382,26 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
     return null;
   }, [account.creditLimit, account.balance, calcDirection, calcNumericAmount, editingTx]);
 
-  const handleConfirmCalc = async () => {
+  const handleConfirmCalc = async (ignoreDuplicate = false) => {
     if (!calcDirection) return;
     const amt = evaluateCalcExpression(calcExpr);
     if (amt <= 0) {
       setCalcError('Enter an amount greater than ₹0.');
       return;
     }
+    if (!editingTx && !ignoreDuplicate) {
+      const dup = findRecentDuplicateTransaction({
+        transactions,
+        accountId: account.id,
+        direction: calcDirection,
+        amount: amt,
+      });
+      if (dup) {
+        setCalcDuplicateWarn({ amount: amt, minutesAgo: dup.minutesAgo });
+        return;
+      }
+    }
+    setCalcDuplicateWarn(null);
     setCalcSaving(true);
     try {
       const nowTime = new Date().toTimeString().slice(0, 8);
@@ -652,6 +682,29 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
               <p className="text-xs font-bold text-[var(--credit-red)] text-center">{calcError}</p>
             )}
 
+            {calcDuplicateWarn && (
+              <div
+                role="alert"
+                className="rounded-2xl bg-[var(--alert-tint)] px-3.5 py-2.5 flex items-center justify-between gap-2"
+              >
+                <p className="text-xs font-semibold text-[var(--alert-amber)] leading-snug">
+                  Similar {formatINR(calcDuplicateWarn.amount)} entry recorded{' '}
+                  {calcDuplicateWarn.minutesAgo === 0
+                    ? 'just now'
+                    : `${calcDuplicateWarn.minutesAgo}m ago`}
+                  . Save again?
+                </p>
+                <button
+                  type="button"
+                  disabled={calcSaving}
+                  onClick={() => void handleConfirmCalc(true)}
+                  className="min-h-[36px] px-3 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold shrink-0 active:scale-95 transition"
+                >
+                  Save Anyway
+                </button>
+              </div>
+            )}
+
             <div className="flex gap-2.5 pt-1">
               {calcDirection === 'given' && capabilities.showGstBills && (
                 <button
@@ -670,7 +723,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
               <button
                 type="button"
                 disabled={calcSaving}
-                onClick={handleConfirmCalc}
+                onClick={() => void handleConfirmCalc(false)}
                 className="flex-1 min-h-[52px] rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] disabled:opacity-60 text-[var(--brand-fg)] font-extrabold text-base flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
               >
                 <Check className="w-5 h-5" />
@@ -679,7 +732,28 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 pt-3">
+          {/* Quick ₹ Increment Chips */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-2.5">
+            {([100, 500, 1000, 5000] as const).map((inc) => (
+              <motion.button
+                key={inc}
+                type="button"
+                whileTap={{ scale: 0.92 }}
+                onClick={() => {
+                  haptics.tap();
+                  setCalcError('');
+                  setCalcDuplicateWarn(null);
+                  const current = evaluateCalcExpression(calcExpr);
+                  setCalcExpr(String(Math.round((current + inc) * 100) / 100));
+                }}
+                className="min-h-[38px] px-3 rounded-xl liquid-glass text-xs font-extrabold font-tabular text-[var(--ink)] whitespace-nowrap"
+              >
+                +₹{inc}
+              </motion.button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 pt-2">
             {KEYPAD_BUTTONS.map((btn) => {
               const isOp = ['+', '-', '×', '=', 'BACK'].includes(btn);
               return (
@@ -688,7 +762,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                   type="button"
                   whileTap={TACTILE_TAP_ANIMATION}
                   onClick={() => handleKeypadPress(btn)}
-                  className={`min-h-[56px] rounded-2xl font-tabular text-xl font-bold flex items-center justify-center transition ${
+                  className={`min-h-[54px] rounded-2xl font-tabular text-xl font-bold flex items-center justify-center transition ${
                     btn === '='
                       ? 'bg-[var(--brand)] text-[var(--brand-fg)] shadow-md'
                       : isOp
@@ -745,103 +819,155 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
           if ((e.target as HTMLElement).closest('button, a, input')) return;
           sheetDragControls.start(e);
         }}
-        className="no-print border-b border-[var(--surface-border)] px-3 py-2 flex items-center justify-between gap-2"
+        className="no-print border-b border-[var(--surface-border)]"
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              onBack();
-            }}
-            aria-label="Back to Ledger"
-            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition shrink-0"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div
-            className="w-10 h-10 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] font-bold font-display text-sm flex items-center justify-center shrink-0 shadow-xs"
-          >
-            {account.name.charAt(0).toUpperCase()}
+        <div className="px-2.5 sm:px-3 py-2 flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                onBack();
+              }}
+              aria-label="Back to Ledger"
+              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-subtle)] active:scale-95 transition shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] font-bold font-display text-sm flex items-center justify-center shrink-0 shadow-xs"
+            >
+              {account.name.charAt(0).toUpperCase()}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                setEditName(account.name);
+                setEditPhone(account.phone);
+                setEditDueDate(account.dueDate);
+                setEditPromiseDate(account.promiseDate || '');
+                setEditPromiseNote(account.promiseNote || '');
+                setEditCreditLimit(account.creditLimit ? String(account.creditLimit) : '');
+                setEditTag(account.tag || 'regular');
+                setMergeTargetId('');
+                setConfirmDeleteCustomer(false);
+                setShowProfileDrawer(true);
+              }}
+              className="text-left flex-1 min-w-0 min-h-[40px] flex flex-col justify-center"
+            >
+              <h2 className="font-display text-[15px] sm:text-base font-extrabold text-[var(--ink)] truncate">
+                {account.name}
+              </h2>
+              <p className="text-[11px] font-semibold text-[var(--brand-accent)] truncate">
+                View Profile
+                {account.tag && account.tag !== 'regular' ? ` · ${account.tag.toUpperCase()}` : ''}
+                {account.creditLimit ? ` · Limit ₹${account.creditLimit.toLocaleString('en-IN')}` : ''}
+                {account.promiseDate ? ` · Promise ${account.promiseDate}` : ''}
+              </p>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              setEditName(account.name);
-              setEditPhone(account.phone);
-              setEditDueDate(account.dueDate);
-              setEditPromiseDate(account.promiseDate || '');
-              setEditPromiseNote(account.promiseNote || '');
-              setEditCreditLimit(account.creditLimit ? String(account.creditLimit) : '');
-              setConfirmDeleteCustomer(false);
-              setShowProfileDrawer(true);
-            }}
-            className="text-left min-w-0 min-h-[44px] flex flex-col justify-center"
-          >
-            <h2 className="font-display text-base font-extrabold text-[var(--ink)] truncate">
-              {account.name}
-            </h2>
-            <p className="text-[11px] font-semibold text-[var(--brand-accent)] truncate">
-              View Profile
-              {account.creditLimit ? ` · Limit ₹${account.creditLimit.toLocaleString('en-IN')}` : ''}
-              {account.promiseDate ? ` · Promise ${account.promiseDate}` : ''}
-            </p>
-          </button>
+
+          <div className="flex items-center gap-0.5 shrink-0">
+            {account.balance > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.tap();
+                  const estDays = estimateInterestDaysForParty(
+                    account,
+                    transactions,
+                    getLocalDateKey()
+                  );
+                  setVyaajDays(String(estDays));
+                  setShowVyaajModal(true);
+                }}
+                aria-label="Interest Calculator"
+                title="Calculate Monthly Vyaaj (Interest)"
+                className="w-9 h-10 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+              >
+                <Calculator className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                window.print();
+              }}
+              aria-label="Print PDF Statement"
+              title="Print / Save PDF Statement"
+              className="w-9 h-10 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.tap();
+                setSearchOpen((v) => !v);
+              }}
+              aria-label="Search entries"
+              className="w-9 h-10 rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-0.5 shrink-0">
-          {onToggleHideBalance && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                onToggleHideBalance();
-              }}
-              aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
-              className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-            >
-              {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          )}
-          {onOpenParchiScanner && capabilities.focus !== 'personal' && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.tap();
-                onOpenParchiScanner();
-              }}
-              aria-label="Scan Receipt"
-              title="Scan Receipt"
-              className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-            >
-              <Camera className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              window.print();
-            }}
-            aria-label="Print PDF Statement"
-            title="Print / Save PDF Statement"
-            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-          >
-            <FileText className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              haptics.tap();
-              setSearchOpen((v) => !v);
-            }}
-            aria-label="Search entries"
-            className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-          >
-            <Search className="w-4 h-4" />
-          </button>
-        </div>
+        {(onToggleHideBalance || (onOpenParchiScanner && capabilities.focus !== 'personal')) && (
+          <div className="px-3 pb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              {onOpenParchiScanner && capabilities.focus !== 'personal' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.tap();
+                    onOpenParchiScanner();
+                  }}
+                  aria-label="Scan Receipt"
+                  className="min-h-[32px] px-2.5 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[11px] font-semibold text-[var(--ink)] inline-flex items-center gap-1.5 hover:bg-[var(--brand-tint)] active:scale-95 transition"
+                >
+                  <Camera className="w-3.5 h-3.5 text-[var(--ink-muted)]" />
+                  <span>Scan Receipt</span>
+                </button>
+              )}
+              {onToggleHideBalance && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.tap();
+                    onToggleHideBalance();
+                  }}
+                  aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
+                  className="min-h-[32px] px-2.5 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[11px] font-semibold text-[var(--ink)] inline-flex items-center gap-1.5 hover:bg-[var(--brand-tint)] active:scale-95 transition"
+                >
+                  {hideBalance ? <EyeOff className="w-3.5 h-3.5 text-[var(--ink-muted)]" /> : <Eye className="w-3.5 h-3.5 text-[var(--ink-muted)]" />}
+                  <span>{hideBalance ? 'Show ₹' : 'Hide ₹'}</span>
+                </button>
+              )}
+            </div>
+            {account.balance > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.tap();
+                  const estDays = estimateInterestDaysForParty(
+                    account,
+                    transactions,
+                    getLocalDateKey()
+                  );
+                  setVyaajDays(String(estDays));
+                  setShowVyaajModal(true);
+                }}
+                className="min-h-[32px] px-2.5 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[11px] font-semibold text-[var(--ink)] inline-flex items-center gap-1 hover:bg-[var(--brand-tint)] active:scale-95 transition"
+              >
+                <Calculator className="w-3 h-3 text-[var(--ink-muted)]" />
+                <span>Vyaaj</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {searchOpen && (
@@ -1383,6 +1509,38 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                 className="w-full min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold font-tabular text-[var(--ink)] outline-none"
               />
             </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1.5">
+                Party Tag
+              </label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {(
+                  [
+                    { id: 'regular', label: 'Regular' },
+                    { id: 'vip', label: 'VIP' },
+                    { id: 'slow', label: 'Slow' },
+                    { id: 'blocked', label: 'Blocked' },
+                  ] as const
+                ).map((tg) => (
+                  <button
+                    key={tg.id}
+                    type="button"
+                    onClick={() => {
+                      haptics.tap();
+                      setEditTag(tg.id);
+                    }}
+                    className={`min-h-[40px] rounded-xl text-xs font-bold transition border ${
+                      editTag === tg.id
+                        ? 'bg-[var(--brand)] text-[var(--brand-fg)] border-transparent'
+                        : 'bg-[var(--app-bg)] border-[var(--glass-border)] text-[var(--ink)]'
+                    }`}
+                  >
+                    {tg.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {profileError && (
@@ -1406,6 +1564,7 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
                   dueDate: editDueDate,
                   promiseDate: editPromiseDate,
                   creditLimit: Math.max(0, Number(editCreditLimit) || 0),
+                  tag: editTag,
                 });
                 setShowProfileDrawer(false);
               } catch (err) {
@@ -1420,6 +1579,54 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
           >
             {profileSaving ? 'Saving...' : 'Save Changes'}
           </button>
+
+          {onMergeAccount && allAccounts.filter((a) => a.id !== account.id).length > 0 && (
+            <div className="pt-2 border-t border-[var(--glass-border)] space-y-2">
+              <p className="text-xs font-bold text-[var(--ink-muted)] flex items-center gap-1.5">
+                <Merge className="w-3.5 h-3.5" />
+                <span>Merge Duplicate Party</span>
+              </p>
+              <div className="flex gap-2">
+                <select
+                  value={mergeTargetId}
+                  onChange={(e) => setMergeTargetId(e.target.value)}
+                  className="flex-1 min-h-[44px] rounded-xl bg-[var(--app-bg)] px-3 text-xs font-bold text-[var(--ink)] outline-none"
+                >
+                  <option value="">Select destination party...</option>
+                  {allAccounts
+                    .filter((a) => a.id !== account.id)
+                    .map((other) => (
+                      <option key={other.id} value={other.id}>
+                        {other.name} ({formatINR(Math.abs(other.balance))})
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!mergeTargetId || mergeBusy || profileSaving}
+                  onClick={async () => {
+                    if (!mergeTargetId) return;
+                    setMergeBusy(true);
+                    setProfileError('');
+                    try {
+                      await onMergeAccount(mergeTargetId);
+                      haptics.success();
+                      setShowProfileDrawer(false);
+                    } catch (err) {
+                      setProfileError(
+                        err instanceof Error ? err.message : 'Failed to merge parties.'
+                      );
+                    } finally {
+                      setMergeBusy(false);
+                    }
+                  }}
+                  className="min-h-[44px] px-3.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-xs font-extrabold text-[var(--ink)] disabled:opacity-40 active:scale-95 transition"
+                >
+                  {mergeBusy ? 'Merging...' : 'Merge'}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="pt-2">
             {!confirmDeleteCustomer ? (
@@ -1584,6 +1791,124 @@ export const PartyStatementView: React.FC<PartyStatementViewProps> = ({
             </button>
           </div>
         </div>
+      </DetentSheetOverlay>
+
+      {/* Vyaaj (Monthly Simple Interest) Calculator Detent Sheet */}
+      <DetentSheetOverlay
+        open={showVyaajModal}
+        onClose={() => {
+          if (!vyaajPosting) setShowVyaajModal(false);
+        }}
+        title="Vyaaj (Interest) Calculator"
+        subtitle={account.name}
+        initialDetent="peek"
+      >
+        {(() => {
+          const rate = Math.max(0, Number(vyaajRatePct) || 0);
+          const days = Math.max(0, Math.round(Number(vyaajDays) || 0));
+          const res = calculateMonthlySimpleInterest({
+            principal: Math.max(0, account.balance),
+            monthlyRatePct: rate,
+            daysElapsed: days,
+          });
+          return (
+            <div className="space-y-4 pb-safe">
+              <div className="rounded-2xl bg-[var(--app-bg)] p-3.5 space-y-1.5 font-tabular">
+                <div className="flex justify-between text-xs text-[var(--ink-muted)]">
+                  <span>Principal Due</span>
+                  <span className="font-bold text-[var(--ink)]">{formatINR(res.principal)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-[var(--ink-muted)]">
+                  <span>Interest ({res.monthsElapsed} mo @ {res.monthlyRatePct}%/mo)</span>
+                  <span className="font-bold text-[var(--credit-red)]">
+                    +{formatINR(res.interestAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-base font-extrabold border-t border-[var(--glass-border)] pt-1.5">
+                  <span>Total Payable</span>
+                  <span className="text-[var(--ink)]">{formatINR(res.totalPayable)}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                    Monthly Rate (% / mo)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="25"
+                    value={vyaajRatePct}
+                    onChange={(e) => setVyaajRatePct(e.target.value)}
+                    className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] px-3 text-sm font-bold font-tabular text-[var(--ink)] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">
+                    Elapsed Days
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="3650"
+                    value={vyaajDays}
+                    onChange={(e) => setVyaajDays(e.target.value)}
+                    className="w-full min-h-[44px] rounded-2xl bg-[var(--app-bg)] px-3 text-sm font-bold font-tabular text-[var(--ink)] outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-1.5">
+                {(['1', '1.5', '2', '3'] as const).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => {
+                      haptics.tap();
+                      setVyaajRatePct(r);
+                    }}
+                    className={`flex-1 min-h-[38px] rounded-xl text-xs font-bold ${
+                      vyaajRatePct === r
+                        ? 'bg-[var(--brand)] text-[var(--brand-fg)]'
+                        : 'bg-[var(--app-bg)] text-[var(--ink)]'
+                    }`}
+                  >
+                    {r}%
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                disabled={vyaajPosting || res.interestAmount <= 0}
+                onClick={async () => {
+                  if (res.interestAmount <= 0) return;
+                  setVyaajPosting(true);
+                  try {
+                    await onAddTransaction({
+                      direction: 'given',
+                      amount: res.interestAmount,
+                      note: `Vyaaj (${res.monthlyRatePct}%/mo × ${res.daysElapsed}d)`,
+                      billDate: new Date().toISOString(),
+                      billImage: '',
+                    });
+                    haptics.success();
+                    setShowVyaajModal(false);
+                  } finally {
+                    setVyaajPosting(false);
+                  }
+                }}
+                className="w-full min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] font-extrabold text-sm disabled:opacity-50 active:scale-95 transition"
+              >
+                {vyaajPosting
+                  ? 'Posting...'
+                  : `Post ${formatINR(res.interestAmount)} Interest as Credit`}
+              </button>
+            </div>
+          );
+        })()}
       </DetentSheetOverlay>
 
       {/* Bill Image Lightbox */}

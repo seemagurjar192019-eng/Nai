@@ -22,20 +22,7 @@ import {
 import {
   AlertTriangle,
   ArrowLeft,
-  Check,
-  CloudUpload,
-  Edit2,
-  KeyRound,
   Lock,
-  Mail,
-  Package,
-  Plus,
-  RefreshCw,
-  ShieldCheck,
-  SlidersHorizontal,
-  Smartphone,
-  Volume2,
-  VolumeX,
   X,
 } from 'lucide-react';
 import { indianMobileSchema, otpCodeSchema } from '@/lib/design-system';
@@ -71,6 +58,7 @@ import {
   deleteUserAccountCascade,
   getUserProfile,
   getVaultKeyEnvelope,
+  mergeAccountsInCloud,
   recordActivityLog,
   restoreBusinessBackup,
   restoreTransactionAtomic,
@@ -107,6 +95,7 @@ import {
   applyDeleteStaffMember,
   applyDeleteStockItem,
   applyDeleteTransactionAtomic,
+  applyMergeAccounts,
   applyRecordActivityLog,
   applyRestoreTransactionAtomic,
   applySaveBillDocument,
@@ -128,13 +117,17 @@ import {
   buildTransactionSlipMessage,
   buildWhatsAppUrl,
   formatINR,
-  getAvatarColor,
   getLocalDateKey,
   getUIStrings,
   hashPinForUid,
   speakHinglish,
   stopSpeaking,
 } from '@/lib/i18n';
+import {
+  isWeeklyBackupRecommended,
+  subscribeStorageWarnings,
+  type StorageWarningEvent,
+} from '@/lib/idb-vault';
 import {
   computeDailyGallaPulse,
   computeNetCashflowSummary,
@@ -162,7 +155,9 @@ import type {
   UserProfile,
 } from '@/lib/types';
 import type { MainTab } from '@/types';
+import { useBackStack } from '@/hooks/useBackStack';
 import { useLedgerBackup } from '@/hooks/useLedgerBackup';
+import { useOfflineSyncQueue } from '@/hooks/useOfflineSyncQueue';
 import { usePersonaGate } from '@/hooks/usePersonaGate';
 import { useSpatialMotion } from '@/hooks/useSpatialMotion';
 import { useVaultSecurity } from '@/hooks/useVaultSecurity';
@@ -182,6 +177,10 @@ import { GallaCashbookView } from './GallaCashbookView';
 import { BottomSpatialDock, type DockDestination } from './layout/BottomSpatialDock';
 import { DynamicIslandHeader, type DynamicIslandToast } from './layout/DynamicIslandHeader';
 import { PartyStatementView } from './ledger/PartyStatementView';
+import { CloudSyncModal } from './modals/CloudSyncModal';
+import { SecondaryModals } from './modals/SecondaryModals';
+import { LegalConsentGate } from './LegalConsentGate';
+import { TermsAndPrivacyModal } from './TermsAndPrivacyModal';
 import { ParchiScannerModal } from './ParchiScannerModal';
 import { PersonaOnboardingSheet } from './PersonaOnboardingSheet';
 import { OfflineIndicator } from './PwaControls';
@@ -198,8 +197,6 @@ import {
 } from './SecondaryViews';
 import { StaffAuditView } from './StaffAuditView';
 import { StockView } from './StockView';
-import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
-import { APPLE_EASE, SPATIAL_SPRING } from './motion/SpatialMotionEngine';
 import { VoiceMunimSheet } from './voice/VoiceMunimSheet';
 
 type NotifPrefsMap = Record<string, { read?: boolean; fav?: boolean }>;
@@ -407,6 +404,8 @@ function BolBahiAppInner() {
   const [billPrefill, setBillPrefill] = useState<{ name: string; phone: string } | null>(null);
   const [billDraft, setBillDraft] = useState<BillExternalDraft | null>(null);
   const [dailySummaryOpen, setDailySummaryOpen] = useState(false);
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
   const mainScrollRef = useRef<HTMLElement | null>(null);
 
   const [actionToast, setActionToast] = useState<
@@ -550,6 +549,18 @@ function BolBahiAppInner() {
 
   const spatialMotion = useSpatialMotion(mainScrollRef);
   const scopedCashflow = useMemo(() => computeNetCashflowSummary(scopedAccounts), [scopedAccounts]);
+  const offlineSync = useOfflineSyncQueue(currentBusiness.id);
+  const [storageWarning, setStorageWarning] = useState<StorageWarningEvent | null>(null);
+  const [backupTick, setBackupTick] = useState(0);
+
+  useEffect(() => subscribeStorageWarnings((evt) => setStorageWarning(evt)), []);
+
+  useEffect(() => {
+    if (offlineSync.isOnline && offlineSync.pendingCount > 0 && isCloudReady) {
+      const id = window.setTimeout(() => offlineSync.clearBusinessQueue(), 1200);
+      return () => clearTimeout(id);
+    }
+  }, [offlineSync, isCloudReady]);
 
   useEffect(() => {
     guestVaultRef.current = guestVault;
@@ -1189,7 +1200,11 @@ function BolBahiAppInner() {
     ]
   );
 
-  const { handleExportCsv, handleExportJson, handleRestoreJson } = useLedgerBackup({
+  const {
+    handleExportCsv: rawExportCsv,
+    handleExportJson: rawExportJson,
+    handleRestoreJson,
+  } = useLedgerBackup({
     currentBusiness,
     activeAccounts,
     activeTransactions,
@@ -1203,6 +1218,63 @@ function BolBahiAppInner() {
     updateGuestVault,
     logActivity,
   });
+
+  const handleExportCsv = useCallback(() => {
+    rawExportCsv();
+    setBackupTick((t) => t + 1);
+  }, [rawExportCsv]);
+
+  const handleExportJson = useCallback(() => {
+    rawExportJson();
+    setBackupTick((t) => t + 1);
+  }, [rawExportJson]);
+
+  const backupStatus = useMemo(() => {
+    void backupTick;
+    return isWeeklyBackupRecommended(activeTransactions.length);
+  }, [activeTransactions.length, backupTick]);
+
+  const triggerAccountHighlight = useCallback((accountId: string) => {
+    if (recentHighlightTimerRef.current) clearTimeout(recentHighlightTimerRef.current);
+    setRecentlyUpdatedAccountId(accountId);
+    recentHighlightTimerRef.current = setTimeout(() => {
+      setRecentlyUpdatedAccountId(null);
+    }, 1800);
+  }, []);
+
+  const handleMergeAccount = useCallback(
+    async (sourceAccountId: string, targetAccountId: string) => {
+      if (sourceAccountId === targetAccountId) return;
+      const source = activeAccounts.find((a) => a.id === sourceAccountId);
+      const target = activeAccounts.find((a) => a.id === targetAccountId);
+      if (!source || !target) return;
+      if (isGuestMode) {
+        updateGuestVault((prev) =>
+          applyMergeAccounts(prev, { sourceAccountId, targetAccountId }).vault
+        );
+      } else {
+        await mergeAccountsInCloud({
+          sourceAccount: source,
+          targetAccount: target,
+          sourceTransactions: activeTransactions.filter((t) => t.accountId === source.id),
+          targetTransactions: activeTransactions.filter((t) => t.accountId === target.id),
+          dek: cloudDek,
+        });
+      }
+      logActivity('account', `Merged ${source.name} into ${target.name}`, target.name);
+      triggerAccountHighlight(target.id);
+      setSelectedAccountId(target.id);
+    },
+    [
+      activeAccounts,
+      activeTransactions,
+      cloudDek,
+      isGuestMode,
+      logActivity,
+      triggerAccountHighlight,
+      updateGuestVault,
+    ]
+  );
 
   const handleSelectLanguage = async (lang: LanguageCode) => {
     persistPrelogin({ language: lang });
@@ -1260,13 +1332,6 @@ function BolBahiAppInner() {
     }
   };
 
-  const triggerAccountHighlight = (accountId: string) => {
-    if (recentHighlightTimerRef.current) clearTimeout(recentHighlightTimerRef.current);
-    setRecentlyUpdatedAccountId(accountId);
-    recentHighlightTimerRef.current = setTimeout(() => {
-      setRecentlyUpdatedAccountId(null);
-    }, 1800);
-  };
 
   const formatFirebasePhoneError = (err: unknown): string => {
     const msg = err instanceof Error ? err.message : String(err || '');
@@ -1929,60 +1994,14 @@ function BolBahiAppInner() {
     setDailySummaryOpen(false);
   };
 
-  // Global Escape key handler for overlays
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (syncSheetOpen && !authBusy) setSyncSheetOpen(false);
-      else if (dailySummaryOpen) closeDailyMunimSummary();
-      else if (bizSwitcherOpen) setBizSwitcherOpen(false);
-      else if (notifOpen) setNotifOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [syncSheetOpen, authBusy, dailySummaryOpen, bizSwitcherOpen, notifOpen]);
-
-  // Android hardware Back / browser popstate handling for nested views
-  const hasNestedLayer = Boolean(
-    voiceModalOpen ||
-      parchiScannerOpen ||
-      dailySummaryOpen ||
-      bizSwitcherOpen ||
-      notifOpen ||
-      syncSheetOpen ||
-      secondaryRoute ||
-      selectedAccountId
+  // Unified LIFO Hardware Back & Escape Navigation Stack
+  useBackStack(
+    shellReady && mainTab !== 'ledger' && !secondaryRoute && !selectedAccountId,
+    () => setMainTab('ledger')
   );
-
-  useEffect(() => {
-    if (!shellReady || !hasNestedLayer) return;
-    if (window.location.hash !== '#nav') {
-      window.history.pushState({ ucredNav: true }, '', '#nav');
-    }
-    const onPopState = () => {
-      if (parchiScannerOpen) setParchiScannerOpen(false);
-      else if (voiceModalOpen) setVoiceModalOpen(false);
-      else if (syncSheetOpen) setSyncSheetOpen(false);
-      else if (dailySummaryOpen) closeDailyMunimSummary();
-      else if (bizSwitcherOpen) setBizSwitcherOpen(false);
-      else if (notifOpen) setNotifOpen(false);
-      else if (secondaryRoute) setSecondaryRoute(null);
-      else if (selectedAccountId) setSelectedAccountId(null);
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, [
-    shellReady,
-    hasNestedLayer,
-    parchiScannerOpen,
-    voiceModalOpen,
-    syncSheetOpen,
-    dailySummaryOpen,
-    bizSwitcherOpen,
-    notifOpen,
-    secondaryRoute,
-    selectedAccountId,
-  ]);
+  useBackStack(shellReady && Boolean(selectedAccountId), () => setSelectedAccountId(null));
+  useBackStack(shellReady && Boolean(secondaryRoute), () => setSecondaryRoute(null));
+  useBackStack(shellReady && notifOpen, () => setNotifOpen(false));
 
   const handleVoiceSave = async (entry: {
     customerName: string;
@@ -2523,8 +2542,38 @@ function BolBahiAppInner() {
   const hasForegroundOverlay = Boolean(selectedAccount || effectiveSecondaryRoute);
 
   return (
-    <div className="w-full max-w-[480px] lg:max-w-none mx-auto h-dvh overflow-hidden relative shadow-2xl lg:shadow-none flex flex-col select-none spatial-shell-bg native-app-shell text-[var(--ink)]">
+    <div className="w-full max-w-[480px] mx-auto min-h-[100dvh] h-[100dvh] overflow-hidden relative shadow-2xl flex flex-col select-none spatial-shell-bg native-app-shell text-[var(--ink)]">
+      <LegalConsentGate />
       <OfflineIndicator />
+
+      {storageWarning && (
+        <div
+          role="alert"
+          className="no-print fixed top-12 left-1/2 -translate-x-1/2 z-50 w-[min(92vw,420px)] rounded-2xl bg-[var(--credit-tint)] border border-[var(--credit-red)] px-3.5 py-2.5 shadow-lg flex items-center justify-between gap-2 text-xs font-bold text-[var(--credit-red)]"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span className="truncate">{storageWarning.message}</span>
+          </span>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={handleExportJson}
+              className="px-2.5 py-1 rounded-lg bg-[var(--credit-red)] text-white text-[11px] font-extrabold"
+            >
+              Backup
+            </button>
+            <button
+              type="button"
+              onClick={() => setStorageWarning(null)}
+              aria-label="Dismiss storage alert"
+              className="p-1 rounded-full hover:bg-black/10"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Scroll-Linked Floating Liquid Glass Top Chrome */}
       {!hasForegroundOverlay && !personaOnboardingOpen && (
@@ -2675,6 +2724,10 @@ function BolBahiAppInner() {
             largeTitleScale={spatialMotion.largeTitleScale}
             largeTitleY={spatialMotion.largeTitleY}
             jellySkew={spatialMotion.jellySkew}
+            backupNeeded={backupStatus.needed}
+            isOffline={!offlineSync.isOnline}
+            pendingSyncCount={offlineSync.pendingCount}
+            onExportBackup={handleExportJson}
             onToggleHideBalance={() => setHideBalance((v) => !v)}
             onToggleShowAllModes={() => setShowAllModes((v) => !v)}
             onSelectAccount={(acc) => setSelectedAccountId(acc.id)}
@@ -3197,6 +3250,7 @@ function BolBahiAppInner() {
               <PartyStatementView
               key={selectedAccount.id}
               account={selectedAccount}
+              allAccounts={scopedAccounts}
               business={currentBusiness}
               language={language}
               capabilities={capabilities}
@@ -3337,6 +3391,9 @@ function BolBahiAppInner() {
                   `Updated party details for ${selectedAccount.name}`,
                   selectedAccount.name
                 );
+              }}
+              onMergeAccount={async (targetAccountId) => {
+                await handleMergeAccount(selectedAccount.id, targetAccountId);
               }}
               onDeleteAccount={async () => {
                 if (isGuestMode) {
@@ -3541,6 +3598,10 @@ function BolBahiAppInner() {
                   }}
                   onOpenMultiDevice={() => setSecondaryRoute('multi-device')}
                   onOpenHelp={() => setSecondaryRoute('help-support')}
+                  onOpenLegal={(tab) => {
+                    setLegalModalTab(tab || 'terms');
+                    setLegalModalOpen(true);
+                  }}
                   onBack={() => setSecondaryRoute(null)}
                   onChangeAppearance={handleSetAppearance}
                   onSelectAccentTheme={(theme) => void handleSelectAccentTheme(theme)}
@@ -3727,427 +3788,32 @@ function BolBahiAppInner() {
         />
       )}
 
-      {/* Optional Multi-Auth Cloud Sync Bottom Sheet (Google + Email Link + Mobile OTP) */}
-      <AnimatePresence>
-        {syncSheetOpen && (
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Cloud Backup and Sync"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.18, ease: APPLE_EASE } }}
-            onClick={() => {
-              if (!authBusy) setSyncSheetOpen(false);
-            }}
-            className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-end justify-center"
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={SPATIAL_SPRING}
-              drag="y"
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.4 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.y > 90 && !authBusy) setSyncSheetOpen(false);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[460px] rounded-t-[34px] liquid-glass-elevated p-6 space-y-4 pb-safe max-h-[92dvh] overflow-y-auto no-scrollbar"
-            >
-              <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <span
-                    style={{ background: 'var(--munim-gradient)' }}
-                    className="w-11 h-11 rounded-2xl text-white flex items-center justify-center shadow-inner shrink-0"
-                  >
-                    <CloudUpload className="w-5 h-5" />
-                  </span>
-                  <div>
-                    <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                      Cloud Backup &amp; Sync
-                    </h3>
-                    <p className="text-xs text-[var(--ink-muted)] font-semibold">
-                      Free Google, Email Link, or +91 OTP · Auto-merges local ledger
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={authBusy}
-                  onClick={() => setSyncSheetOpen(false)}
-                  aria-label="Close sync sheet"
-                  className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {hasGuestRecordsToSync(guestVault) && !syncSuccessMsg && (
-                <div className="rounded-2xl bg-[var(--brand-tint)] px-3.5 py-2.5 text-xs font-bold text-[var(--brand-accent)] flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 shrink-0" />
-                  <span>
-                    {activeAccounts.length} parties, {activeTransactions.length} entries &amp;{' '}
-                    {activeBills.length} bills ready to merge seamlessly.
-                  </span>
-                </div>
-              )}
-
-              {syncSuccessMsg ? (
-                <div className="rounded-2xl bg-[var(--debit-tint)] p-4 text-center space-y-2">
-                  <Check className="w-7 h-7 mx-auto text-[var(--debit-green)]" />
-                  <p className="text-sm font-extrabold text-[var(--debit-green)]">
-                    {syncSuccessMsg}
-                  </p>
-                </div>
-              ) : otpSentTo ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs text-[var(--ink-muted)]">
-                    <span>
-                      OTP sent to <strong className="font-tabular text-[var(--ink)]">{otpSentTo}</strong>
-                    </span>
-                    <button
-                      type="button"
-                      disabled={authBusy}
-                      onClick={handleResetOtp}
-                      className="inline-flex items-center gap-1 font-bold text-[var(--brand-accent)] hover:underline"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                      <span>Change</span>
-                    </button>
-                  </div>
-
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={otpInput}
-                    onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !authBusy && otpInput.length === 6) {
-                        void handleVerifyOtp(otpInput);
-                      }
-                    }}
-                    placeholder="● ● ● ● ● ●"
-                    className="w-full min-h-[54px] rounded-2xl bg-[var(--app-bg)] ring-2 ring-[var(--brand)] text-center text-xl sm:text-2xl font-extrabold font-tabular tracking-wider sm:tracking-[0.3em] outline-none whitespace-nowrap overflow-hidden text-ellipsis"
-                  />
-
-                  {authError && (
-                    <p
-                      role="alert"
-                      className="rounded-2xl bg-[var(--credit-tint)] px-3.5 py-2.5 text-xs font-bold text-[var(--credit-red)]"
-                    >
-                      {authError}
-                    </p>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      disabled={authBusy || otpResendCooldown > 0}
-                      onClick={() => void handleSendOtp(syncPhoneInput)}
-                      className="min-h-[48px] rounded-2xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)] inline-flex items-center justify-center gap-1.5 disabled:opacity-50 active:scale-95 transition"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>{otpResendCooldown > 0 ? `Resend (${otpResendCooldown}s)` : 'Resend OTP'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={authBusy || otpInput.length !== 6}
-                      onClick={() => void handleVerifyOtp(otpInput)}
-                      className="min-h-[48px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold inline-flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50 active:scale-95 transition"
-                    >
-                      <KeyRound className="w-3.5 h-3.5" />
-                      <span>{authBusy ? 'Syncing...' : 'Verify & Sync'}</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* 1. Primary Zero-Cost Google (Gmail) Sign-In */}
-                  <button
-                    type="button"
-                    disabled={authBusy}
-                    onClick={() => {
-                      haptics.tap();
-                      void handleGoogleSignIn();
-                    }}
-                    className="tactile-key-primary w-full min-h-[50px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-display font-extrabold text-sm flex items-center justify-center gap-2.5 disabled:opacity-60 active:scale-[0.98] transition"
-                  >
-                    <span className="w-5 h-5 rounded-full bg-white text-[#4F46E5] font-black text-xs flex items-center justify-center">
-                      G
-                    </span>
-                    <span>{authBusy ? 'Connecting...' : 'Continue with Google (Gmail)'}</span>
-                  </button>
-
-                  {/* 2. Passwordless Email Verification Link */}
-                  <div className="rounded-2xl bg-[var(--app-bg)] p-3.5 space-y-2.5">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
-                      <span className="text-xs font-extrabold text-[var(--ink)]">
-                        Or Email Verification Link (No Password)
-                      </span>
-                    </div>
-
-                    {emailLinkSentTo ? (
-                      <p className="rounded-xl bg-[var(--debit-tint)] p-3 text-xs font-bold text-[var(--debit-green)]">
-                        Verification link sent to <span className="underline">{emailLinkSentTo}</span>. Open that email on this browser to finish syncing!
-                      </p>
-                    ) : (
-                      <div className="flex gap-2">
-                        <input
-                          type="email"
-                          value={syncEmailInput}
-                          onChange={(e) => setSyncEmailInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !authBusy) {
-                              void handleSendEmailLink(syncEmailInput);
-                            }
-                          }}
-                          placeholder="you@gmail.com"
-                          className="flex-1 min-h-[44px] rounded-xl bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                        />
-                        <button
-                          type="button"
-                          disabled={authBusy}
-                          onClick={() => {
-                            haptics.tap();
-                            void handleSendEmailLink(syncEmailInput);
-                          }}
-                          className="min-h-[44px] px-4 rounded-xl liquid-glass text-xs font-extrabold text-[var(--ink)] hover:bg-[var(--brand-tint)] disabled:opacity-60"
-                        >
-                          Send Link
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 3. Collapsible +91 Mobile OTP */}
-                  {!showPhoneOtpInSync ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptics.tap();
-                        setShowPhoneOtpInSync(true);
-                      }}
-                      className="w-full min-h-[44px] rounded-xl liquid-glass text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] inline-flex items-center justify-center gap-1.5"
-                    >
-                      <Smartphone className="w-3.5 h-3.5" />
-                      <span>Use +91 Mobile SMS OTP instead</span>
-                    </button>
-                  ) : (
-                    <div className="rounded-2xl bg-[var(--app-bg)] p-3.5 space-y-2.5">
-                      <label
-                        htmlFor="sync-mobile-input"
-                        className="block text-[11px] font-bold uppercase tracking-wider text-[var(--ink-muted)]"
-                      >
-                        10-Digit Mobile Number
-                      </label>
-                      <div className="flex items-center gap-2 rounded-xl bg-[var(--surface)] ring-1 ring-[var(--brand)] px-3 min-h-[46px]">
-                        <Smartphone className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />
-                        <span className="font-tabular font-bold text-sm text-[var(--ink-muted)]">+91</span>
-                        <input
-                          id="sync-mobile-input"
-                          type="tel"
-                          inputMode="numeric"
-                          maxLength={10}
-                          value={syncPhoneInput}
-                          onChange={(e) =>
-                            setSyncPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !authBusy) {
-                              void handleSendOtp(syncPhoneInput);
-                            }
-                          }}
-                          placeholder="9876543210"
-                          className="w-full bg-transparent text-base font-extrabold font-tabular text-[var(--ink)] outline-none"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        disabled={authBusy}
-                        onClick={() => void handleSendOtp(syncPhoneInput)}
-                        className="w-full min-h-[44px] rounded-xl bg-[var(--surface)] ring-1 ring-[var(--brand)] text-[var(--brand-accent)] font-extrabold text-xs disabled:opacity-60 active:scale-95 transition"
-                      >
-                        {authBusy ? 'Sending SMS OTP...' : 'Send SMS OTP'}
-                      </button>
-                    </div>
-                  )}
-
-                  {authError && (
-                    <p
-                      role="alert"
-                      className="rounded-2xl bg-[var(--credit-tint)] px-3.5 py-2.5 text-xs font-bold text-[var(--credit-red)]"
-                    >
-                      {authError}
-                    </p>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Cross-Browser Email Link Confirmation Modal (zero window.prompt) */}
-      {emailConfirmPrompt && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirm Email Address"
-          className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4"
-        >
-          <div className="w-full max-w-sm rounded-[28px] liquid-glass-elevated p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                Confirm Your Email
-              </h3>
-              <button
-                type="button"
-                onClick={() => setEmailConfirmPrompt(false)}
-                aria-label="Cancel email confirmation"
-                className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)]"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
-              Enter the email address you used to request your sign-in link to complete cloud backup sync.
-            </p>
-            <input
-              type="email"
-              value={emailConfirmInput}
-              onChange={(e) => setEmailConfirmInput(e.target.value)}
-              placeholder="you@gmail.com"
-              className="w-full min-h-[46px] rounded-xl bg-[var(--app-bg)] px-3.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--brand)]"
-            />
-            {authError && (
-              <p className="text-xs font-bold text-[var(--credit-red)]">{authError}</p>
-            )}
-            <button
-              type="button"
-              disabled={authBusy}
-              onClick={() => void handleConfirmCrossBrowserEmailLink()}
-              className="w-full min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold disabled:opacity-60"
-            >
-              {authBusy ? 'Verifying...' : 'Complete Sign-In'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Business Switcher Bottom Sheet */}
-      <AnimatePresence>
-        {bizSwitcherOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setBizSwitcherOpen(false)}
-            className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-end justify-center"
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={SPATIAL_SPRING}
-              drag="y"
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.4 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.y > 90) setBizSwitcherOpen(false);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[460px] rounded-t-[34px] liquid-glass-elevated p-6 space-y-4 pb-safe"
-            >
-              <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-lg font-extrabold">Switch Business</h3>
-                <button
-                  type="button"
-                  onClick={() => setBizSwitcherOpen(false)}
-                  aria-label="Close switcher"
-                  className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
-                {activeBusinesses.map((biz) => {
-                  const active = biz.id === currentBusiness.id;
-                  return (
-                    <button
-                      key={biz.id}
-                      type="button"
-                      onClick={() => void handleSwitchBusiness(biz.id)}
-                      className={`w-full min-h-[54px] px-4 rounded-[20px] flex items-center justify-between gap-3 active:scale-95 transition ${
-                        active
-                          ? 'bg-[var(--brand-tint)] ring-1 ring-[var(--brand-accent)]'
-                          : 'bg-[var(--app-bg)] hover:bg-[var(--surface-subtle)]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          style={{ backgroundColor: getAvatarColor(biz.name) }}
-                          className="w-9 h-9 rounded-full text-white font-bold flex items-center justify-center shrink-0"
-                        >
-                          {biz.name.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="font-bold text-sm truncate">{biz.name}</span>
-                      </div>
-                      {active && <Check className="w-4 h-4 text-[var(--brand-accent)] shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="pt-2 space-y-2">
-                <p className="text-xs font-bold uppercase text-[var(--ink-muted)]">
-                  Create New Business
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newBizName}
-                    onChange={(e) => setNewBizName(e.target.value)}
-                    placeholder="e.g. Sharma Wholesale"
-                    className="flex-1 min-h-[46px] rounded-2xl bg-[var(--app-bg)] px-3.5 text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-                  />
-                  <button
-                    type="button"
-                    disabled={creatingBiz || !newBizName.trim()}
-                    onClick={() => void handleCreateExtraBusiness()}
-                    className="min-h-[46px] px-4 rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold inline-flex items-center gap-1 disabled:opacity-50 active:scale-95 transition"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Create</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.tap();
-                    setBizSwitcherOpen(false);
-                    setPersonaOnboardingStep(3);
-                    setPersonaOnboardingOpen(true);
-                  }}
-                  className="w-full min-h-[46px] rounded-2xl bg-[var(--brand-tint)] text-[var(--brand-accent)] text-xs font-extrabold inline-flex items-center justify-center gap-2 active:scale-95 transition"
-                >
-                  <SlidersHorizontal className="w-4 h-4" />
-                  <span>Change Business Mode ({personaAdaptation.focusBadge})</span>
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+       {/* Optional Google & Gmail Sign-In Cloud Sync Modal */}
+      <CloudSyncModal
+        open={syncSheetOpen}
+        onClose={() => setSyncSheetOpen(false)}
+        authBusy={authBusy}
+        authError={authError}
+        syncSuccessMsg={syncSuccessMsg}
+        hasGuestRecords={hasGuestRecordsToSync(guestVault)}
+        activeAccountsCount={activeAccounts.length}
+        activeTransactionsCount={activeTransactions.length}
+        activeBillsCount={activeBills.length}
+        syncEmailInput={syncEmailInput}
+        onChangeSyncEmailInput={setSyncEmailInput}
+        emailLinkSentTo={emailLinkSentTo}
+        onGoogleSignIn={() => void handleGoogleSignIn()}
+        onSendEmailLink={(email) => void handleSendEmailLink(email)}
+        emailConfirmPrompt={emailConfirmPrompt}
+        onCloseEmailConfirm={() => setEmailConfirmPrompt(false)}
+        emailConfirmInput={emailConfirmInput}
+        onChangeEmailConfirmInput={setEmailConfirmInput}
+        onConfirmCrossBrowserEmailLink={() => void handleConfirmCrossBrowserEmailLink()}
+        onOpenLegal={(tab) => {
+          setLegalModalTab(tab || 'terms');
+          setLegalModalOpen(true);
+        }}
+      />
 
       {/* Notifications Drawer */}
       <NotificationsDrawer
@@ -4177,157 +3843,62 @@ function BolBahiAppInner() {
         }}
       />
 
-      {/* Today's Business Audio Summary Modal */}
-      <AnimatePresence>
-        {dailySummaryOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeDailyMunimSummary}
-            className="no-print fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-end justify-center"
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={SPATIAL_SPRING}
-              drag="y"
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.4 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.y > 90) closeDailyMunimSummary();
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[460px] rounded-t-[34px] liquid-glass-elevated p-6 space-y-4 pb-safe"
-            >
-              <div className="w-10 h-1 rounded-full bg-[var(--surface-subtle)] mx-auto" />
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <span
-                    style={{ background: 'var(--munim-gradient)' }}
-                    className="w-11 h-11 rounded-2xl text-white flex items-center justify-center shadow-inner"
-                  >
-                    <Volume2 className="w-5 h-5" />
-                  </span>
-                  <div>
-                    <h3 className="text-lg font-extrabold text-[var(--ink)]">Today&apos;s Business Summary</h3>
-                    <p className="text-xs text-[var(--ink-muted)] font-semibold">
-                      {currentBusiness.name} · {dailyStats.todayKey}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeDailyMunimSummary}
-                  aria-label="Close Daily Summary"
-                  className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-[20px] bg-[var(--credit-tint)] p-3 text-center">
-                  <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase">Given Today</p>
-                  <p className="text-base font-extrabold text-[var(--credit-red)] font-tabular mt-0.5">
-                    {formatINR(dailyStats.givenToday)}
-                  </p>
-                </div>
-                <div className="rounded-[20px] bg-[var(--debit-tint)] p-3 text-center">
-                  <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase">Collected</p>
-                  <p className="text-base font-extrabold text-[var(--debit-green)] font-tabular mt-0.5">
-                    {formatINR(dailyStats.receivedToday)}
-                  </p>
-                </div>
-                <div className="rounded-[20px] bg-[var(--brand-tint)] p-3 text-center">
-                  <p className="text-[11px] font-bold text-[var(--ink-muted)] uppercase">Cash Drawer</p>
-                  <p className="text-base font-extrabold text-[var(--brand-accent)] font-tabular mt-0.5">
-                    {formatINR(gallaPulse.cashDrawerBalance)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-[var(--brand-tint)] p-3.5 text-xs font-semibold text-[var(--ink)] leading-relaxed">
-                {buildDailyMunimScript({
-                  givenToday: dailyStats.givenToday,
-                  receivedToday: dailyStats.receivedToday,
-                  overdueCount: dailyStats.overdueCount,
-                  lowStockCount: dailyStats.lowStockCount,
-                  shopName: currentBusiness.name,
-                  language,
-                })}
-              </div>
-
-              {(dailyStats.overdueCount > 0 || dailyStats.lowStockCount > 0) && (
-                <div className="grid grid-cols-2 gap-2">
-                  {dailyStats.overdueCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        closeDailyMunimSummary();
-                        setSecondaryRoute(null);
-                        setSelectedAccountId(null);
-                        setMainTab('collection');
-                      }}
-                      className="min-h-[44px] rounded-xl bg-[var(--credit-tint)] px-3 text-xs font-extrabold text-[var(--credit-red)] flex items-center justify-center gap-1.5 active:scale-95 transition"
-                    >
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      <span>{dailyStats.overdueCount} Overdue</span>
-                    </button>
-                  )}
-                  {dailyStats.lowStockCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        closeDailyMunimSummary();
-                        setSecondaryRoute(null);
-                        setSelectedAccountId(null);
-                        setMainTab('stock');
-                      }}
-                      className="min-h-[44px] rounded-xl bg-[var(--alert-tint)] px-3 text-xs font-extrabold text-[var(--alert-amber)] flex items-center justify-center gap-1.5 active:scale-95 transition"
-                    >
-                      <Package className="w-3.5 h-3.5" />
-                      <span>{dailyStats.lowStockCount} Low Stock</span>
-                    </button>
-                  )}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    speakHinglish(
-                      buildDailyMunimScript({
-                        givenToday: dailyStats.givenToday,
-                        receivedToday: dailyStats.receivedToday,
-                        overdueCount: dailyStats.overdueCount,
-                        lowStockCount: dailyStats.lowStockCount,
-                        shopName: currentBusiness.name,
-                        language,
-                      }),
-                      language
-                    )
-                  }
-                  className="min-h-[48px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-sm font-extrabold flex items-center justify-center gap-2 active:scale-95 transition"
-                >
-                  <Volume2 className="w-4 h-4" />
-                  <span>Replay Audio</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={stopSpeaking}
-                  className="min-h-[48px] rounded-xl bg-[var(--surface-subtle)] text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition"
-                >
-                  <VolumeX className="w-4 h-4" />
-                  <span>Stop Voice</span>
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Business Switcher, Daily Summary, OTP Reauth & Cloud Vault Unlock */}
+      <SecondaryModals
+        bizSwitcherOpen={bizSwitcherOpen}
+        onCloseBizSwitcher={() => setBizSwitcherOpen(false)}
+        activeBusinesses={activeBusinesses}
+        currentBusiness={currentBusiness}
+        onSwitchBusiness={(id) => void handleSwitchBusiness(id)}
+        newBizName={newBizName}
+        onChangeNewBizName={setNewBizName}
+        creatingBiz={creatingBiz}
+        onCreateExtraBusiness={() => void handleCreateExtraBusiness()}
+        focusBadge={personaAdaptation.focusBadge}
+        onOpenBusinessModes={() => {
+          setBizSwitcherOpen(false);
+          setPersonaOnboardingStep(3);
+          setPersonaOnboardingOpen(true);
+        }}
+        dailySummaryOpen={dailySummaryOpen}
+        onCloseDailySummary={closeDailyMunimSummary}
+        dailyStats={dailyStats}
+        cashDrawerBalance={gallaPulse.cashDrawerBalance}
+        language={language}
+        onNavigateCollection={() => {
+          closeDailyMunimSummary();
+          setSecondaryRoute(null);
+          setSelectedAccountId(null);
+          setMainTab('collection');
+        }}
+        onNavigateStock={() => {
+          closeDailyMunimSummary();
+          setSecondaryRoute(null);
+          setSelectedAccountId(null);
+          setMainTab('stock');
+        }}
+        reauthOtpTarget={reauthOtpTarget}
+        onCloseReauthOtp={() => setReauthOtpTarget(null)}
+        reauthBusy={reauthBusy}
+        reauthOtpSent={reauthOtpSent}
+        phoneNumberDisplay={user?.phoneNumber || 'your mobile number'}
+        reauthOtpCode={reauthOtpCode}
+        onChangeReauthOtpCode={setReauthOtpCode}
+        reauthError={reauthError}
+        onResendOtpReauth={(target) => void startOtpReauthFlow(target)}
+        onConfirmOtpReauth={() => void handleConfirmOtpReauth()}
+        cloudVaultUnlockOpen={Boolean(user && cloudVaultUnlockOpen)}
+        vaultUnlockBusy={vaultUnlockBusy}
+        onCloseCloudVaultUnlock={() => setCloudVaultUnlockOpen(false)}
+        vaultUnlockPin={vaultUnlockPin}
+        onChangeVaultUnlockPin={setVaultUnlockPin}
+        vaultUnlockError={vaultUnlockError}
+        onUseGuestMode={async () => {
+          await signOut(auth);
+          setCloudVaultUnlockOpen(false);
+        }}
+        onUnlockCloudVault={() => void handleUnlockCloudVault()}
+      />
 
       {/* Aperture Iris Spatial Voice & Hands-Free Counter Modal */}
       <VoiceMunimSheet
@@ -4597,140 +4168,12 @@ function BolBahiAppInner() {
         aria-hidden="true"
       />
 
-      {/* OTP Re-Verification Modal for Sensitive Actions (Forgot PIN / Permanent Deletion) */}
-      {reauthOtpTarget && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Mobile OTP Verification"
-          className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4"
-        >
-          <div className="w-full max-w-sm rounded-[28px] liquid-glass-elevated p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="w-10 h-10 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
-                  <KeyRound className="w-5 h-5" />
-                </span>
-                <h3 className="font-display text-lg font-extrabold text-[var(--ink)]">
-                  {reauthOtpTarget === 'forgot-pin'
-                    ? 'Verify Mobile to Reset PIN'
-                    : 'Verify Mobile to Delete Account'}
-                </h3>
-              </div>
-              <button
-                type="button"
-                disabled={reauthBusy}
-                onClick={() => setReauthOtpTarget(null)}
-                aria-label="Close OTP verification"
-                className="min-w-[44px] min-h-[44px] rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--ink-muted)] active:scale-95 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-[var(--ink-muted)] leading-relaxed">
-              {reauthOtpSent
-                ? `Enter the 6-digit SMS OTP sent to ${user?.phoneNumber || 'your mobile number'}.`
-                : `Sending SMS verification code to ${user?.phoneNumber || 'your mobile number'}...`}
-            </p>
-
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              value={reauthOtpCode}
-              onChange={(e) => setReauthOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="● ● ● ● ● ●"
-              className="w-full min-h-[52px] rounded-2xl bg-[var(--surface-subtle)] px-4 ring-2 ring-transparent focus:ring-[var(--brand-accent)] text-center text-xl font-extrabold font-tabular tracking-wider sm:tracking-[0.3em] outline-none transition whitespace-nowrap overflow-hidden text-ellipsis"
-            />
-
-            {reauthError && (
-              <p role="alert" className="text-xs font-bold text-[var(--credit-red)]">
-                {reauthError}
-              </p>
-            )}
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                disabled={reauthBusy}
-                onClick={() => void startOtpReauthFlow(reauthOtpTarget)}
-                className="min-h-[46px] rounded-xl bg-[var(--surface-subtle)] text-[var(--ink)] text-xs font-bold active:scale-95 transition"
-              >
-                Resend OTP
-              </button>
-              <button
-                type="button"
-                disabled={reauthBusy || !reauthOtpSent || reauthOtpCode.length !== 6}
-                onClick={() => void handleConfirmOtpReauth()}
-                className="min-h-[46px] rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold disabled:opacity-50 inline-flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>{reauthBusy ? 'Verifying...' : 'Confirm OTP'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Zero-Knowledge Cloud Sync Vault PIN Unlock Sheet */}
-      <DetentSheetOverlay
-        open={Boolean(user && cloudVaultUnlockOpen)}
-        onClose={() => {
-          if (!vaultUnlockBusy) setCloudVaultUnlockOpen(false);
-        }}
-        title="Unlock Encrypted Cloud Vault"
-        subtitle="AES-256-GCM Zero-Knowledge Sync"
-        initialDetent="peek"
-        allowDetentToggle={false}
-      >
-        <div className="space-y-4 pb-safe">
-          <div className="rounded-2xl bg-[var(--brand-tint)] px-3.5 py-3 flex items-start gap-2.5">
-            <ShieldCheck className="w-5 h-5 text-[var(--brand-accent)] shrink-0 mt-0.5" />
-            <p className="text-xs font-semibold text-[var(--ink)] leading-relaxed">
-              Your cloud ledger is protected with a custom Vault Sync PIN. Enter it once to
-              decrypt records cleanly on this device.
-            </p>
-          </div>
-          <input
-            type="password"
-            value={vaultUnlockPin}
-            onChange={(e) => setVaultUnlockPin(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !vaultUnlockBusy) {
-                void handleUnlockCloudVault();
-              }
-            }}
-            placeholder="Enter Vault Sync PIN"
-            className="w-full min-h-[48px] rounded-2xl bg-[var(--app-bg)] px-4 text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
-          />
-          {vaultUnlockError && (
-            <p role="alert" className="text-xs font-bold text-[var(--credit-red)]">
-              {vaultUnlockError}
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              disabled={vaultUnlockBusy}
-              onClick={async () => {
-                await signOut(auth);
-                setCloudVaultUnlockOpen(false);
-              }}
-              className="min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)] active:scale-95 transition"
-            >
-              Use Guest Mode
-            </button>
-            <button
-              type="button"
-              disabled={vaultUnlockBusy || vaultUnlockPin.trim().length < 4}
-              onClick={() => void handleUnlockCloudVault()}
-              className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold disabled:opacity-50 active:scale-95 transition"
-            >
-              {vaultUnlockBusy ? 'Decrypting...' : 'Unlock Vault'}
-            </button>
-          </div>
-        </div>
-      </DetentSheetOverlay>
+      {/* Global Terms of Service & Privacy Policy Modal */}
+      <TermsAndPrivacyModal
+        open={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialTab={legalModalTab}
+      />
 
       {/* Privacy Curtain Veil */}
       {privacyCurtainVisible && (
@@ -4782,7 +4225,7 @@ export const BolBahiApp: React.FC = () => {
     return (
       <div
         suppressHydrationWarning
-        className="w-full max-w-[460px] lg:max-w-[1200px] mx-auto h-dvh overflow-hidden shadow-2xl spatial-shell-bg native-app-shell"
+        className="w-full max-w-[480px] mx-auto min-h-[100dvh] h-[100dvh] overflow-hidden shadow-2xl spatial-shell-bg native-app-shell"
       />
     );
   }

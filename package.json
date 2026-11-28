@@ -13,9 +13,12 @@
   "dependencies": {
     "@capacitor/android": "^8.6.2",
     "@capacitor/app": "^8.1.2",
+    "@capacitor/camera": "^8.2.7",
     "@capacitor/cli": "^8.6.2",
     "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.6",
     "@capacitor/ios": "^8.6.3",
+    "@capacitor/share": "^8.0.3",
     "@capacitor/status-bar": "^8.0.4",
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@google/genai": "^3.6.0",

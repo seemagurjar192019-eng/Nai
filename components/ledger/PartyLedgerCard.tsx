@@ -116,7 +116,7 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
   const overLimit = Boolean(
     account.creditLimit && account.creditLimit > 0 && account.balance > account.creditLimit
   );
-  const descriptionText = overLimit
+  const baseDescriptionText = overLimit
     ? `Over Limit · ${formatINR(account.creditLimit || 0)}`
     : account.lastNote && account.lastNote !== 'Added Today'
       ? account.lastNote
@@ -125,6 +125,19 @@ export const PartyLedgerCard: React.FC<PartyLedgerCardProps> = ({
         : account.phone
           ? `+91 ${account.phone}`
           : 'Tap for ledger';
+
+  const tagLabel =
+    account.tag === 'vip'
+      ? 'VIP'
+      : account.tag === 'slow'
+        ? 'Slow Payer'
+        : account.tag === 'blocked'
+          ? 'Blocked'
+          : account.tag === 'regular'
+            ? 'Regular'
+            : '';
+
+  const descriptionText = tagLabel ? `${tagLabel} · ${baseDescriptionText}` : baseDescriptionText;
 
   const rightProgress = Math.max(0, Math.min(1, dragX / SWIPE_THRESHOLD));
   const leftProgress = Math.max(0, Math.min(1, -dragX / SWIPE_THRESHOLD));

@@ -15,6 +15,7 @@ import type {
   LanguageCode,
   LedgerAccount,
   LedgerTransaction,
+  PartyTag,
   PersonaContext,
   StaffMember,
   StaffRole,
@@ -24,6 +25,12 @@ import type {
 import { getLocalDateKey } from './i18n';
 import { decryptString, encryptString, isEncryptedEnvelope } from './e2ee';
 import { validateSafeBackupJson } from './security';
+import {
+  emitStorageWarning,
+  idbDeleteVaultString,
+  idbGetVaultString,
+  idbSetVaultString,
+} from './idb-vault';
 
 export const GUEST_VAULT_STORAGE_KEY = 'ucred_guest_vault_v1';
 export const GUEST_ENCRYPTED_VAULT_KEY = 'ucred_guest_vault_enc_v1';
@@ -216,24 +223,57 @@ export async function loadEncryptedGuestVault(
     return inMemoryFallbackVault;
   }
   try {
-    const encRaw = window.localStorage.getItem(GUEST_ENCRYPTED_VAULT_KEY);
-    if (encRaw) {
-      const jsonStr = isEncryptedEnvelope(encRaw) ? await decryptString(dek, encRaw) : encRaw;
-      const normalized = normalizeGuestVault(JSON.parse(jsonStr) as Partial<GuestVaultState>, prelogin);
+    // 1. Prefer IndexedDB encrypted vault (eliminates 5MB localStorage ceiling)
+    const idbEncRaw = await idbGetVaultString(GUEST_ENCRYPTED_VAULT_KEY);
+    if (idbEncRaw) {
+      const jsonStr = isEncryptedEnvelope(idbEncRaw)
+        ? await decryptString(dek, idbEncRaw)
+        : idbEncRaw;
+      const normalized = normalizeGuestVault(
+        JSON.parse(jsonStr) as Partial<GuestVaultState>,
+        prelogin
+      );
       inMemoryFallbackVault = normalized;
-      if (dek && !isEncryptedEnvelope(encRaw)) {
+      if (dek && !isEncryptedEnvelope(idbEncRaw)) {
         await saveEncryptedGuestVault(dek, normalized);
       }
       return normalized;
     }
 
-    const legacyRaw = window.localStorage.getItem(GUEST_VAULT_STORAGE_KEY);
-    if (legacyRaw) {
-      const normalized = normalizeGuestVault(JSON.parse(legacyRaw) as Partial<GuestVaultState>, prelogin);
+    const idbLegacyRaw = await idbGetVaultString(GUEST_VAULT_STORAGE_KEY);
+    if (idbLegacyRaw) {
+      const normalized = normalizeGuestVault(
+        JSON.parse(idbLegacyRaw) as Partial<GuestVaultState>,
+        prelogin
+      );
       inMemoryFallbackVault = normalized;
       if (dek) {
         await saveEncryptedGuestVault(dek, normalized);
       }
+      return normalized;
+    }
+
+    // 2. Migrate transparently from legacy localStorage entries
+    const encRaw = window.localStorage.getItem(GUEST_ENCRYPTED_VAULT_KEY);
+    if (encRaw) {
+      const jsonStr = isEncryptedEnvelope(encRaw) ? await decryptString(dek, encRaw) : encRaw;
+      const normalized = normalizeGuestVault(
+        JSON.parse(jsonStr) as Partial<GuestVaultState>,
+        prelogin
+      );
+      inMemoryFallbackVault = normalized;
+      await saveEncryptedGuestVault(dek, normalized);
+      return normalized;
+    }
+
+    const legacyRaw = window.localStorage.getItem(GUEST_VAULT_STORAGE_KEY);
+    if (legacyRaw) {
+      const normalized = normalizeGuestVault(
+        JSON.parse(legacyRaw) as Partial<GuestVaultState>,
+        prelogin
+      );
+      inMemoryFallbackVault = normalized;
+      await saveEncryptedGuestVault(dek, normalized);
       return normalized;
     }
 
@@ -258,15 +298,46 @@ export async function saveEncryptedGuestVault(
   if (typeof window !== 'undefined') {
     try {
       const serialized = JSON.stringify(vault);
-      if (dek) {
-        const encrypted = await encryptString(dek, serialized);
-        window.localStorage.setItem(GUEST_ENCRYPTED_VAULT_KEY, encrypted);
-        window.localStorage.removeItem(GUEST_VAULT_STORAGE_KEY);
+      const keyToWrite = dek ? GUEST_ENCRYPTED_VAULT_KEY : GUEST_VAULT_STORAGE_KEY;
+      const payloadToWrite = dek ? await encryptString(dek, serialized) : serialized;
+
+      // Primary persistence in IndexedDB
+      const idbOk = await idbSetVaultString(keyToWrite, payloadToWrite);
+
+      // Keep localStorage synced only while small (< 2MB) to avoid QuotaExceeded errors
+      if (payloadToWrite.length < 2_000_000) {
+        try {
+          if (dek) {
+            window.localStorage.setItem(GUEST_ENCRYPTED_VAULT_KEY, payloadToWrite);
+            window.localStorage.removeItem(GUEST_VAULT_STORAGE_KEY);
+          } else {
+            window.localStorage.setItem(GUEST_VAULT_STORAGE_KEY, payloadToWrite);
+          }
+        } catch (lsErr) {
+          if (!idbOk) {
+            emitStorageWarning({
+              reason: lsErr instanceof Error && lsErr.name === 'QuotaExceededError' ? 'quota' : 'write-failed',
+              message: 'Local storage is nearly full. Export a JSON backup in Settings to avoid losing data.',
+            });
+          }
+        }
       } else {
-        window.localStorage.setItem(GUEST_VAULT_STORAGE_KEY, serialized);
+        // Vault exceeds safe localStorage budget; remove stale localStorage copy once IDB succeeds
+        if (idbOk) {
+          window.localStorage.removeItem(GUEST_ENCRYPTED_VAULT_KEY);
+          window.localStorage.removeItem(GUEST_VAULT_STORAGE_KEY);
+        } else {
+          emitStorageWarning({
+            reason: 'quota',
+            message: 'Vault size exceeded browser localStorage limit and IndexedDB write failed. Please export backup.',
+          });
+        }
       }
-    } catch {
-      // Rely on in-memory vault if storage quota is full
+    } catch (err) {
+      emitStorageWarning({
+        reason: err instanceof Error && err.name === 'QuotaExceededError' ? 'quota' : 'write-failed',
+        message: 'Could not persist vault changes safely. Export a JSON backup now.',
+      });
     }
   }
   return vault;
@@ -281,6 +352,8 @@ export function clearGuestVault(): void {
     } catch {
       // Ignore removal error
     }
+    void idbDeleteVaultString(GUEST_VAULT_STORAGE_KEY);
+    void idbDeleteVaultString(GUEST_ENCRYPTED_VAULT_KEY);
   }
 }
 
@@ -450,7 +523,7 @@ export function applyUpdateAccountMeta(
   patch: Partial<
     Pick<
       LedgerAccount,
-      'name' | 'phone' | 'dueDate' | 'kind' | 'creditLimit' | 'promiseDate' | 'promiseNote'
+      'name' | 'phone' | 'dueDate' | 'kind' | 'creditLimit' | 'promiseDate' | 'promiseNote' | 'tag'
     >
   >
 ): GuestVaultState {
@@ -464,6 +537,7 @@ export function applyUpdateAccountMeta(
         ...(patch.phone !== undefined ? { phone: clampStr(patch.phone, 20) } : {}),
         ...(patch.dueDate !== undefined ? { dueDate: clampStr(patch.dueDate, 24) } : {}),
         ...(patch.kind !== undefined ? { kind: patch.kind } : {}),
+        ...(patch.tag !== undefined ? { tag: patch.tag as PartyTag | undefined } : {}),
         ...(patch.promiseDate !== undefined
           ? { promiseDate: clampStr(patch.promiseDate, 24) }
           : {}),
@@ -744,6 +818,51 @@ export function applyDeleteAccountWithTransactions(
     ...vault,
     accounts: vault.accounts.filter((a) => a.id !== accountId),
     transactions: vault.transactions.filter((t) => t.accountId !== accountId),
+  };
+}
+
+export function applyMergeAccounts(
+  vault: GuestVaultState,
+  params: { sourceAccountId: string; targetAccountId: string }
+): { vault: GuestVaultState; movedTxCount: number } {
+  if (!params.sourceAccountId || params.sourceAccountId === params.targetAccountId) {
+    return { vault, movedTxCount: 0 };
+  }
+  const sourceAcc = vault.accounts.find((a) => a.id === params.sourceAccountId);
+  const targetAcc = vault.accounts.find((a) => a.id === params.targetAccountId);
+  if (!sourceAcc || !targetAcc) {
+    throw new Error('Selected accounts could not be found for merge.');
+  }
+
+  let movedTxCount = 0;
+  const nextTransactions = vault.transactions.map((tx) => {
+    if (tx.accountId !== sourceAcc.id) return tx;
+    movedTxCount++;
+    return {
+      ...tx,
+      accountId: targetAcc.id,
+    };
+  });
+
+  const mergedTargetBase: LedgerAccount = {
+    ...targetAcc,
+    phone: targetAcc.phone || sourceAcc.phone,
+    dueDate: targetAcc.dueDate || sourceAcc.dueDate,
+    creditLimit: targetAcc.creditLimit || sourceAcc.creditLimit,
+    tag: targetAcc.tag || sourceAcc.tag,
+  };
+  const targetTxs = nextTransactions.filter((t) => t.accountId === targetAcc.id);
+  const recalculatedTarget = recalculateAccountSummary(mergedTargetBase, targetTxs);
+
+  return {
+    movedTxCount,
+    vault: {
+      ...vault,
+      transactions: nextTransactions,
+      accounts: vault.accounts
+        .filter((a) => a.id !== sourceAcc.id)
+        .map((a) => (a.id === targetAcc.id ? recalculatedTarget : a)),
+    },
   };
 }
 

@@ -49,8 +49,10 @@ import {
   isValidIndianMobile,
   isValidUpiId,
   maskContactIdentifier,
+  verifyGstinChecksum,
   verifyStoredPin,
 } from '@/lib/i18n';
+import { useBackStack } from '@/hooks/useBackStack';
 import {
   getLastBackupAt,
   getPinCooldownSeconds,
@@ -175,6 +177,7 @@ interface SettingsViewProps {
   onClearAll: () => Promise<void>;
   onDeleteAccount: () => Promise<void>;
   onLogout: () => Promise<void>;
+  onOpenLegal?: (tab?: 'terms' | 'privacy') => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -194,6 +197,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onOpenCloudSync,
   onOpenBusinessProfile,
   onOpenHelp,
+  onOpenLegal,
   onBack,
   onChangeAppearance,
   onSaveMobile,
@@ -241,6 +245,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [recoveryKeyValue, setRecoveryKeyValue] = useState('');
   const [recoveryCopied, setRecoveryCopied] = useState(false);
   const restoreRef = useRef<HTMLInputElement | null>(null);
+
+  useBackStack(Boolean(activeSheet), () => {
+    setDangerConfirmInput('');
+    setActiveSheet(null);
+  });
 
   const isDarkActive =
     appearance === 'dark' || (appearance === 'system' && resolvedAppearance === 'dark');
@@ -678,13 +687,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <FileText className="w-4 h-4" />
               </span>
               <span className="text-sm font-semibold text-[var(--ink)] flex items-center gap-1.5 flex-wrap">
-                <Link href="/privacy" className="hover:underline">
-                  Privacy
-                </Link>
-                <span className="text-[var(--ink-muted)]">·</span>
-                <Link href="/terms" className="hover:underline">
-                  Terms
-                </Link>
+                {onOpenLegal ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.tap();
+                        onOpenLegal('privacy');
+                      }}
+                      className="hover:underline font-semibold text-[var(--ink)]"
+                    >
+                      Privacy Policy
+                    </button>
+                    <span className="text-[var(--ink-muted)]">·</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.tap();
+                        onOpenLegal('terms');
+                      }}
+                      className="hover:underline font-semibold text-[var(--ink)]"
+                    >
+                      Terms
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/privacy" className="hover:underline">
+                      Privacy
+                    </Link>
+                    <span className="text-[var(--ink-muted)]">·</span>
+                    <Link href="/terms" className="hover:underline">
+                      Terms
+                    </Link>
+                  </>
+                )}
               </span>
             </span>
             <span className="text-xs font-bold text-[var(--ink-muted)] font-tabular shrink-0">
@@ -1472,6 +1509,9 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
   const [deletingBiz, setDeletingBiz] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
 
+  useBackStack(showCardModal, () => setShowCardModal(false));
+  const gstCheck = verifyGstinChecksum(gstNumber);
+
   const handleSave = async () => {
     setFormError('');
     if (phone && !isValidIndianMobile(phone)) {
@@ -1600,6 +1640,19 @@ export const BusinessProfileView: React.FC<BusinessProfileViewProps> = ({
               placeholder="22AAAAA0000A1Z5"
               className="w-full min-h-[44px] rounded-2xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-3.5 text-sm font-tabular uppercase text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
+            {gstNumber.trim() !== '' && gstCheck.message && (
+              <p
+                className={`mt-1 text-[11px] font-semibold ${
+                  gstCheck.validChecksum
+                    ? 'text-[var(--debit-green)]'
+                    : gstCheck.validFormat && gstCheck.validState
+                      ? 'text-[var(--alert-amber)]'
+                      : 'text-[var(--credit-red)]'
+                }`}
+              >
+                {gstCheck.message}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-bold text-[var(--ink-muted)] mb-1">UPI ID</label>

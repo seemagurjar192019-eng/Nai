@@ -394,7 +394,9 @@ export type KeypadKey =
   | 'clear'
   | '+100'
   | '+500'
-  | '+2000';
+  | '+1000'
+  | '+2000'
+  | '+5000';
 
 /**
  * Pure tactile numeric keypad state transition for Quick Entry without popping OS soft keyboard.
@@ -406,7 +408,7 @@ export function applyKeypadKey(current: string, key: KeypadKey, maxIntegerDigits
     return current.length > 0 ? current.slice(0, -1) : '';
   }
 
-  if (key === '+100' || key === '+500' || key === '+2000') {
+  if (key === '+100' || key === '+500' || key === '+1000' || key === '+2000' || key === '+5000') {
     const add = Number(key.slice(1));
     const base = Number(current);
     const safeBase = Number.isFinite(base) && base > 0 ? base : 0;

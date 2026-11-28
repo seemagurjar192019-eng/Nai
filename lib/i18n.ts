@@ -474,10 +474,77 @@ export function isValidUpiId(upi: string): boolean {
   return /^[a-zA-Z0-9._-]{2,64}@[a-zA-Z0-9.-]{2,32}$/.test(clean);
 }
 
+const GSTIN_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+export function computeGstinCheckDigit(gst14: string): string | null {
+  const prefix = gst14.trim().toUpperCase();
+  if (prefix.length !== 14) return null;
+  let sum = 0;
+  for (let i = 0; i < 14; i++) {
+    const codePoint = GSTIN_ALPHABET.indexOf(prefix[i]);
+    if (codePoint === -1) return null;
+    const factor = i % 2 === 0 ? 1 : 2;
+    const product = codePoint * factor;
+    const weighted = Math.floor(product / 36) + (product % 36);
+    sum += weighted;
+  }
+  const remainder = sum % 36;
+  const checkCodePoint = (36 - remainder) % 36;
+  return GSTIN_ALPHABET[checkCodePoint] || null;
+}
+
+export function verifyGstinChecksum(gst: string): {
+  validFormat: boolean;
+  validState: boolean;
+  validChecksum: boolean;
+  message: string;
+} {
+  const clean = gst.trim().toUpperCase();
+  if (!clean) {
+    return { validFormat: true, validState: true, validChecksum: true, message: '' };
+  }
+  const formatOk = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(clean);
+  if (!formatOk) {
+    return {
+      validFormat: false,
+      validState: false,
+      validChecksum: false,
+      message: 'GSTIN must be 15 characters (e.g. 27AABCU9603R1ZM).',
+    };
+  }
+  const stateNum = Number.parseInt(clean.slice(0, 2), 10);
+  const validState = (stateNum >= 1 && stateNum <= 38) || stateNum === 97 || stateNum === 99;
+  if (!validState) {
+    return {
+      validFormat: true,
+      validState: false,
+      validChecksum: false,
+      message: `Invalid state code "${clean.slice(0, 2)}" in GSTIN.`,
+    };
+  }
+  const expected = computeGstinCheckDigit(clean.slice(0, 14));
+  const validChecksum = expected !== null && expected === clean[14];
+  return {
+    validFormat: true,
+    validState: true,
+    validChecksum,
+    message: validChecksum ? 'Valid 15-digit GSTIN' : `Check digit mismatch (expected "${expected || '?'}").`,
+  };
+}
+
 export function isValidGstNumber(gst: string): boolean {
   const clean = gst.trim().toUpperCase();
   if (!clean) return true;
-  return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(clean);
+  if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(clean)) return false;
+  const stateNum = Number.parseInt(clean.slice(0, 2), 10);
+  return (stateNum >= 1 && stateNum <= 38) || stateNum === 97 || stateNum === 99;
+}
+
+export function splitCgstSgst(totalGst: number): { cgst: number; sgst: number } {
+  const total = Math.max(0, Math.round((Number(totalGst) || 0) * 100) / 100);
+  const cgst = Math.round((total / 2) * 100) / 100;
+  const sgst = Math.round((total - cgst) * 100) / 100;
+  return { cgst, sgst };
 }
 
 export function isValidIndianMobile(phone: string): boolean {

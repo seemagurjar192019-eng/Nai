@@ -755,7 +755,7 @@ export async function createAccount(params: {
 export async function updateAccountMeta(
   accountId: string,
   patch: Partial<
-    Pick<LedgerAccount, 'name' | 'phone' | 'dueDate' | 'kind' | 'creditLimit' | 'promiseDate' | 'promiseNote'>
+    Pick<LedgerAccount, 'name' | 'phone' | 'dueDate' | 'kind' | 'creditLimit' | 'promiseDate' | 'promiseNote' | 'tag'>
   >,
   dek?: CryptoKey | null
 ): Promise<void> {
@@ -766,6 +766,7 @@ export async function updateAccountMeta(
     if (patch.phone !== undefined) payload.phone = await enc(dek, patch.phone, 20);
     if (patch.dueDate !== undefined) payload.dueDate = clampStr(patch.dueDate, 24);
     if (patch.kind !== undefined) payload.kind = patch.kind;
+    if (patch.tag !== undefined) payload.tag = patch.tag;
     if (patch.promiseDate !== undefined) payload.promiseDate = clampStr(patch.promiseDate, 24);
     if (patch.promiseNote !== undefined)
       payload.promiseNote = await enc(dek, patch.promiseNote, 160);
@@ -1106,6 +1107,47 @@ export async function deleteAccountWithTransactions(
     await commitDeletesInChunks(refs, 400);
   } catch (err) {
     handleFirestoreError(err, OperationType.DELETE, `accounts/${accountId}`);
+  }
+}
+
+export async function mergeAccountsInCloud(params: {
+  sourceAccount: LedgerAccount;
+  targetAccount: LedgerAccount;
+  sourceTransactions: LedgerTransaction[];
+  targetTransactions: LedgerTransaction[];
+  dek?: CryptoKey | null;
+}): Promise<void> {
+  try {
+    const allTargetTxs = [...params.targetTransactions, ...params.sourceTransactions];
+    let nextBalance = 0;
+    for (const tx of allTargetTxs) {
+      nextBalance += tx.direction === 'given' ? tx.amount : -tx.amount;
+    }
+    nextBalance = Math.round(nextBalance * 100) / 100;
+    const latest = allTargetTxs
+      .slice()
+      .sort((a, b) => (b.billDate || '').localeCompare(a.billDate || ''))[0];
+    const lastNotePlain = latest?.note || 'Merged Ledger';
+    const latestIso = latest?.billDate || params.targetAccount.lastActivityAt;
+
+    const batch = writeBatch(db);
+    for (const tx of params.sourceTransactions.slice(0, 400)) {
+      batch.update(doc(db, 'transactions', tx.id), {
+        accountId: params.targetAccount.id,
+        updatedAt: serverTimestamp(),
+      });
+    }
+    batch.update(doc(db, 'accounts', params.targetAccount.id), {
+      balance: nextBalance,
+      lastNote: await encRequired(params.dek, lastNotePlain, 160, 'Merged Ledger'),
+      lastActivityAt: latestIso,
+      phone: await enc(params.dek, params.targetAccount.phone || params.sourceAccount.phone, 20),
+      updatedAt: serverTimestamp(),
+    });
+    batch.delete(doc(db, 'accounts', params.sourceAccount.id));
+    await batch.commit();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `accounts/${params.targetAccount.id}`);
   }
 }
 

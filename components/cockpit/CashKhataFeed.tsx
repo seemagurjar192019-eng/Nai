@@ -44,6 +44,9 @@ import {
   filterAndSuggestAccounts,
   type KeypadKey,
 } from '@/lib/ucred-intelligence';
+import { findRecentDuplicateTransaction } from '@/lib/duplicate-guard';
+import { computeOverdueAgingBuckets } from '@/lib/vyaaj-interest';
+import { useBackStack } from '@/hooks/useBackStack';
 import type {
   AccountKind,
   CashbookEntry,
@@ -92,6 +95,10 @@ export interface CashKhataFeedProps {
   largeTitleY?: MotionValue<number>;
   jellySkew?: MotionValue<number>;
   addPartySignal?: number;
+  backupNeeded?: boolean;
+  isOffline?: boolean;
+  pendingSyncCount?: number;
+  onExportBackup?: () => void;
   onToggleHideBalance: () => void;
   onToggleShowAllModes?: () => void;
   onSelectAccount: (account: LedgerAccount) => void;
@@ -170,6 +177,10 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   heroY,
   jellySkew,
   addPartySignal = 0,
+  backupNeeded = false,
+  isOffline = false,
+  pendingSyncCount = 0,
+  onExportBackup,
   onToggleHideBalance,
   onToggleShowAllModes,
   onSelectAccount,
@@ -241,6 +252,10 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
   const [quickGallaMode, setQuickGallaMode] = useState<CashbookMode | null>(null);
   const [quickSaving, setQuickSaving] = useState(false);
   const [quickError, setQuickError] = useState('');
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    amount: number;
+    minutesAgo: number;
+  } | null>(null);
   const [quickCelebration, setQuickCelebration] = useState<{
     partyName: string;
     previousBalance: number;
@@ -272,25 +287,17 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
     return () => clearTimeout(timer);
   }, [addPartySignal, capabilities.showSuppliers]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (quickEntryAccount && !quickSaving && !quickCelebration) setQuickEntryAccount(null);
-      else if (showQuickMenuSheet) setShowQuickMenuSheet(false);
-      else if (showFilterSortSheet) setShowFilterSortSheet(false);
-      else if (showAddModal && !addingBusy) setShowAddModal(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [
-    quickEntryAccount,
-    quickSaving,
-    quickCelebration,
-    showQuickMenuSheet,
-    showFilterSortSheet,
-    showAddModal,
-    addingBusy,
-  ]);
+  useBackStack(showFilterSortSheet, () => setShowFilterSortSheet(false));
+  useBackStack(showQuickMenuSheet, () => setShowQuickMenuSheet(false));
+  useBackStack(showAddModal && !addingBusy, () => setShowAddModal(false));
+  useBackStack(Boolean(quickEntryAccount && !quickSaving && !quickCelebration), () =>
+    setQuickEntryAccount(null)
+  );
+
+  const agingBuckets = useMemo(
+    () => computeOverdueAgingBuckets(accounts, todayStr),
+    [accounts, todayStr]
+  );
 
   const cashflow = useMemo(() => computeNetCashflowSummary(accounts), [accounts]);
 
@@ -454,10 +461,11 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
     setQuickNote('');
     setQuickGallaMode(null);
     setQuickError('');
+    setDuplicateWarning(null);
     setQuickCelebration(null);
   };
 
-  const handleSaveQuickEntry = async () => {
+  const handleSaveQuickEntry = async (ignoreDuplicate = false) => {
     if (!quickEntryAccount) return;
     setQuickError('');
     const amt = Math.round((Number(quickAmount) || 0) * 100) / 100;
@@ -465,6 +473,20 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
       setQuickError('Tap keypad digits above to enter an amount greater than ₹0.');
       return;
     }
+
+    if (!ignoreDuplicate) {
+      const dup = findRecentDuplicateTransaction({
+        transactions,
+        accountId: quickEntryAccount.id,
+        direction: quickDirection,
+        amount: amt,
+      });
+      if (dup) {
+        setDuplicateWarning({ amount: amt, minutesAgo: dup.minutesAgo });
+        return;
+      }
+    }
+    setDuplicateWarning(null);
 
     // Capture previousBalance BEFORE mutating account state
     const prevBal = quickEntryAccount.balance;
@@ -761,10 +783,14 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
             todayOutflow={gallaPulse.todayOutflow}
             isPersonalMode={capabilities.focus === 'personal'}
             dismissedKey={dismissedNoticeKey}
+            backupNeeded={backupNeeded}
+            isOffline={isOffline}
+            pendingSyncCount={pendingSyncCount}
             onDismiss={handleDismissNotice}
             onReviewOverdue={onOpenCollection}
             onListenSummary={onOpenDailySummary}
             onOpenVoice={onOpenVoiceEntry}
+            onExportBackup={onExportBackup}
           />
 
           {/* Scroll-Velocity Jelly Party List / Inline Galla / Minimal Empty State */}
@@ -874,17 +900,17 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                 initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
                 animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
                 transition={SPRING_FAST}
-                className="ios27-inset-group rounded-[22px] p-4 sm:p-7 text-center flex flex-col items-center space-y-3"
+                className="ios27-inset-group rounded-[22px] p-3.5 sm:p-7 text-center flex flex-col items-center space-y-2 sm:space-y-3"
               >
-                <span className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shadow-xs">
+                <span className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-[var(--surface)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shadow-xs">
                   <UserPlus className="w-4 h-4 sm:w-5 sm:h-5 stroke-[1.8]" />
                 </span>
 
-                <div className="space-y-1">
+                <div className="space-y-0.5 sm:space-y-1">
                   <h1 className="font-display text-base sm:text-lg font-semibold tracking-[-0.01em] text-[var(--ink)]">
                     {capabilities.focus === 'personal' ? 'Start your personal ledger' : 'Start your business ledger'}
                   </h1>
-                  <p className="text-[13px] font-normal text-[var(--ink-muted)] max-w-[300px] leading-snug">
+                  <p className="text-xs sm:text-[13px] font-normal text-[var(--ink-muted)] max-w-[300px] leading-snug">
                     {capabilities.focus === 'personal'
                       ? 'Add a contact manually or speak an entry hands-free.'
                       : 'Add your first customer or supplier, or speak an entry hands-free.'}
@@ -1266,7 +1292,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
 
               {/* Quick Increment Chips */}
               <div className="flex flex-wrap items-center gap-1.5">
-                {(['+100', '+500', '+2000'] as const).map((presetKey) => (
+                {(['+100', '+500', '+1000', '+2000', '+5000'] as const).map((presetKey) => (
                   <motion.button
                     key={presetKey}
                     whileTap={{ scale: 0.92 }}
@@ -1275,6 +1301,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                     onClick={() => {
                       haptics.tap();
                       setQuickError('');
+                      setDuplicateWarning(null);
                       setQuickAmount((prev) => applyKeypadKey(prev, presetKey));
                     }}
                     className="min-h-[40px] px-3 rounded-xl liquid-glass text-xs font-extrabold font-tabular text-[var(--ink)] whitespace-nowrap"
@@ -1315,6 +1342,7 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                       onClick={() => {
                         haptics.keypad();
                         setQuickError('');
+                        setDuplicateWarning(null);
                         setQuickAmount((prev) => applyKeypadKey(prev, key));
                       }}
                       className="min-h-[48px] rounded-2xl ios27-ceramic-tile font-display text-lg font-extrabold font-tabular text-[var(--ink)] flex items-center justify-center hover:bg-[var(--brand-tint)] disabled:opacity-50"
@@ -1395,12 +1423,35 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
                 </p>
               )}
 
+              {duplicateWarning && (
+                <div
+                  role="alert"
+                  className="rounded-2xl bg-[var(--alert-tint)] px-3.5 py-2.5 flex items-center justify-between gap-2"
+                >
+                  <p className="text-xs font-semibold text-[var(--alert-amber)] leading-snug">
+                    Similar {formatINR(duplicateWarning.amount)} entry recorded{' '}
+                    {duplicateWarning.minutesAgo === 0
+                      ? 'just now'
+                      : `${duplicateWarning.minutesAgo}m ago`}
+                    . Save again?
+                  </p>
+                  <button
+                    type="button"
+                    disabled={quickSaving}
+                    onClick={() => void handleSaveQuickEntry(true)}
+                    className="min-h-[36px] px-3 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-bold shrink-0 active:scale-95 transition"
+                  >
+                    Save Anyway
+                  </button>
+                </div>
+              )}
+
               <motion.button
                 whileTap={{ scale: 0.94, y: 1 }}
                 transition={SPRING_FAST}
                 type="button"
                 disabled={quickSaving}
-                onClick={() => void handleSaveQuickEntry()}
+                onClick={() => void handleSaveQuickEntry(false)}
                 className={`w-full min-h-[52px] rounded-2xl text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-lg disabled:opacity-60 ${
                   quickDirection === 'received'
                     ? 'bg-[var(--debit-green)]'
@@ -1513,6 +1564,40 @@ export const CashKhataFeed: React.FC<CashKhataFeedProps> = ({
               ))}
             </div>
           </div>
+
+          {agingBuckets.totalReceivable > 0 && (
+            <div className="space-y-2 pt-2 border-t border-[var(--glass-border)]">
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                Receivable Aging
+              </p>
+              <div className="grid grid-cols-4 gap-2 text-center font-tabular rounded-2xl bg-[var(--app-bg)] p-2.5">
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--ink-muted)]">0-30d</p>
+                  <p className="text-xs font-bold text-[var(--ink)]">
+                    {formatINR(agingBuckets.bucket0to30)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--ink-muted)]">31-60d</p>
+                  <p className="text-xs font-bold text-[var(--ink)]">
+                    {formatINR(agingBuckets.bucket31to60)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--ink-muted)]">61-90d</p>
+                  <p className="text-xs font-bold text-[var(--alert-amber)]">
+                    {formatINR(agingBuckets.bucket61to90)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-[var(--ink-muted)]">90d+</p>
+                  <p className="text-xs font-bold text-[var(--credit-red)]">
+                    {formatINR(agingBuckets.bucket90Plus)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </DetentSheetOverlay>
 

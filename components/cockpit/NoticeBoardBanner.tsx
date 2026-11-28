@@ -15,10 +15,14 @@ export interface NoticeBoardBannerProps {
   todayOutflow: number;
   isPersonalMode: boolean;
   dismissedKey: string | null;
+  backupNeeded?: boolean;
+  isOffline?: boolean;
+  pendingSyncCount?: number;
   onDismiss: (key: string) => void;
   onReviewOverdue: () => void;
   onListenSummary: () => void;
   onOpenVoice: () => void;
+  onExportBackup?: () => void;
 }
 
 /**
@@ -35,10 +39,14 @@ export const NoticeBoardBanner: React.FC<NoticeBoardBannerProps> = ({
   todayOutflow,
   isPersonalMode,
   dismissedKey,
+  backupNeeded = false,
+  isOffline = false,
+  pendingSyncCount = 0,
   onDismiss,
   onReviewOverdue,
   onListenSummary,
   onOpenVoice,
+  onExportBackup,
 }) => {
   const prefersReducedMotion = useReducedMotion();
 
@@ -56,6 +64,18 @@ export const NoticeBoardBanner: React.FC<NoticeBoardBannerProps> = ({
     body = `${formatINRCompact(overdueTotal)} pending collection.`;
     actionLabel = 'Review';
     onAction = onReviewOverdue;
+  } else if (backupNeeded && onExportBackup) {
+    noticeKey = 'weekly-backup-nudge';
+    title = 'Backup Ledger';
+    body = 'Save a free copy of your khata to this phone.';
+    actionLabel = 'Export JSON';
+    onAction = onExportBackup;
+  } else if (isOffline && pendingSyncCount > 0) {
+    noticeKey = `offline-queue-${pendingSyncCount}`;
+    title = 'Offline Mode';
+    body = `${pendingSyncCount} ${pendingSyncCount === 1 ? 'entry' : 'entries'} saved locally · Syncs when online.`;
+    actionLabel = null;
+    onAction = null;
   } else if (partyCount > 0 && (todayInflow > 0 || todayOutflow > 0)) {
     noticeKey = `today-${Math.round(todayInflow)}-${Math.round(todayOutflow)}`;
     title = "Today's Counter";

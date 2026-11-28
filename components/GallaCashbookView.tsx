@@ -6,6 +6,7 @@ import {
   ArrowDownLeft,
   ArrowLeft,
   ArrowUpRight,
+  Calculator,
   Eye,
   EyeOff,
   Landmark,
@@ -17,6 +18,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
+import { useBackStack } from '@/hooks/useBackStack';
 import { formatDateTime, formatINR, getLocalDateKey } from '@/lib/i18n';
 import { computeDailyGallaPulse } from '@/lib/ucred-intelligence';
 import type {
@@ -82,6 +84,28 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
   const [entryDate, setEntryDate] = useState(todayStr);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [showDenomSheet, setShowDenomSheet] = useState(false);
+  const [denomCounts, setDenomCounts] = useState<Record<number, string>>({
+    500: '',
+    200: '',
+    100: '',
+    50: '',
+    20: '',
+    10: '',
+    1: '',
+  });
+  const [denomPosting, setDenomPosting] = useState(false);
+
+  useBackStack(Boolean(modalType && !saving), () => setModalType(null));
+  useBackStack(showDenomSheet && !denomPosting, () => setShowDenomSheet(false));
+
+  const denomNotes = useMemo(() => [500, 200, 100, 50, 20, 10, 1] as const, []);
+  const denomTotal = useMemo(() => {
+    return denomNotes.reduce((sum, face) => {
+      const count = Math.max(0, Math.floor(Number(denomCounts[face]) || 0));
+      return sum + face * count;
+    }, 0);
+  }, [denomCounts, denomNotes]);
 
   const pulse = useMemo(
     () =>
@@ -171,16 +195,30 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
             </p>
           </div>
         </div>
-        {onToggleHideBalance && (
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
-            onClick={onToggleHideBalance}
-            aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
-            className="min-w-[44px] min-h-[44px] rounded-full liquid-glass flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] active:scale-95 transition shrink-0"
+            onClick={() => {
+              haptics.tap();
+              setShowDenomSheet(true);
+            }}
+            aria-label="Count Cash Notes"
+            className="min-h-[44px] px-3 rounded-full liquid-glass inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)] active:scale-95 transition shrink-0"
           >
-            {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            <Calculator className="w-3.5 h-3.5" />
+            <span>Notes</span>
           </button>
-        )}
+          {onToggleHideBalance && (
+            <button
+              type="button"
+              onClick={onToggleHideBalance}
+              aria-label={hideBalance ? 'Show balances' : 'Hide balances'}
+              className="min-w-[44px] min-h-[44px] rounded-full liquid-glass flex items-center justify-center text-[var(--ink-muted)] hover:text-[var(--ink)] active:scale-95 transition shrink-0"
+            >
+              {hideBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Top 50/50 Split Actions */}
@@ -564,6 +602,103 @@ export const GallaCashbookView: React.FC<GallaCashbookViewProps> = ({
           >
             {saving ? 'Saving...' : 'Save Entry'}
           </button>
+        </div>
+      </DetentSheetOverlay>
+
+      {/* Cash Drawer Note & Coin Denomination Counter Sheet */}
+      <DetentSheetOverlay
+        open={showDenomSheet}
+        onClose={() => {
+          if (!denomPosting) setShowDenomSheet(false);
+        }}
+        title="Note & Coin Counter"
+        subtitle="Count galla drawer cash accurately"
+        initialDetent="full"
+      >
+        <div className="space-y-3.5 pb-safe">
+          <div className="rounded-2xl bg-[var(--app-bg)] px-4 py-3 flex items-center justify-between">
+            <span className="text-xs font-semibold text-[var(--ink-muted)]">Counted Total</span>
+            <span className="font-display text-2xl font-extrabold font-tabular text-[var(--debit-green)]">
+              {formatINR(denomTotal)}
+            </span>
+          </div>
+
+          <div className="ios27-inset-group rounded-2xl divide-y divide-[var(--glass-border)] overflow-hidden">
+            {denomNotes.map((face) => {
+              const count = Math.max(0, Math.floor(Number(denomCounts[face]) || 0));
+              const lineTotal = face * count;
+              return (
+                <div
+                  key={face}
+                  className="px-3.5 py-2.5 flex items-center justify-between gap-3 font-tabular"
+                >
+                  <span className="w-16 text-sm font-bold text-[var(--ink)] shrink-0">
+                    {face === 1 ? 'Coins ₹' : `₹${face}`}
+                  </span>
+                  <span className="text-xs text-[var(--ink-muted)]">×</span>
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={denomCounts[face] ?? ''}
+                    onChange={(e) =>
+                      setDenomCounts((prev) => ({
+                        ...prev,
+                        [face]: e.target.value.replace(/\D/g, '').slice(0, 5),
+                      }))
+                    }
+                    placeholder="0"
+                    className="w-20 min-h-[40px] rounded-xl bg-[var(--surface-subtle)] border border-[var(--glass-border)] px-2.5 text-center text-sm font-bold text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  />
+                  <span className="flex-1 text-right text-sm font-bold text-[var(--ink)]">
+                    {formatINR(lineTotal)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              disabled={denomPosting}
+              onClick={() =>
+                setDenomCounts({ 500: '', 200: '', 100: '', 50: '', 20: '', 10: '', 1: '' })
+              }
+              className="min-h-[46px] rounded-2xl bg-[var(--surface-subtle)] text-xs font-bold text-[var(--ink)]"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              disabled={denomPosting || denomTotal <= 0}
+              onClick={async () => {
+                if (denomTotal <= 0) return;
+                setDenomPosting(true);
+                try {
+                  const summary = denomNotes
+                    .filter((f) => (Number(denomCounts[f]) || 0) > 0)
+                    .map((f) => `${f === 1 ? 'Coins' : `₹${f}`}×${Number(denomCounts[f])}`)
+                    .join(', ');
+                  await onAddEntry({
+                    entryType: 'inflow',
+                    mode: 'cash',
+                    category: 'Opening Cash',
+                    amount: denomTotal,
+                    note: `Denom: ${summary}`,
+                    entryDate: new Date().toISOString(),
+                  });
+                  haptics.success();
+                  setShowDenomSheet(false);
+                } finally {
+                  setDenomPosting(false);
+                }
+              }}
+              className="min-h-[46px] rounded-2xl bg-[var(--brand)] text-[var(--brand-fg)] text-xs font-extrabold disabled:opacity-50 active:scale-95 transition"
+            >
+              {denomPosting ? 'Posting...' : 'Post as Opening Cash'}
+            </button>
+          </div>
         </div>
       </DetentSheetOverlay>
     </div>

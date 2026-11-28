@@ -15,8 +15,11 @@ import {
   Repeat,
   Undo2,
   Volume2,
+  VolumeX,
   X,
 } from 'lucide-react';
+import { useBackStack } from '@/hooks/useBackStack';
+import { requestNativeMicrophonePermission } from '@/lib/native-permissions';
 import {
   amountToHinglishWords,
   parseVoiceCommand,
@@ -150,7 +153,8 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   const [continuousMode, setContinuousMode] = useState(initialCounterMode);
   const [sessionQueue, setSessionQueue] = useState<SessionQueueSavedItem[]>([]);
   const [listening, setListening] = useState(false);
-  const [statusText, setStatusText] = useState('Starting microphone...');
+  const [speechLang, setSpeechLang] = useState<'hi-IN' | 'en-IN'>(() => (language === 'hi' ? 'hi-IN' : 'hi-IN'));
+  const [statusText, setStatusText] = useState('Tap Mic to speak or start talking...');
   const [transcript, setTranscript] = useState('');
   const [manualText, setManualText] = useState('');
   const [voiceError, setVoiceError] = useState('');
@@ -168,6 +172,27 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [undoingId, setUndoingId] = useState<string | null>(null);
+  const [ttsMuted, setTtsMuted] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem('ucred_tts_muted') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const speakIfUnmuted = (phrase: string, langCode: LanguageCode) => {
+    if (ttsMuted) return;
+    speakHinglish(phrase, langCode);
+  };
+
+  useBackStack(open && !saving, () => {
+    if (stage !== 'listen' && stage !== 'saved') {
+      setStage('listen');
+    } else {
+      onClose();
+    }
+  });
   const [savedSnapshot, setSavedSnapshot] = useState<{
     partyName: string;
     previousBalance: number;
@@ -192,8 +217,13 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
   const appliedThisListenRef = useRef(false);
   const manualInputRef = useRef<HTMLInputElement | null>(null);
   const lastSavedSigRef = useRef<{ sig: string; at: number } | null>(null);
+  const autoConfirmTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const stopMic = () => {
+    if (autoConfirmTimerRef.current) {
+      clearTimeout(autoConfirmTimerRef.current);
+      autoConfirmTimerRef.current = null;
+    }
     const rec = recognitionRef.current;
     recognitionRef.current = null;
     setListening(false);
@@ -266,6 +296,10 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
           language,
         }),
       });
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Offline/APK mode: AI cloud parser unavailable. Edit fields below to save.');
+      }
       const json = (await res.json()) as Partial<HybridVoiceParseResult> & { error?: string };
       if (!res.ok) {
         throw new Error(json.error || 'Cloud voice parser could not understand that.');
@@ -306,7 +340,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         setVoiceBillItems(json.billItems);
         setRawPhrase(phrase);
         setStage('bill');
-        speakHinglish(
+        speakIfUnmuted(
           `${json.customerName || 'Customer'} ke ${json.billItems.length} items ka bill taiyaar hai.`,
           language
         );
@@ -329,7 +363,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         setRawPhrase(phrase);
         setConfirmError('');
         setStage('batch');
-        speakHinglish(`${aiEntries.length} entries samajh aayi hain.`, language);
+        speakIfUnmuted(`${aiEntries.length} entries samajh aayi hain.`, language);
         return;
       }
 
@@ -345,7 +379,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
         setActiveField(first.amount <= 0 ? 'amount' : !first.name ? 'name' : null);
         setStage('confirm');
         const words = first.amount > 0 ? amountToHinglishWords(first.amount) : 'shunya';
-        speakHinglish(
+        speakIfUnmuted(
           `${resolvedName}, ${words} rupaye, ${resolvedDir === 'given' ? 'Udhaar' : 'Mila'}. Sahi hai?`,
           language
         );
@@ -357,7 +391,9 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       setActiveField('amount');
     } catch (err) {
       setVoiceError(
-        err instanceof Error ? err.message : 'Cloud parse failed. Tap any field below to edit.'
+        err instanceof Error
+          ? err.message
+          : 'Offline mode: AI cloud parser unavailable. Edit fields below to save.'
       );
       setStage('confirm');
       setActiveField('amount');
@@ -407,9 +443,9 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
             : found.balance < 0
               ? 'advance jama hai'
               : 'hisaab barabar hai';
-        speakHinglish(`${found.name} ka ${words} rupaye ${statusSpoken}.`, language);
+        speakIfUnmuted(`${found.name} ka ${words} rupaye ${statusSpoken}.`, language);
       } else {
-        speakHinglish(`${targetName || 'Customer'} ka khata nahi mila.`, language);
+        speakIfUnmuted(`${targetName || 'Customer'} ka khata nahi mila.`, language);
       }
       return;
     }
@@ -425,7 +461,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
       setRawPhrase(phrase);
       setConfirmError('');
       setStage('batch');
-      speakHinglish(`${cmd.entries.length} entries mili hain. Check karke save karein.`, language);
+      speakIfUnmuted(`${cmd.entries.length} entries mili hain. Check karke save karein.`, language);
       return;
     }
 
@@ -452,17 +488,33 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
 
     const typeWord = resolvedDir === 'given' ? 'Udhaar' : 'Mila';
     const words = parsed.amount > 0 ? amountToHinglishWords(parsed.amount) : 'shunya';
-    speakHinglish(`${resolvedName}, ${words} rupaye, ${typeWord}. Sahi hai?`, language);
+    speakIfUnmuted(`${resolvedName}, ${words} rupaye, ${typeWord}. Sahi hai?`, language);
   };
 
-  const startMic = () => {
+  const startMic = async (forcedLang?: 'hi-IN' | 'en-IN') => {
+    const activeLang = forcedLang || speechLang;
     setVoiceError('');
     setMicDenied(false);
     finalTranscriptRef.current = '';
     appliedThisListenRef.current = false;
     setTranscript('');
+    if (autoConfirmTimerRef.current) {
+      clearTimeout(autoConfirmTimerRef.current);
+      autoConfirmTimerRef.current = null;
+    }
 
     if (typeof window === 'undefined') return;
+
+    // Check & request native microphone permission explicitly
+    const perm = await requestNativeMicrophonePermission();
+    if (!perm.granted) {
+      setListening(false);
+      setMicDenied(true);
+      setStatusText('Microphone permission needed');
+      setVoiceError(perm.error || 'Microphone access denied. Tap "Allow Mic" or enable in settings.');
+      return;
+    }
+
     const win = window as unknown as {
       SpeechRecognition?: new () => SpeechRecognitionLike;
       webkitSpeechRecognition?: new () => SpeechRecognitionLike;
@@ -472,21 +524,30 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
     if (!SR) {
       setListening(false);
       setStatusText('Voice recognition paused · type or tap a sample');
-      setVoiceError('Live mic unavailable on this browser. Type Hinglish or tap a sample below.');
+      setVoiceError('Live Web Speech recognition unavailable on this browser. Type Hinglish or tap a sample below.');
       setTimeout(() => manualInputRef.current?.focus(), 60);
       return;
     }
 
     try {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // Ignore
+        }
+        recognitionRef.current = null;
+      }
+
       const rec = new SR();
-      rec.lang = 'hi-IN';
+      rec.lang = activeLang;
       rec.interimResults = true;
-      rec.continuous = false;
+      rec.continuous = true;
       rec.maxAlternatives = 1;
 
       rec.onstart = () => {
         setListening(true);
-        setStatusText('Listening... speak clearly');
+        setStatusText('Listening... speak clearly (e.g. Sharma 500 udhar)');
       };
 
       rec.onresult = (ev) => {
@@ -501,19 +562,40 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
           }
         }
         const combined = (finalText || interim).trim();
-        finalTranscriptRef.current = combined;
-        setTranscript(combined);
+        if (combined) {
+          finalTranscriptRef.current = combined;
+          setTranscript(combined);
+          setStatusText(`Hearing: "${combined}"`);
+
+          if (autoConfirmTimerRef.current) clearTimeout(autoConfirmTimerRef.current);
+          autoConfirmTimerRef.current = setTimeout(() => {
+            const active = finalTranscriptRef.current.trim();
+            if (active && !appliedThisListenRef.current) {
+              const cmd = parseVoiceCommand(active);
+              if (cmd.intent === 'entries' && cmd.entries.length > 0 && cmd.entries[0].amount > 0) {
+                appliedThisListenRef.current = true;
+                applyTranscriptToConfirm(active);
+              }
+            }
+          }, 2400);
+        }
       };
 
       rec.onerror = (ev) => {
-        setListening(false);
-        setStatusText('Microphone paused');
         if (ev?.error === 'not-allowed' || ev?.error === 'service-not-allowed') {
+          setListening(false);
           setMicDenied(true);
-          setVoiceError('Microphone permission is blocked in browser settings.');
+          setStatusText('Microphone permission blocked');
+          setVoiceError('Microphone permission is blocked in browser settings. Please allow access.');
           setTimeout(() => manualInputRef.current?.focus(), 60);
+        } else if (ev?.error === 'network' && activeLang === 'hi-IN') {
+          setSpeechLang('en-IN');
+          setStatusText('Switching to Hinglish speech model...');
+          setTimeout(() => {
+            if (!appliedThisListenRef.current) void startMic('en-IN');
+          }, 300);
         } else if (ev?.error && ev.error !== 'no-speech' && ev.error !== 'aborted') {
-          setVoiceError(`Speech error: ${ev.error}. You can type manually below.`);
+          setVoiceError(`Speech note: ${ev.error}. You can speak again or type below.`);
         }
       };
 
@@ -524,16 +606,18 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
           appliedThisListenRef.current = true;
           applyTranscriptToConfirm(text);
         } else if (!text) {
-          setStatusText('Paused · tap Play to speak or type below');
+          setStatusText('Paused · tap Mic button to speak or type below');
         }
       };
 
       recognitionRef.current = rec;
       rec.start();
-    } catch {
+      setListening(true);
+      setStatusText('Listening... speak clearly (e.g. Sharma 500 udhar)');
+    } catch (err: unknown) {
       setListening(false);
-      setStatusText('Could not start microphone');
-      setVoiceError('Use the manual phrase input below.');
+      setStatusText('Tap Mic button to start');
+      setVoiceError(err instanceof Error ? err.message : 'Could not start mic. Use manual input below.');
       setTimeout(() => manualInputRef.current?.focus(), 60);
     }
   };
@@ -799,14 +883,33 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    aria-label="Close voice entry"
-                    className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition shrink-0"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !ttsMuted;
+                        setTtsMuted(next);
+                        if (next) stopSpeaking();
+                        try {
+                          window.localStorage.setItem('ucred_tts_muted', next ? '1' : '0');
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                      aria-label={ttsMuted ? 'Unmute voice readback' : 'Mute voice readback'}
+                      className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+                    >
+                      {ttsMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      aria-label="Close voice entry"
+                      className="min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[var(--ink-muted)] hover:bg-[var(--surface-subtle)] active:scale-95 transition"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Hands-Free Counter Mode Toggle Pill */}
@@ -945,20 +1048,42 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                   ))}
                 </div>
 
+                {/* Speech Language Switcher & Mic Status */}
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic.tap();
+                      const next = speechLang === 'hi-IN' ? 'en-IN' : 'hi-IN';
+                      setSpeechLang(next);
+                      stopMic();
+                      setTimeout(() => void startMic(next), 200);
+                    }}
+                    className="min-h-[28px] px-2.5 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[11px] font-bold text-[var(--ink)] inline-flex items-center gap-1.5 hover:bg-[var(--brand-tint)] active:scale-95 transition"
+                  >
+                    <span>{speechLang === 'hi-IN' ? '🇮🇳 हिन्दी' : '🌐 Hinglish'}</span>
+                    <span className="text-[10px] text-[var(--ink-muted)]">· Switch</span>
+                  </button>
+                  <span className="text-[11px] font-medium text-[var(--ink-muted)] truncate max-w-[220px]">
+                    {statusText}
+                  </span>
+                </div>
+
                 {voiceError && (
-                  <div className="text-xs font-semibold text-[var(--alert-amber)] bg-[var(--alert-tint)] rounded-2xl px-3.5 py-2.5 space-y-1.5">
+                  <div className="text-xs font-semibold text-[var(--alert-amber)] bg-[var(--alert-tint)] rounded-2xl px-3.5 py-2.5 space-y-2">
                     <p>{voiceError}</p>
                     {micDenied && (
-                      <div className="flex items-center justify-between gap-2 flex-wrap text-[11px] font-medium">
+                      <div className="flex items-center justify-between gap-2 flex-wrap text-[11px] font-medium pt-1">
                         <span>
-                          Tap Lock / Site Settings in browser bar → Permissions → Allow Microphone.
+                          Microphone permission is blocked. Allow access to enable voice entry.
                         </span>
                         <button
                           type="button"
-                          onClick={startMic}
-                          className="min-h-[34px] px-3 py-1 rounded-xl bg-[var(--alert-amber)] text-white font-bold active:scale-95 transition"
+                          onClick={() => void startMic()}
+                          className="min-h-[34px] px-3.5 py-1 rounded-xl bg-[var(--brand)] text-[var(--brand-fg)] font-bold text-xs inline-flex items-center gap-1 active:scale-95 transition"
                         >
-                          Retry Mic
+                          <Mic className="w-3.5 h-3.5" />
+                          <span>Allow Microphone</span>
                         </button>
                       </div>
                     )}
@@ -1038,7 +1163,7 @@ export const VoiceEntryModal: React.FC<VoiceEntryModalProps> = ({
                     {listening ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
                   </motion.button>
 
-                  <VoiceWaveform active={listening} aiParsing={aiParsing} />
+                  <VoiceWaveform active={listening} aiParsing={aiParsing} shareMicWithSpeechRec />
 
                   <motion.button
                     whileTap={{ scale: 0.9 }}

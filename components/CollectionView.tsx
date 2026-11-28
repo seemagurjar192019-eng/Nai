@@ -37,6 +37,7 @@ import type { PersonaCapabilities } from '@/lib/persona';
 import { haptics } from '@/utils/haptics';
 import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
 import { SNAPPY_SPRING } from './motion/SpatialMotionEngine';
+import { useBackStack } from '@/hooks/useBackStack';
 
 interface CollectionViewProps {
   accounts: LedgerAccount[];
@@ -76,6 +77,12 @@ export const CollectionView: React.FC<CollectionViewProps> = ({
   const [dueBusy, setDueBusy] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [actionError, setActionError] = useState('');
+
+  useBackStack(selectedIndex !== null, () => setSelectedIndex(null));
+  useBackStack(showSort, () => setShowSort(false));
+  useBackStack(showUpiSetup && !upiBusy, () => setShowUpiSetup(false));
+  useBackStack(Boolean(dueEditAccount) && !dueBusy, () => setDueEditAccount(null));
+  useBackStack(showBulkModal, () => setShowBulkModal(false));
 
   const todayStr = getLocalDateKey();
 

@@ -15,6 +15,8 @@ import {
   Upload,
 } from 'lucide-react';
 import { DetentSheetOverlay } from './motion/DetentSheetOverlay';
+import { useBackStack } from '@/hooks/useBackStack';
+import { captureBillPhoto } from '@/lib/native-permissions';
 import {
   compressImageToDataUrl,
   formatINR,
@@ -85,6 +87,10 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
   const [restocking, setRestocking] = useState(false);
   const [restockSuccess, setRestockSuccess] = useState(false);
 
+  useBackStack(open && !scanning && !posting, () => {
+    onClose();
+  });
+
   const matchedAccount = useMemo(() => {
     const clean = partyName.trim().toLowerCase();
     if (!clean) return null;
@@ -140,6 +146,10 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageDataUrl: imageForAi }),
       });
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Offline/APK mode: AI scanner unavailable right now. Tap "Fill Manually" to attach photo & save.');
+      }
       const json = (await res.json()) as Partial<ParchiScanResult> & { error?: string };
       if (!res.ok) {
         throw new Error(json.error || 'Could not scan parchi image.');
@@ -172,9 +182,34 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
       );
       setHasScanResult(true);
     } catch (err) {
-      setScanError(err instanceof Error ? err.message : 'Receipt scan failed. Try a clearer photo.');
+      setScanError(
+        err instanceof Error
+          ? err.message
+          : 'Receipt scan unavailable offline. Tap "Fill Manually" to save photo & amount.'
+      );
     } finally {
       setScanning(false);
+    }
+  };
+
+  const handleNativeOrWebCapture = async (fromGallery: boolean) => {
+    setScanError('');
+    setPostError('');
+    try {
+      const result = await captureBillPhoto({ fromGallery });
+      if (!result.success) {
+        if (result.error && !result.error.toLowerCase().includes('cancel')) {
+          setScanError(result.error);
+        }
+        return;
+      }
+      if (result.dataUrl) {
+        setThumbDataUrl(result.dataUrl);
+        setScanDataUrl(result.dataUrl);
+        await runAiScan(result.dataUrl);
+      }
+    } catch (err: unknown) {
+      setScanError(err instanceof Error ? err.message : 'Error capturing bill photo.');
     }
   };
 
@@ -343,7 +378,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
-                onClick={() => cameraInputRef.current?.click()}
+                onClick={() => handleNativeOrWebCapture(false)}
                 className="min-h-[48px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-extrabold text-sm inline-flex items-center justify-center gap-2 tactile-key-primary active:scale-95 transition"
               >
                 <Camera className="w-4 h-4" />
@@ -351,7 +386,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => galleryInputRef.current?.click()}
+                onClick={() => handleNativeOrWebCapture(true)}
                 className="min-h-[48px] px-4 rounded-2xl liquid-glass font-extrabold text-sm text-[var(--ink)] inline-flex items-center justify-center gap-2 active:scale-95 transition"
               >
                 <Upload className="w-4 h-4 text-[var(--brand-accent)]" />
@@ -391,7 +426,7 @@ export const ParchiScannerModal: React.FC<ParchiScannerModalProps> = ({
                 <button
                   type="button"
                   disabled={scanning}
-                  onClick={() => cameraInputRef.current?.click()}
+                  onClick={() => handleNativeOrWebCapture(false)}
                   className="min-h-[44px] rounded-xl liquid-glass text-xs font-bold text-[var(--ink)] active:scale-95 transition"
                 >
                   Retake

@@ -16,6 +16,7 @@ export type LanguageCode =
 export type AppearanceMode = 'system' | 'light' | 'dark';
 
 export type AccountKind = 'customer' | 'supplier';
+export type PartyTag = 'vip' | 'regular' | 'slow' | 'blocked';
 export type PersonaContext = 'personal' | 'kirana' | 'mandi' | 'wholesale';
 export type TxDirection = 'given' | 'received';
 export type BillDocType = 'bill' | 'quote';
@@ -84,6 +85,7 @@ export interface LedgerAccount {
   businessId: string;
   kind: AccountKind;
   personaContext?: PersonaContext;
+  tag?: PartyTag;
   name: string;
   phone: string;
   dueDate: string;

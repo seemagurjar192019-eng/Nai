@@ -28,6 +28,7 @@ import {
   type PersonaPrefs,
 } from '@/lib/persona';
 import { APPLE_EASE, SNAPPY_SPRING } from './motion/SpatialMotionEngine';
+import { TermsAndPrivacyModal } from './TermsAndPrivacyModal';
 
 interface PersonaOnboardingSheetProps {
   initialPrefs: PersonaPrefs;
@@ -76,7 +77,7 @@ const STEP_EASE = APPLE_EASE;
 /**
  * Crisp 3-Step English Onboarding:
  * 1. Welcome & Core Value (3 clean plain-English capabilities + Continue)
- * 2. Cloud Backup (Single clear primary flow + masked identity)
+ * 2. Cloud Backup (Single clear primary flow + masked identity + Terms & Conditions agreement gate)
  * 3. Workspace Selection (Multi-select checkboxes + 1-tap Select All + clean "Open Ucred" CTA)
  */
 export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
@@ -96,6 +97,11 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
   const [direction, setDirection] = useState<1 | -1>(1);
   const [showEmailForm, setShowEmailForm] = useState(false);
+
+  // Terms and Conditions agreement state on Step 2
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [openLegalModal, setOpenLegalModal] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
 
   const goStep = (next: 1 | 2 | 3) => {
     setDirection(next >= step ? 1 : -1);
@@ -145,6 +151,11 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
   }, [allSelected, selectedCategories]);
 
   const finishOnboarding = () => {
+    if (step >= 2 && !agreedToTerms && !isSignedIn) {
+      setLocalError('Please agree to Terms of Service & Privacy Policy to continue.');
+      haptics.tap();
+      return;
+    }
     haptics.success();
     const safeCats: PersonaCategoryId[] =
       selectedCategories.length > 0 ? selectedCategories : ['kirana'];
@@ -159,6 +170,11 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
   };
 
   const handleEmailSubmit = async () => {
+    if (!agreedToTerms && !isSignedIn) {
+      setLocalError('Please agree to Terms of Service & Privacy Policy to continue.');
+      haptics.tap();
+      return;
+    }
     const clean = emailInput.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
       setLocalError('Please enter a valid email address.');
@@ -210,7 +226,14 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
             whileTap={prefersReducedMotion ? undefined : { scale: 0.95 }}
             transition={SPRING_TACTILE}
             type="button"
-            onClick={finishOnboarding}
+            onClick={() => {
+              if (step >= 2 && !agreedToTerms && !isSignedIn) {
+                setLocalError('Please agree to Terms of Service & Privacy Policy to continue.');
+                haptics.tap();
+                return;
+              }
+              finishOnboarding();
+            }}
             className="min-h-[44px] px-4 rounded-full liquid-glass text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] transition cursor-pointer"
           >
             Skip
@@ -226,76 +249,62 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
               animate={{ opacity: 1, x: 0 }}
               exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -direction * 20 }}
               transition={{ duration: 0.24, ease: STEP_EASE }}
-              className="flex-1 flex flex-col items-center justify-center py-8 space-y-8"
+              className="flex-1 flex flex-col items-center justify-center py-6 space-y-6 text-center"
             >
-              <div className="flex flex-col items-center text-center space-y-5">
-                <motion.div
-                  initial={prefersReducedMotion ? undefined : { scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ ...SPRING_TACTILE, delay: 0.04 }}
-                  className="w-[84px] h-[84px] rounded-[24px] overflow-hidden liquid-glass-elevated"
-                >
-                  <Image
-                    src={UCRED_LOGO_PATH}
-                    alt="Ucred"
-                    width={84}
-                    height={84}
-                    priority
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                  />
-                </motion.div>
-
-                <div className="space-y-2.5 max-w-[330px]">
-                  <h1 className="font-display text-[30px] font-extrabold text-[var(--ink)] leading-[1.12] tracking-tight text-balance">
-                    Simple, fast business ledger.
-                  </h1>
-                  <p className="text-[14px] font-medium text-[var(--ink-muted)] leading-relaxed">
-                    Track credit, scan bills, and keep your daily cashbook ready.
-                  </p>
-                </div>
+              <div className="w-20 h-20 rounded-[28px] liquid-glass-elevated flex items-center justify-center shadow-xl p-3.5 mx-auto">
+                <Image
+                  src={UCRED_LOGO_PATH}
+                  alt="Ucred Logo"
+                  width={64}
+                  height={64}
+                  className="w-14 h-14 object-contain rounded-2xl"
+                  priority
+                  referrerPolicy="no-referrer"
+                />
               </div>
 
-              {/* 3 Clean Monochrome Capabilities */}
-              <div className="w-full divide-y divide-[var(--surface-border)] border-y border-[var(--surface-border)]">
-                <div className="py-3.5 flex items-center gap-3.5">
-                  <span className="w-9 h-9 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
-                    <Mic className="w-4 h-4" />
-                  </span>
-                  <div className="min-w-0 text-left">
-                    <p className="text-sm font-bold text-[var(--ink)] leading-snug">
-                      Voice Entries
-                    </p>
-                    <p className="text-xs text-[var(--ink-muted)] leading-snug mt-0.5">
-                      Speak an entry hands-free in seconds
+              <div className="space-y-2.5 max-w-[340px]">
+                <h1 className="font-display text-[26px] sm:text-[30px] font-extrabold text-[var(--ink)] tracking-tight leading-tight">
+                  Welcome to Ucred
+                </h1>
+                <p className="text-xs sm:text-sm font-medium text-[var(--ink-muted)] leading-relaxed">
+                  Voice Ledger, Receipt Scanner &amp; Cashbook OS built specially for Indian shopkeepers.
+                </p>
+              </div>
+
+              <div className="w-full ios27-inset-group rounded-[26px] p-4 space-y-3 text-left">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                    <Mic className="w-4 h-4 stroke-[2]" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-xs text-[var(--ink)]">Voice Entry in Hinglish</p>
+                    <p className="text-[11px] text-[var(--ink-muted)] leading-snug">
+                      Say &ldquo;Ramesh 500 udhaar&rdquo; or &ldquo;Suresh 300 mila&rdquo; to record instantly.
                     </p>
                   </div>
                 </div>
 
-                <div className="py-3.5 flex items-center gap-3.5">
-                  <span className="w-9 h-9 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
-                    <Receipt className="w-4 h-4" />
-                  </span>
-                  <div className="min-w-0 text-left">
-                    <p className="text-sm font-bold text-[var(--ink)] leading-snug">
-                      Receipt Scan &amp; Billing
-                    </p>
-                    <p className="text-xs text-[var(--ink-muted)] leading-snug mt-0.5">
-                      Scan paper bills and share GST invoices
+                <div className="flex items-center gap-3 pt-2 border-t border-[var(--glass-border)]">
+                  <div className="w-9 h-9 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                    <Receipt className="w-4 h-4 stroke-[2]" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-xs text-[var(--ink)]">AI Receipt &amp; Parchi Scanner</p>
+                    <p className="text-[11px] text-[var(--ink-muted)] leading-snug">
+                      Snap handwritten slips to auto-extract items &amp; post to Khata.
                     </p>
                   </div>
                 </div>
 
-                <div className="py-3.5 flex items-center gap-3.5">
-                  <span className="w-9 h-9 rounded-full bg-[var(--surface-subtle)] border border-[var(--glass-border)] text-[var(--ink)] flex items-center justify-center shrink-0">
-                    <Lock className="w-4 h-4" />
-                  </span>
-                  <div className="min-w-0 text-left">
-                    <p className="text-sm font-bold text-[var(--ink)] leading-snug">
-                      Private &amp; Backed Up
-                    </p>
-                    <p className="text-xs text-[var(--ink-muted)] leading-snug mt-0.5">
-                      Your records stay protected on your device
+                <div className="flex items-center gap-3 pt-2 border-t border-[var(--glass-border)]">
+                  <div className="w-9 h-9 rounded-xl bg-[var(--brand-tint)] text-[var(--brand-accent)] flex items-center justify-center shrink-0">
+                    <Lock className="w-4 h-4 stroke-[2]" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-xs text-[var(--ink)]">100% Private &amp; Offline-First</p>
+                    <p className="text-[11px] text-[var(--ink-muted)] leading-snug">
+                      Your ledger data is encrypted locally on your device.
                     </p>
                   </div>
                 </div>
@@ -308,9 +317,9 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
               animate={{ opacity: 1, x: 0 }}
               exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -direction * 20 }}
               transition={{ duration: 0.24, ease: STEP_EASE }}
-              className="flex-1 flex flex-col items-center justify-center py-6 space-y-6"
+              className="flex-1 flex flex-col items-center justify-center py-6 space-y-5"
             >
-              <div className="flex flex-col items-center text-center space-y-3 max-w-[330px]">
+              <div className="flex flex-col items-center text-center space-y-2.5 max-w-[330px]">
                 <div className="w-14 h-14 rounded-2xl liquid-glass-elevated text-[var(--ink)] flex items-center justify-center">
                   <CloudUpload className="w-7 h-7" />
                 </div>
@@ -324,7 +333,7 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                 </p>
               </div>
 
-              <div className="w-full ios27-inset-group rounded-[26px] p-4 space-y-2.5 text-left">
+              <div className="w-full ios27-inset-group rounded-[26px] p-4 space-y-3 text-left">
                 {isSignedIn ? (
                   <div className="min-h-[50px] px-4 rounded-2xl bg-[var(--debit-tint)] text-[var(--debit-green)] font-bold text-sm flex items-center justify-center gap-2">
                     <Check className="w-4 h-4 shrink-0" />
@@ -334,6 +343,62 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                   </div>
                 ) : (
                   <>
+                    {/* Mandatory Terms & Conditions Checkbox */}
+                    <div className="rounded-2xl bg-[var(--app-bg)] p-3.5 border border-[var(--glass-border)] shadow-xs">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <div className="pt-0.5 shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={agreedToTerms}
+                            onChange={(e) => {
+                              haptics.tap();
+                              setAgreedToTerms(e.target.checked);
+                              setLocalError('');
+                            }}
+                            className="sr-only"
+                          />
+                          <div
+                            className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${
+                              agreedToTerms
+                                ? 'bg-[var(--brand)] border-[var(--brand)] text-[var(--brand-fg)]'
+                                : 'border-[var(--ink-muted)]/40 bg-[var(--surface-subtle)]'
+                            }`}
+                          >
+                            {agreedToTerms && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                          </div>
+                        </div>
+                        <div className="text-xs text-[var(--ink)] leading-snug select-text">
+                          I agree to Ucred&rsquo;s{' '}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setLegalModalTab('terms');
+                              setOpenLegalModal(true);
+                            }}
+                            className="font-bold underline text-[var(--brand-accent)] hover:opacity-80"
+                          >
+                            Terms of Service
+                          </button>{' '}
+                          and{' '}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setLegalModalTab('privacy');
+                              setOpenLegalModal(true);
+                            }}
+                            className="font-bold underline text-[var(--brand-accent)] hover:opacity-80"
+                          >
+                            Privacy Policy
+                          </button>
+                          .
+                        </div>
+                      </label>
+                    </div>
+
                     <motion.button
                       whileTap={prefersReducedMotion ? undefined : { scale: 0.98 }}
                       transition={SPRING_TACTILE}
@@ -341,10 +406,14 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                       disabled={authBusy}
                       onClick={() => {
                         haptics.tap();
+                        if (!agreedToTerms) {
+                          setLocalError('Please agree to Terms of Service & Privacy Policy to continue.');
+                          return;
+                        }
                         setLocalError('');
                         void onGoogleSignIn?.();
                       }}
-                      className="tactile-key-primary w-full min-h-[50px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-display font-extrabold text-sm flex items-center justify-center gap-2.5 disabled:opacity-60 cursor-pointer"
+                      className="tactile-key-primary w-full min-h-[50px] px-4 rounded-2xl bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-fg)] font-display font-extrabold text-sm flex items-center justify-center gap-2.5 disabled:opacity-60 cursor-pointer shadow-md"
                     >
                       <span className="w-5 h-5 rounded-full bg-white text-[#111111] font-black text-xs flex items-center justify-center">
                         G
@@ -360,6 +429,10 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                         disabled={authBusy}
                         onClick={() => {
                           haptics.tap();
+                          if (!agreedToTerms) {
+                            setLocalError('Please agree to Terms of Service & Privacy Policy to continue.');
+                            return;
+                          }
                           setLocalError('');
                           setShowEmailForm(true);
                         }}
@@ -369,7 +442,7 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                         <span>Sign in with Email Link</span>
                       </motion.button>
                     ) : (
-                      <div className="rounded-2xl bg-[var(--app-bg)] p-3 space-y-2">
+                      <div className="rounded-2xl bg-[var(--app-bg)] p-3 space-y-2 border border-[var(--glass-border)]">
                         {emailLinkSentTo ? (
                           <div className="text-xs font-bold text-[var(--debit-green)] bg-[var(--debit-tint)] rounded-xl p-2.5 text-center">
                             Sign-in link sent to{' '}
@@ -411,6 +484,11 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                       disabled={authBusy}
                       onClick={() => {
                         haptics.tap();
+                        if (!agreedToTerms) {
+                          setLocalError('Please agree to Terms of Service & Privacy Policy to continue.');
+                          return;
+                        }
+                        setLocalError('');
                         onOpenPhoneSignIn?.();
                       }}
                       className="w-full min-h-[44px] px-3 rounded-xl text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] flex items-center justify-center gap-1.5 transition"
@@ -422,7 +500,7 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                     {combinedError && (
                       <p
                         role="alert"
-                        className="rounded-xl bg-[var(--credit-tint)] px-3 py-2 text-xs font-bold text-[var(--credit-red)]"
+                        className="rounded-xl bg-[var(--credit-tint)] px-3 py-2 text-xs font-bold text-[var(--credit-red)] leading-relaxed"
                       >
                         {combinedError}
                       </p>
@@ -431,19 +509,10 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                 )}
               </div>
 
-              <div className="space-y-1.5 text-center">
+              <div className="space-y-1 text-center">
                 <p className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[var(--ink-muted)]">
                   <ShieldCheck className="w-3.5 h-3.5 text-[var(--debit-green)] shrink-0" />
                   <span>Private and encrypted before sync</span>
-                </p>
-                <p className="text-[11px] font-semibold text-[var(--ink-muted)]">
-                  <Link href="/privacy" className="hover:underline">
-                    Privacy Policy
-                  </Link>
-                  {' · '}
-                  <Link href="/terms" className="hover:underline">
-                    Terms of Service
-                  </Link>
                 </p>
               </div>
             </motion.div>
@@ -592,9 +661,18 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
                 type="button"
                 onClick={() => {
                   haptics.tap();
+                  if (!agreedToTerms) {
+                    setLocalError('Please agree to Terms of Service & Privacy Policy to continue.');
+                    return;
+                  }
+                  setLocalError('');
                   goStep(3);
                 }}
-                className="w-full min-h-[48px] rounded-2xl text-xs font-bold text-[var(--ink-muted)] hover:text-[var(--ink)] transition cursor-pointer"
+                className={`w-full min-h-[48px] rounded-2xl text-xs font-bold transition cursor-pointer ${
+                  agreedToTerms
+                    ? 'text-[var(--ink)] hover:underline'
+                    : 'text-[var(--ink-muted)] opacity-70'
+                }`}
               >
                 Continue Without Account &rarr;
               </button>
@@ -613,6 +691,14 @@ export const PersonaOnboardingSheet: React.FC<PersonaOnboardingSheetProps> = ({
           )}
         </div>
       </div>
+
+      {/* Terms & Privacy Modal from Onboarding Step 2 */}
+      <TermsAndPrivacyModal
+        open={openLegalModal}
+        onClose={() => setOpenLegalModal(false)}
+        initialTab={legalModalTab}
+        onAgreeAndContinue={() => setAgreedToTerms(true)}
+      />
     </div>
   );
 };
